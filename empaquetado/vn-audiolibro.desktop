@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=vn-audiolibro
+GenericName=Audiolibro para novelas visuales
+Comment=Traduce novelas visuales en chino y japonés y las lee en voz alta en español
+Exec=vn-audiolibro
+Icon=vn-audiolibro
+Categories=Game;Utility;
+Terminal=false
+StartupWMClass=vn-audiolibro

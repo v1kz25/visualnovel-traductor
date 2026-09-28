@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  calidad:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - name: Instalar dependencias
+        run: uv sync --locked
+      - name: Fuente CJK (OCR), libpulse (volumen) y bibliotecas de Qt (interfaz)
+        run: >-
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends
+          fonts-noto-cjk libpulse0 libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+      - name: Caché de los modelos de OCR y voz
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/vn-audiolibro/modelos
+          key: modelos-${{ hashFiles('src/vn_audiolibro/ocr/modelos.py', 'src/vn_audiolibro/voz/piper.py') }}
+      - name: Lint (incluye reglas de seguridad y complejidad)
+        run: uv run ruff check
+      - name: Formato
+        run: uv run ruff format --check
+      - name: Tipos
+        run: uv run mypy
+      - name: Tipos del código de Windows
+        run: uv run mypy --platform win32
+      - name: Tests y cobertura (mínimo 80 %)
+        # Xvfb da un servidor X virtual para los tests de captura y ventanas.
+        run: xvfb-run -a uv run pytest
+      - name: Vulnerabilidades en dependencias
+        run: uv run --with pip-audit pip-audit --skip-editable
+
+  windows:
+    # Mientras se completa la versión para Windows (#41), comprueba que las dependencias se
+    # instalan y que los tests pasan; lo que aún solo existe en Linux se salta. La cobertura
+    # mínima, el lint y los tipos se exigen en el job de Linux.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - name: Instalar dependencias
+        run: uv sync --locked
+      - name: Tests
+        # Sin CI=true, los tests que necesitan la fuente CJK se saltan en vez de fallar: en Windows
+        # aún no se instala.
+        env:
+          CI: ""
+        run: uv run pytest --no-cov

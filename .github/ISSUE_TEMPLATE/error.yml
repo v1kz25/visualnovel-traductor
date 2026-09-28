@@ -1,0 +1,58 @@
+name: Error
+description: Algo no funciona como debería.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Gracias por avisar. **No adjuntes capturas, textos ni audio de juegos**: tienen copyright y el
+        repo es público. Si hace falta, describe la escena con tus palabras.
+  - type: textarea
+    id: que-pasa
+    attributes:
+      label: Qué pasa
+      description: Qué esperabas que ocurriera y qué ocurre en realidad.
+    validations:
+      required: true
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Cómo reproducirlo
+      placeholder: |
+        1. Añado un juego en chino tradicional…
+        2. Pulso Jugar…
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versión de vn-audiolibro
+      placeholder: v0.2.0
+    validations:
+      required: true
+  - type: dropdown
+    id: sistema
+    attributes:
+      label: Sistema
+      options:
+        - Linux (AppImage)
+        - Windows (zip portable)
+        - Desde el código (uv run)
+    validations:
+      required: true
+  - type: input
+    id: detalle-sistema
+    attributes:
+      label: Distribución o versión de Windows
+      placeholder: Ubuntu 24.04 con X11 / Windows 11 23H2
+  - type: input
+    id: idioma
+    attributes:
+      label: Idioma del juego
+      placeholder: zh-Hant, zh-Hans o ja
+  - type: textarea
+    id: registro
+    attributes:
+      label: Mensajes de error
+      description: Lo que muestre la app o la terminal (por ejemplo, con `--autocomprobacion`).
+      render: text

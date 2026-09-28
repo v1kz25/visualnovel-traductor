@@ -1,0 +1,21 @@
+name: Propuesta
+description: Una idea para mejorar vn-audiolibro.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: Qué problema resuelve
+      description: Qué te falta o qué te resulta incómodo al usar la app.
+    validations:
+      required: true
+  - type: textarea
+    id: propuesta
+    attributes:
+      label: Qué propones
+    validations:
+      required: true
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Alternativas que has pensado

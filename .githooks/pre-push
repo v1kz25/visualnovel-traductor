@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Bloquea el push directo a main y develop: todo cambio entra por PR.
+# (Sustituye a la protección de ramas, no disponible en repos privados del plan gratuito.)
+while read -r _ _ ref_remota _; do
+  case "$ref_remota" in
+    refs/heads/main|refs/heads/develop)
+      echo "Push directo a ${ref_remota#refs/heads/} bloqueado: abre un PR." >&2
+      exit 1 ;;
+  esac
+done

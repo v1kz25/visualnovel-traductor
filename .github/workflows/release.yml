@@ -1,0 +1,124 @@
+name: Release
+
+# Con un tag vX.Y.Z en main: construye el AppImage y la versión portable de Windows y los publica
+# en GitHub Releases con sus checksums y la atestación de origen. En los PR que tocan el
+# empaquetado solo los construye y comprueba que arrancan, para no descubrir un fallo al publicar.
+on:
+  push:
+    tags: ["v*.*.*"]
+  pull_request:
+    paths:
+      - "empaquetado/**"
+      - ".github/workflows/release.yml"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "src/vn_audiolibro/autocomprobacion.py"
+
+permissions:
+  contents: read
+
+jobs:
+  appimage:
+    # La versión más antigua de Ubuntu que se soporta: el AppImage funciona en las posteriores.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+
+      - name: El tag coincide con la versión de pyproject.toml
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          version="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -1)"
+          test "$GITHUB_REF_NAME" = "v$version" || { echo "Tag $GITHUB_REF_NAME, versión $version"; exit 1; }
+
+      - name: libxcb-cursor, que va dentro del AppImage, y lo que Qt toma del escritorio
+        # libEGL y compañía están en cualquier escritorio, pero no en el runner.
+        run: >-
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends
+          libxcb-cursor0 libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+
+      - name: Construir el AppImage
+        run: empaquetado/construir_appimage.sh build/appimage
+
+      - name: Comprobar que arranca y que no le falta nada
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          appimage="$(ls build/appimage/*.AppImage)"
+          "$appimage" --appimage-extract-and-run --version
+          "$appimage" --appimage-extract-and-run --autocomprobacion
+          "$appimage" --appimage-extract-and-run juegos
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: appimage
+          path: |
+            build/appimage/*.AppImage
+            build/appimage/*.sha256
+          retention-days: 7
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Construir la versión portable
+        run: empaquetado/construir_windows.sh build/windows
+
+      - name: Comprobar que arranca y que no le falta nada
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          consola="$(ls -d build/windows/vn-audiolibro-*-windows-x64)/vn-audiolibro-consola.exe"
+          "$consola" --version
+          "$consola" --autocomprobacion
+          "$consola" juegos
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows
+          path: |
+            build/windows/*.zip
+            build/windows/*.zip.sha256
+          retention-days: 7
+
+  publicar:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [appimage, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: publicar
+          merge-multiple: true
+
+      - name: Atestación de origen
+        # GitHub solo la permite en repos públicos (en los privados de una cuenta personal falla).
+        if: ${{ !github.event.repository.private }}
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            publicar/*.AppImage
+            publicar/*.zip
+
+      - name: Publicar en GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # Notas: la sección de esta versión en el CHANGELOG.
+          awk -v v="$version" '/^## \[/ { dentro = index($0, "[" v "]") > 0; next } dentro' CHANGELOG.md > notas.md
+          test -s notas.md || echo "vn-audiolibro $version." > notas.md
+          cat empaquetado/instalar.md >> notas.md
+          gh release create "$GITHUB_REF_NAME" publicar/* \
+            --title "vn-audiolibro $version" --notes-file notas.md --verify-tag

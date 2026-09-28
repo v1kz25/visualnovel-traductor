@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <rect width="256" height="256" rx="48" fill="#1f3a5f"/>
+  <!-- Libro abierto -->
+  <path d="M40 76 Q84 60 124 80 V196 Q84 176 40 192 Z" fill="#f4f1ea"/>
+  <path d="M216 76 Q172 60 132 80 V196 Q172 176 216 192 Z" fill="#e6e0d2"/>
+  <!-- Ondas de sonido saliendo del libro -->
+  <path d="M150 112 Q164 128 150 144" stroke="#f2a93b" stroke-width="9" fill="none" stroke-linecap="round"/>
+  <path d="M168 98 Q192 128 168 158" stroke="#f2a93b" stroke-width="9" fill="none" stroke-linecap="round"/>
+  <path d="M186 84 Q220 128 186 172" stroke="#f2a93b" stroke-width="9" fill="none" stroke-linecap="round"/>
+  <!-- Líneas de texto -->
+  <path d="M58 104 H106 M58 124 H106 M58 144 H96" stroke="#1f3a5f" stroke-width="6" stroke-linecap="round"/>
+</svg>

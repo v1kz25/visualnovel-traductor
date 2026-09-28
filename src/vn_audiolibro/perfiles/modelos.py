@@ -1,0 +1,142 @@
+"""Perfil de un juego: todo lo que se configura una vez y se reutiliza en cada partida."""
+
+import uuid
+from dataclasses import dataclass, field
+from enum import StrEnum
+
+from vn_audiolibro.captura.mascara import TEXTO_CLARO, TEXTO_OSCURO, ColorTexto
+from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, ZonaRelativa
+from vn_audiolibro.ocr.preprocesado import Orientacion
+from vn_audiolibro.traduccion.modelos import Glosario
+from vn_audiolibro.voz.modelos import PAUSA_ENTRE_LINEAS_S, ModoLectura
+from vn_audiolibro.voz.piper import HABLANTE_POR_DEFECTO, Hablante
+from vn_audiolibro.voz.volumen import NIVEL_POR_DEFECTO, Juego, Seleccion
+
+IDIOMAS = ("zh-Hant", "zh-Hans", "ja")
+"""Idiomas de origen admitidos: chino tradicional, chino simplificado y japonés."""
+
+DESTINOS = ("es", "en")
+"""Idiomas a los que se traduce y en los que se lee: español (por defecto) e inglés."""
+
+LARGO_MAX_NOMBRE = 80
+VELOCIDAD_MIN, VELOCIDAD_MAX = 0.5, 2.0
+
+
+class PerfilInvalidoError(ValueError):
+    """El perfil tiene un valor no válido o su fichero no se puede leer."""
+
+
+class Color(StrEnum):
+    """Color del texto del juego respecto al fondo de la caja de texto."""
+
+    CLARO = "claro"
+    OSCURO = "oscuro"
+
+    @property
+    def color_texto(self) -> ColorTexto:
+        """Ajustes de captura y OCR para este color."""
+        return TEXTO_CLARO if self is Color.CLARO else TEXTO_OSCURO
+
+
+def _nivel_valido(nivel: float, que: str) -> None:
+    if not 0 <= nivel <= 1:
+        raise PerfilInvalidoError(f"El nivel de {que} tiene que estar entre 0 y 1: {nivel}")
+
+
+@dataclass(frozen=True)
+class AjustesVoz:
+    """Voz con la que se lee el juego."""
+
+    hablante: Hablante = HABLANTE_POR_DEFECTO
+    velocidad: float = 1.0
+    """1 es la velocidad normal; 1,25 lee un 25 % más deprisa."""
+
+    def __post_init__(self) -> None:
+        if not VELOCIDAD_MIN <= self.velocidad <= VELOCIDAD_MAX:
+            raise PerfilInvalidoError(
+                f"La velocidad tiene que estar entre {VELOCIDAD_MIN} y {VELOCIDAD_MAX}: {self.velocidad}"
+            )
+
+
+PAUSA_MAX_S = 10.0
+
+
+@dataclass(frozen=True)
+class AjustesLectura:
+    """Cómo se leen las líneas que llegan mientras suena otra."""
+
+    modo: ModoLectura = ModoLectura.COLA
+    pausa_s: float = PAUSA_ENTRE_LINEAS_S
+    """Silencio entre líneas en modo cola."""
+
+    def __post_init__(self) -> None:
+        if not 0 <= self.pausa_s <= PAUSA_MAX_S:
+            raise PerfilInvalidoError(f"La pausa entre líneas tiene que estar entre 0 y {PAUSA_MAX_S} s")
+
+
+@dataclass(frozen=True)
+class AjustesVolumen:
+    """Qué se baja mientras habla la voz y a qué nivel (ver `Seleccion`)."""
+
+    activo: bool = True
+    nivel_juego: float = NIVEL_POR_DEFECTO
+    otras: tuple[tuple[str, float], ...] = ()
+    """Otras aplicaciones con su nivel mientras habla la voz; 0 las silencia."""
+    excluir: tuple[str, ...] = ()
+    """Aplicaciones que no se tocan nunca, aunque parezcan del juego."""
+
+    def __post_init__(self) -> None:
+        _nivel_valido(self.nivel_juego, "juego")
+        for nombre, nivel in self.otras:
+            _nivel_valido(nivel, nombre)
+
+    def seleccion(self, juego: Juego | None) -> Seleccion | None:
+        """Criterio para el atenuador, o None si no hay que bajar nada."""
+        if not self.activo:
+            return None
+        return Seleccion.de_nombres(juego, self.nivel_juego, dict(self.otras), self.excluir)
+
+
+def nuevo_id() -> str:
+    """Identificador de un perfil nuevo."""
+    return uuid.uuid4().hex
+
+
+@dataclass(frozen=True)
+class Perfil:
+    """Configuración de un juego.
+
+    `id` no cambia nunca: es el nombre del fichero y la clave de la caché del juego, así que el
+    `nombre` se puede cambiar sin perder las traducciones ni el audio guardados.
+    """
+
+    nombre: str
+    ventana: str
+    """Texto que aparece en el título de la ventana del juego (sin distinguir mayúsculas)."""
+    idioma: str = IDIOMAS[0]
+    destino: str = DESTINOS[0]
+    """Idioma de la traducción y de la voz. El glosario del juego va en este idioma."""
+    zona: ZonaRelativa = TODA_LA_VENTANA
+    color: Color = Color.CLARO
+    orientacion: Orientacion = Orientacion.HORIZONTAL
+    glosario: Glosario = field(default_factory=Glosario)
+    voz: AjustesVoz = field(default_factory=AjustesVoz)
+    lectura: AjustesLectura = field(default_factory=AjustesLectura)
+    volumen: AjustesVolumen = field(default_factory=AjustesVolumen)
+    id: str = field(default_factory=nuevo_id)
+
+    def __post_init__(self) -> None:
+        if not self.nombre.strip():
+            raise PerfilInvalidoError("El juego necesita un nombre")
+        if len(self.nombre) > LARGO_MAX_NOMBRE:
+            raise PerfilInvalidoError(f"El nombre no puede pasar de {LARGO_MAX_NOMBRE} caracteres")
+        if not self.ventana.strip():
+            raise PerfilInvalidoError("Falta el título de la ventana del juego")
+        if self.idioma not in IDIOMAS:
+            raise PerfilInvalidoError(f"Idioma no admitido: {self.idioma} (admitidos: {', '.join(IDIOMAS)})")
+        if self.destino not in DESTINOS:
+            raise PerfilInvalidoError(
+                f"Idioma de traducción no admitido: {self.destino} (admitidos: {', '.join(DESTINOS)})"
+            )
+        if len(self.id) != 32 or any(c not in "0123456789abcdef" for c in self.id):
+            raise PerfilInvalidoError(f"Identificador de juego no válido: {self.id}")

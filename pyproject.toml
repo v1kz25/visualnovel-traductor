@@ -1,0 +1,79 @@
+[project]
+name = "vn-audiolibro"
+version = "0.2.0"
+description = "Traduce en tiempo real novelas visuales en chino y japonés y las lee en voz alta en español."
+readme = "README.md"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Pablo Viqueira" }
+]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "mss>=10.2.0",
+    "numpy>=2.5.3",
+    "onnxruntime>=1.30.0",
+    "opencc>=1.4.2",
+    "opencv-python-headless>=5.0.0.93",
+    "pillow>=12.3.0",
+    "piper-tts>=1.8.0",
+    "pulsectl>=24.12.0; sys_platform == 'linux'",
+    "pycaw>=20240316 ; sys_platform == 'win32'",
+    "pyside6-essentials>=6.11.2",
+    "python-xlib>=0.33; sys_platform == 'linux'",
+    "rapidocr>=3.9.2",
+    "sounddevice>=0.5 ; sys_platform == 'win32'",
+    "soundfile>=0.14.0",
+]
+
+[project.scripts]
+vn-audiolibro = "vn_audiolibro:main"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.3.1",
+    "pytest>=8",
+    "pytest-cov>=7.1.0",
+    "pytest-qt>=4.5.0",
+    "ruff>=0.6",
+    "types-python-xlib>=0.33.0.20260724; sys_platform == 'linux'",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.18,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "RUF", "S", "C90", "PT", "PTH", "RET"]
+# Puntuación de ancho completo: es la normal en chino y japonés, no una confusión.
+allowed-confusables = ["，", "：", "；", "？", "！", "（", "）", "－", "×"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["vn_audiolibro"]
+mypy_path = "src"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=vn_audiolibro --cov-report=term-missing --cov-fail-under=80"
+
+[[tool.mypy.overrides]]
+# soundfile, pulsectl, sounddevice, pycaw, comtypes y onnxruntime no publican tipos.
+module = ["soundfile", "pulsectl", "sounddevice", "pycaw.*", "comtypes", "onnxruntime"]
+ignore_missing_imports = true
+
+[tool.uv]
+# RapidOCR pide opencv-python, que necesita las bibliotecas gráficas del sistema y trae su propia
+# copia de Qt (choca con la de PySide6). Se sustituye por la versión sin interfaz.
+override-dependencies = ["opencv-python; sys_platform == 'never'"]
