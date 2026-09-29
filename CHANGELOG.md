@@ -4,6 +4,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 
 ## [Sin publicar]
 
+### Añadido
+- **Interfaz en inglés:** la app, sus mensajes y la ayuda de la terminal salen en inglés si el sistema está en inglés (o en cualquier idioma que no sea el español). Se puede cambiar en «Idioma de la app», en la ventana principal. Las órdenes y opciones de la terminal no cambian.
+- Resumen del README en inglés (`README.en.md`).
+
 ## [0.2.0] - 2026-09-28
 
 Versión para Windows y opción de oír la traducción en inglés.

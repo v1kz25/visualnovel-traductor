@@ -11,6 +11,8 @@
 
 # vn-audiolibro
 
+**Español** · [English](README.en.md)
+
 Audiolibro en español, en tiempo real, para novelas visuales en chino y japonés.
 
 ![La app leyendo una escena de una novela visual: a la izquierda, el juego con la zona del texto marcada; a la derecha, cada línea original con su traducción](.github/assets/captura.png)
@@ -72,6 +74,9 @@ en `%LOCALAPPDATA%\vn-audiolibro` y los ajustes en `%APPDATA%\vn-audiolibro`.
 3. **Ajustes**: voz (mujer u hombre) y velocidad, cómo leer cuando avanzas deprisa, volumen del juego
    y de otras aplicaciones, y glosario de nombres propios.
 
+La interfaz está en español y en inglés: sigue el idioma del sistema y se puede cambiar en
+**Idioma de la app**, en la ventana principal.
+
 ## Desarrollo
 
 ```bash
@@ -82,7 +87,11 @@ uv run ruff check
 empaquetado/construir_appimage.sh   # AppImage en build/appimage (necesita libxcb-cursor0)
 empaquetado/construir_windows.sh    # zip portable en build/windows (en Windows, con Git Bash)
 uv run python herramientas/imagenes_readme.py   # regenera el banner y las capturas de .github/assets
+uv run python -m vn_audiolibro.textos en        # pone al día el catálogo en inglés (o crea el de otro idioma)
 ```
+
+Los textos de la interfaz se escriben en español marcados con `_()` y cada idioma tiene su catálogo
+`.po` en `src/vn_audiolibro/textos/`. Un test falla si algún texto marcado no está traducido.
 
 ## Contribuir
 
