@@ -28,6 +28,7 @@ from vn_audiolibro.descargas import (
 )
 from vn_audiolibro.plataforma import sin_ventana
 from vn_audiolibro.rutas import directorio_datos
+from vn_audiolibro.textos import _
 from vn_audiolibro.traduccion.modelos import TraduccionFallidaError
 
 VERSION_LLAMA = "b11165"
@@ -147,7 +148,9 @@ class ClienteLlama:
         try:
             texto: str = respuesta["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as error:
-            raise TraduccionFallidaError(f"Respuesta inesperada de llama-server: {respuesta}") from error
+            raise TraduccionFallidaError(
+                _("Respuesta inesperada de llama-server: {respuesta}").format(respuesta=respuesta)
+            ) from error
         return texto
 
     def completar_por_partes(self, prompt: str, max_tokens: int = 512) -> Generator[str]:
@@ -172,7 +175,9 @@ class ClienteLlama:
                     if trozo:
                         yield trozo
         except (OSError, ValueError) as error:
-            raise TraduccionFallidaError(f"Error al llamar a llama-server en streaming: {error}") from error
+            raise TraduccionFallidaError(
+                _("Error al llamar a llama-server en streaming: {error}").format(error=error)
+            ) from error
 
     def disponible(self) -> bool:
         """Si el servidor ha cargado el modelo y acepta peticiones."""
@@ -190,7 +195,9 @@ class ClienteLlama:
                 datos: dict[str, Any] = json.load(respuesta)
                 return datos
         except (OSError, ValueError) as error:
-            raise TraduccionFallidaError(f"Error al llamar a llama-server ({ruta}): {error}") from error
+            raise TraduccionFallidaError(
+                _("Error al llamar a llama-server ({ruta}): {error}").format(ruta=ruta, error=error)
+            ) from error
 
 
 def _trozo_sse(linea: bytes) -> str:
@@ -201,7 +208,9 @@ def _trozo_sse(linea: bytes) -> str:
     try:
         trozo = json.loads(datos[len("data: ") :])["choices"][0]["delta"].get("content")
     except (KeyError, IndexError, TypeError, AttributeError) as error:
-        raise TraduccionFallidaError(f"Evento inesperado de llama-server: {datos}") from error
+        raise TraduccionFallidaError(
+            _("Evento inesperado de llama-server: {datos}").format(datos=datos)
+        ) from error
     return trozo if isinstance(trozo, str) else ""
 
 
@@ -258,7 +267,9 @@ class ServidorLlama:
         while not cliente.disponible():
             if self._proceso.poll() is not None or time.monotonic() > limite:
                 self.detener()
-                raise TraduccionFallidaError(f"llama-server no arrancó; detalles en {self.registro}")
+                raise TraduccionFallidaError(
+                    _("llama-server no arrancó; detalles en {registro}").format(registro=self.registro)
+                )
             time.sleep(0.2)
         self.cliente = cliente
         return cliente

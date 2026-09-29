@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from vn_audiolibro.rutas import directorio_config
+from vn_audiolibro.textos import _, decimal
 
 _registro = logging.getLogger(__name__)
 
@@ -20,10 +21,14 @@ class AjustesApp:
 
     limite_cache_mb: int | None = LIMITE_CACHE_MB
     """Tamaño máximo de la caché en MB, o None para no limitarla."""
+    idioma: str | None = None
+    """Idioma de la interfaz elegido en la app, o None para usar el del sistema."""
 
     def __post_init__(self) -> None:
         if self.limite_cache_mb is not None and self.limite_cache_mb < LIMITE_MIN_MB:
-            raise ValueError(f"El límite de la caché tiene que ser de al menos {LIMITE_MIN_MB} MB")
+            raise ValueError(
+                _("El límite de la caché tiene que ser de al menos {minimo} MB").format(minimo=LIMITE_MIN_MB)
+            )
 
     @property
     def limite_cache_bytes(self) -> int | None:
@@ -42,7 +47,10 @@ def cargar_ajustes(ruta: Path | None = None) -> AjustesApp:
         limite = datos.get("limite_cache_mb", LIMITE_CACHE_MB)
         if limite is not None and (isinstance(limite, bool) or not isinstance(limite, int)):
             raise TypeError(f"límite no válido: {limite!r}")
-        return AjustesApp(limite_cache_mb=limite)
+        idioma = datos.get("idioma")
+        if idioma is not None and not isinstance(idioma, str):
+            raise TypeError(f"idioma no válido: {idioma!r}")
+        return AjustesApp(limite_cache_mb=limite, idioma=idioma)
     except FileNotFoundError:
         return AjustesApp()
     except (OSError, ValueError, TypeError, AttributeError):
@@ -54,14 +62,14 @@ def guardar_ajustes(ajustes: AjustesApp, ruta: Path | None = None) -> None:
     ruta = ruta or fichero_ajustes()
     ruta.parent.mkdir(parents=True, exist_ok=True)
     temporal = ruta.with_name(ruta.name + ".parcial")
-    datos = {"limite_cache_mb": ajustes.limite_cache_mb}
+    datos = {"limite_cache_mb": ajustes.limite_cache_mb, "idioma": ajustes.idioma}
     temporal.write_text(json.dumps(datos, indent=2) + "\n", encoding="utf-8")
     temporal.replace(ruta)
 
 
 def formato_tamano(bytes_: int) -> str:
-    """Tamaño legible en español: «225 KB», «1,2 MB», «2,0 GB»."""
+    """Tamaño legible con el separador decimal del idioma: «225 KB», «1,2 MB», «2,0 GB»."""
     for unidad, factor in (("GB", 1024**3), ("MB", 1024**2)):
         if bytes_ >= factor:
-            return f"{bytes_ / factor:.1f} {unidad}".replace(".", ",")
+            return f"{decimal(bytes_ / factor, 1)} {unidad}"
     return f"{round(bytes_ / 1024)} KB"

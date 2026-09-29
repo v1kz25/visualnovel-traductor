@@ -211,7 +211,7 @@ def test_juego_en_ingles_prueba_la_voz_inglesa_y_pide_el_glosario_en_ingles(
     with qtbot.waitSignal(dialogo.prueba_terminada, timeout=ESPERA_MS):
         dialogo.probar()
     assert probadas == ["en"]
-    assert any("traducción en inglés" in etiqueta.text() for etiqueta in dialogo.findChildren(QLabel))
+    assert any("(Inglés)" in etiqueta.text() for etiqueta in dialogo.findChildren(QLabel))
 
 
 def test_escuchar_la_voz_con_error(qtbot: QtBot, almacen: AlmacenPerfiles) -> None:

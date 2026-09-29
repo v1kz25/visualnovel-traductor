@@ -6,7 +6,7 @@ from PySide6.QtCore import QCoreApplication, QLibraryInfo, QTranslator
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import QApplication
 
-from vn_audiolibro import preparacion
+from vn_audiolibro import preparacion, textos
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
 from vn_audiolibro.rutas import APP
 from vn_audiolibro.ui.acceso import icono_svg, ofrecer_acceso_windows
@@ -21,14 +21,14 @@ def icono() -> QIcon:
 
 
 def instalar_traduccion(app: QCoreApplication) -> QTranslator | None:
-    """Pone en español los textos propios de Qt (Guardar, Cancelar, Sí, No…).
+    """Pone en el idioma de la app los textos propios de Qt (Guardar, Cancelar, Sí, No…).
 
     Devuelve el traductor, que hay que conservar mientras viva la aplicación, o None si Qt no
     trae la traducción.
     """
     traductor = QTranslator(app)
     carpeta = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
-    if not traductor.load("qtbase_es", carpeta):
+    if not traductor.load(f"qtbase_{textos.activo()}", carpeta):
         return None
     app.installTranslator(traductor)
     return traductor

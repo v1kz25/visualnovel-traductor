@@ -8,6 +8,7 @@ from pathlib import Path
 from piper import PiperVoice, SynthesisConfig
 
 from vn_audiolibro.descargas import Cancelado, Descarga, Progreso, asegurar_descarga
+from vn_audiolibro.textos import _
 from vn_audiolibro.voz.modelos import Fragmento, VozFallidaError
 
 _VOCES = "https://huggingface.co/rhasspy/piper-voices/resolve/c10ece1aade47bb51c153c893d14e5bf8e5b7117"
@@ -126,11 +127,15 @@ class SintetizadorPiper:
     ) -> None:
         """`velocidad` 1 es la de la voz; 1,25 lee un 25 % más deprisa."""
         if velocidad <= 0:
-            raise VozFallidaError(f"Velocidad no válida: {velocidad}")
+            raise VozFallidaError(_("Velocidad no válida: {velocidad}").format(velocidad=velocidad))
         self._voz = PiperVoice.load(modelo)
         hablantes = self._voz.config.speaker_id_map or {}
         if hablante is not None and hablante not in hablantes:
-            raise VozFallidaError(f"La voz {modelo.stem} no tiene el hablante {hablante.name.lower()}")
+            raise VozFallidaError(
+                _("La voz {voz} no tiene el hablante {hablante}").format(
+                    voz=modelo.stem, hablante=hablante.name.lower()
+                )
+            )
         self._ajustes = SynthesisConfig(
             speaker_id=hablantes[hablante] if hablante is not None else None,
             # Piper alarga los fonemas con `length_scale`: más velocidad, menos duración.

@@ -21,6 +21,7 @@ from vn_audiolibro.perfiles.modelos import (
     nuevo_id,
 )
 from vn_audiolibro.rutas import directorio_config
+from vn_audiolibro.textos import _
 from vn_audiolibro.traduccion.modelos import Glosario
 from vn_audiolibro.voz.modelos import ModoLectura
 from vn_audiolibro.voz.piper import Hablante
@@ -68,9 +69,9 @@ def desde_dict(datos: Mapping[str, Any]) -> Perfil:
     """Perfil a partir de datos JSON. Los campos que falten toman su valor por defecto."""
     version = datos.get("version")
     if not isinstance(version, int) or version < 1:
-        raise PerfilInvalidoError(f"Versión de formato no válida: {version!r}")
+        raise PerfilInvalidoError(_("Versión de formato no válida: {version!r}").format(version=version))
     if version > VERSION_FORMATO:
-        raise PerfilInvalidoError("Este juego se guardó con una versión más nueva de la app: actualízala")
+        raise PerfilInvalidoError(_("Este juego se guardó con una versión más nueva de la app: actualízala"))
     try:
         return Perfil(
             nombre=_texto(datos, "nombre"),
@@ -90,19 +91,21 @@ def desde_dict(datos: Mapping[str, Any]) -> Perfil:
     except (KeyError, TypeError, ValueError, AttributeError) as error:
         if isinstance(error, PerfilInvalidoError):
             raise
-        raise PerfilInvalidoError(f"Juego guardado con un valor no válido: {error}") from error
+        raise PerfilInvalidoError(
+            _("Juego guardado con un valor no válido: {error}").format(error=error)
+        ) from error
 
 
 def _texto(datos: Mapping[str, Any], clave: str) -> str:
     valor = datos.get(clave)
     if not isinstance(valor, str):
-        raise PerfilInvalidoError(f"Falta «{clave}» o no es un texto")
+        raise PerfilInvalidoError(_("Falta «{clave}» o no es un texto").format(clave=clave))
     return valor
 
 
 def _numero(valor: Any) -> float:
     if isinstance(valor, bool) or not isinstance(valor, int | float):
-        raise TypeError(f"se esperaba un número: {valor!r}")
+        raise TypeError(_("se esperaba un número: {valor!r}").format(valor=valor))
     return float(valor)
 
 
@@ -114,7 +117,7 @@ def _zona(datos: Mapping[str, Any]) -> ZonaRelativa:
 
 def _glosario(datos: Mapping[str, Any]) -> Glosario:
     if not all(isinstance(t, str) and isinstance(d, str) for t, d in datos.items()):
-        raise TypeError("el glosario tiene que ser de textos")
+        raise TypeError(_("el glosario tiene que ser de textos"))
     return Glosario.desde_dict(dict(datos))
 
 
@@ -137,11 +140,11 @@ def _volumen(datos: Mapping[str, Any]) -> AjustesVolumen:
     por_defecto = AjustesVolumen()
     activo = datos.get("activo", por_defecto.activo)
     if not isinstance(activo, bool):
-        raise TypeError(f"«activo» tiene que ser verdadero o falso: {activo!r}")
+        raise TypeError(_("«activo» tiene que ser verdadero o falso: {activo!r}").format(activo=activo))
     otras = datos.get("otras", {})
     excluir = datos.get("excluir", [])
     if not all(isinstance(nombre, str) for nombre in [*otras, *excluir]):
-        raise TypeError("los nombres de las aplicaciones tienen que ser textos")
+        raise TypeError(_("los nombres de las aplicaciones tienen que ser textos"))
     return AjustesVolumen(
         activo=activo,
         nivel_juego=_numero(datos.get("nivel_juego", por_defecto.nivel_juego)),
@@ -170,7 +173,9 @@ class AlmacenPerfiles:
         """Perfil con ese identificador."""
         ruta = self._ruta(id_perfil)
         if not ruta.is_file():
-            raise KeyError(f"No hay ningún juego con el identificador {id_perfil}")
+            raise KeyError(
+                _("No hay ningún juego con el identificador {id_perfil}").format(id_perfil=id_perfil)
+            )
         return self._leer(ruta)
 
     def buscar(self, texto: str) -> Perfil:
@@ -179,14 +184,14 @@ class AlmacenPerfiles:
         for perfil in self.listar():
             if buscado in (perfil.nombre.casefold().strip(), perfil.id):
                 return perfil
-        raise KeyError(f"No hay ningún juego llamado «{texto}»")
+        raise KeyError(_("No hay ningún juego llamado «{texto}»").format(texto=texto))
 
     def guardar(self, perfil: Perfil) -> Path:
         """Guarda el perfil, nuevo o modificado. El nombre no puede repetirse con otro perfil."""
         nombre = perfil.nombre.casefold().strip()
         for otro in self.listar():
             if otro.id != perfil.id and otro.nombre.casefold().strip() == nombre:
-                raise PerfilDuplicadoError(f"Ya hay un juego llamado «{otro.nombre}»")
+                raise PerfilDuplicadoError(_("Ya hay un juego llamado «{nombre}»").format(nombre=otro.nombre))
         self.directorio.mkdir(parents=True, exist_ok=True)
         ruta = self._ruta(perfil.id)
         temporal = ruta.with_name(ruta.name + ".parcial")
@@ -201,17 +206,21 @@ class AlmacenPerfiles:
     def _ruta(self, id_perfil: str) -> Path:
         # El id se valida al crear el perfil; aquí se evita que un id externo salga de la carpeta.
         if not id_perfil.isalnum():
-            raise KeyError(f"Identificador de juego no válido: {id_perfil}")
+            raise KeyError(_("Identificador de juego no válido: {id_perfil}").format(id_perfil=id_perfil))
         return self.directorio / f"{id_perfil}.json"
 
     def _leer(self, ruta: Path) -> Perfil:
         try:
             datos = json.loads(ruta.read_text(encoding="utf-8"))
         except (OSError, ValueError) as error:
-            raise PerfilInvalidoError(f"No se pudo leer {ruta.name}: {error}") from error
+            raise PerfilInvalidoError(
+                _("No se pudo leer {fichero}: {error}").format(fichero=ruta.name, error=error)
+            ) from error
         if not isinstance(datos, dict):
-            raise PerfilInvalidoError(f"{ruta.name} no contiene un juego")
+            raise PerfilInvalidoError(_("{fichero} no contiene un juego").format(fichero=ruta.name))
         perfil = desde_dict(datos)
         if perfil.id != ruta.stem:
-            raise PerfilInvalidoError(f"{ruta.name} contiene el juego {perfil.id}")
+            raise PerfilInvalidoError(
+                _("{fichero} contiene el juego {id}").format(fichero=ruta.name, id=perfil.id)
+            )
         return perfil

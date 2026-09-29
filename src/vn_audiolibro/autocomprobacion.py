@@ -95,6 +95,15 @@ def _qt() -> str:
     return str(version_qt)
 
 
+def _textos() -> str:
+    from vn_audiolibro import textos
+
+    idiomas = textos.disponibles()
+    if "en" not in idiomas or textos.catalogo("en").gettext("Jugar") != "Play":
+        raise RuntimeError(f"faltan los catálogos de idiomas: {idiomas}")
+    return ", ".join(idiomas)
+
+
 def comprobaciones(plataforma: str = sys.platform) -> list[Comprobacion]:
     """Lo que se comprueba en este sistema."""
     lista: list[Comprobacion] = [
@@ -106,6 +115,7 @@ def comprobaciones(plataforma: str = sys.platform) -> list[Comprobacion]:
         ("piper y espeak-ng", _piper),
         ("libsndfile", _soundfile),
         ("Qt e icono", _qt),
+        ("idiomas de la interfaz", _textos),
     ]
     if plataforma == "win32":
         lista += [("PortAudio", _sounddevice), ("Core Audio", _pycaw)]

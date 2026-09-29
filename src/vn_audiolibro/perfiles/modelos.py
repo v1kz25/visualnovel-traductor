@@ -7,6 +7,7 @@ from enum import StrEnum
 from vn_audiolibro.captura.mascara import TEXTO_CLARO, TEXTO_OSCURO, ColorTexto
 from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, ZonaRelativa
 from vn_audiolibro.ocr.preprocesado import Orientacion
+from vn_audiolibro.textos import _
 from vn_audiolibro.traduccion.modelos import Glosario
 from vn_audiolibro.voz.modelos import PAUSA_ENTRE_LINEAS_S, ModoLectura
 from vn_audiolibro.voz.piper import HABLANTE_POR_DEFECTO, Hablante
@@ -40,7 +41,9 @@ class Color(StrEnum):
 
 def _nivel_valido(nivel: float, que: str) -> None:
     if not 0 <= nivel <= 1:
-        raise PerfilInvalidoError(f"El nivel de {que} tiene que estar entre 0 y 1: {nivel}")
+        raise PerfilInvalidoError(
+            _("El nivel de {que} tiene que estar entre 0 y 1: {nivel}").format(que=que, nivel=nivel)
+        )
 
 
 @dataclass(frozen=True)
@@ -54,7 +57,9 @@ class AjustesVoz:
     def __post_init__(self) -> None:
         if not VELOCIDAD_MIN <= self.velocidad <= VELOCIDAD_MAX:
             raise PerfilInvalidoError(
-                f"La velocidad tiene que estar entre {VELOCIDAD_MIN} y {VELOCIDAD_MAX}: {self.velocidad}"
+                _("La velocidad tiene que estar entre {minima} y {maxima}: {velocidad}").format(
+                    minima=VELOCIDAD_MIN, maxima=VELOCIDAD_MAX, velocidad=self.velocidad
+                )
             )
 
 
@@ -71,7 +76,9 @@ class AjustesLectura:
 
     def __post_init__(self) -> None:
         if not 0 <= self.pausa_s <= PAUSA_MAX_S:
-            raise PerfilInvalidoError(f"La pausa entre líneas tiene que estar entre 0 y {PAUSA_MAX_S} s")
+            raise PerfilInvalidoError(
+                _("La pausa entre líneas tiene que estar entre 0 y {maximo} s").format(maximo=PAUSA_MAX_S)
+            )
 
 
 @dataclass(frozen=True)
@@ -86,7 +93,7 @@ class AjustesVolumen:
     """Aplicaciones que no se tocan nunca, aunque parezcan del juego."""
 
     def __post_init__(self) -> None:
-        _nivel_valido(self.nivel_juego, "juego")
+        _nivel_valido(self.nivel_juego, _("juego"))
         for nombre, nivel in self.otras:
             _nivel_valido(nivel, nombre)
 
@@ -127,16 +134,24 @@ class Perfil:
 
     def __post_init__(self) -> None:
         if not self.nombre.strip():
-            raise PerfilInvalidoError("El juego necesita un nombre")
+            raise PerfilInvalidoError(_("El juego necesita un nombre"))
         if len(self.nombre) > LARGO_MAX_NOMBRE:
-            raise PerfilInvalidoError(f"El nombre no puede pasar de {LARGO_MAX_NOMBRE} caracteres")
+            raise PerfilInvalidoError(
+                _("El nombre no puede pasar de {maximo} caracteres").format(maximo=LARGO_MAX_NOMBRE)
+            )
         if not self.ventana.strip():
-            raise PerfilInvalidoError("Falta el título de la ventana del juego")
+            raise PerfilInvalidoError(_("Falta el título de la ventana del juego"))
         if self.idioma not in IDIOMAS:
-            raise PerfilInvalidoError(f"Idioma no admitido: {self.idioma} (admitidos: {', '.join(IDIOMAS)})")
+            raise PerfilInvalidoError(
+                _("Idioma no admitido: {idioma} (admitidos: {admitidos})").format(
+                    idioma=self.idioma, admitidos=", ".join(IDIOMAS)
+                )
+            )
         if self.destino not in DESTINOS:
             raise PerfilInvalidoError(
-                f"Idioma de traducción no admitido: {self.destino} (admitidos: {', '.join(DESTINOS)})"
+                _("Idioma de traducción no admitido: {destino} (admitidos: {admitidos})").format(
+                    destino=self.destino, admitidos=", ".join(DESTINOS)
+                )
             )
         if len(self.id) != 32 or any(c not in "0123456789abcdef" for c in self.id):
-            raise PerfilInvalidoError(f"Identificador de juego no válido: {self.id}")
+            raise PerfilInvalidoError(_("Identificador de juego no válido: {id}").format(id=self.id))

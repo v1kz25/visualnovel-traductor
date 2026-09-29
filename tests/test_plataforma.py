@@ -12,6 +12,8 @@ from vn_audiolibro.captura.modelos import Rectangulo
 from vn_audiolibro.voz.portaudio import ReproductorPortAudio
 from vn_audiolibro.voz.volumen import Juego
 
+IDIOMAS_SISTEMA = plataforma.idiomas_sistema
+"""La de verdad: en los tests, `plataforma.idiomas_sistema` se sustituye por el español."""
 VENTANAS = SimpleNamespace(geometria=lambda _: Rectangulo(0, 0, 10, 10))
 
 
@@ -88,3 +90,27 @@ def test_en_otros_sistemas_no_hay_ventanas(monkeypatch: pytest.MonkeyPatch) -> N
         plataforma.reproductor()
     with pytest.raises(plataforma.PlataformaNoCompatibleError, match="darwin"):
         plataforma.cliente_audio()
+
+
+@pytest.mark.parametrize(
+    ("entorno", "esperado"),
+    [
+        ({"LANGUAGE": "en_GB:en", "LANG": "es_ES.UTF-8"}, ["en_GB", "en", "es_ES.UTF-8"]),
+        ({"LC_ALL": "C", "LC_MESSAGES": "fr_FR.UTF-8", "LANG": "POSIX"}, ["fr_FR.UTF-8"]),
+        ({}, []),
+    ],
+)
+def test_idiomas_del_sistema_en_linux(entorno: dict[str, str], esperado: list[str]) -> None:
+    assert IDIOMAS_SISTEMA(entorno) == esperado
+
+
+def test_idiomas_del_sistema_en_windows(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Sale del idioma de la interfaz de Windows; si no se puede leer, no hay ninguno."""
+    import ctypes
+
+    kernel32 = SimpleNamespace(GetUserDefaultUILanguage=lambda: 0x0C0A)  # español de España
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(ctypes, "windll", SimpleNamespace(kernel32=kernel32), raising=False)
+    assert IDIOMAS_SISTEMA() == ["es_ES"]
+    monkeypatch.delattr(ctypes, "windll")
+    assert IDIOMAS_SISTEMA() == []

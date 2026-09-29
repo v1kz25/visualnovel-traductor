@@ -1,0 +1,811 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: en\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Jugar"
+msgstr "Play"
+
+msgid "No hay traducción guardada para «{texto}»"
+msgstr "No saved translation for “{texto}”"
+
+msgid "No hay ninguna ventana con «{texto}» en el título"
+msgstr "No window has “{texto}” in its title"
+
+msgid "La ventana {id_ventana:#x} ya no existe"
+msgstr "Window {id_ventana:#x} no longer exists"
+
+msgid "La ventana {id_ventana:#x} está minimizada"
+msgstr "Window {id_ventana:#x} is minimized"
+
+msgid "Windows no da el contenido de la ventana {id_ventana:#x}"
+msgstr "Windows does not provide the contents of window {id_ventana:#x}"
+
+msgid "El servidor X no tiene la extensión Composite"
+msgstr "The X server does not have the Composite extension"
+
+msgid "Controles (escribe y pulsa Intro): p pausa/reanuda · r repite · s calla · q sale"
+msgstr "Controls (type and press Enter): p pause/resume · r repeat · s skip · q quit"
+
+msgid "zona no válida (x,y,ancho,alto entre 0 y 1): {zona}"
+msgstr "invalid area (x,y,width,height between 0 and 1): {zona}"
+
+msgid "Audiolibro en tiempo real para novelas visuales en chino y japonés."
+msgstr "Real-time audiobook for Chinese and Japanese visual novels."
+
+msgid "comprueba el sistema y descarga lo que falte para usar la app"
+msgstr "check the system and download whatever the app still needs"
+
+msgid "lista los juegos configurados"
+msgstr "list the configured games"
+
+msgid "configura un juego nuevo"
+msgstr "set up a new game"
+
+msgid "nombre"
+msgstr "name"
+
+msgid "cómo se llamará el juego en la lista"
+msgstr "name of the game in the list"
+
+msgid "TÍTULO"
+msgstr "TITLE"
+
+msgid "texto del título de la ventana del juego"
+msgstr "text from the title of the game window"
+
+msgid "ZONA"
+msgstr "AREA"
+
+msgid "x,y,ancho,alto entre 0 y 1"
+msgstr "x,y,width,height between 0 and 1"
+
+msgid "idioma del juego"
+msgstr "language of the game"
+
+msgid "idioma de la traducción y de la voz"
+msgstr "language of the translation and the voice"
+
+msgid "el texto es oscuro sobre fondo claro"
+msgstr "the text is dark on a light background"
+
+msgid "el texto va en columnas verticales"
+msgstr "the text runs in vertical columns"
+
+msgid "voz de hombre (por defecto, de mujer)"
+msgstr "male voice (female by default)"
+
+msgid "VELOCIDAD"
+msgstr "SPEED"
+
+msgid "velocidad de la voz (1 = normal)"
+msgstr "voice speed (1 = normal)"
+
+msgid "NIVEL"
+msgstr "LEVEL"
+
+msgid "volumen del juego"
+msgstr "game volume"
+
+msgid "no bajar el juego mientras habla"
+msgstr "do not lower the game while the voice speaks"
+
+msgid "al avanzar deprisa, cortar la línea que suena y leer solo la última (por defecto, en cola)"
+msgstr "when skipping ahead quickly, cut off the current line and read only the latest one (queued by default)"
+
+msgid "SEGUNDOS"
+msgstr "SECONDS"
+
+msgid "segundos de silencio entre líneas"
+msgstr "seconds of silence between lines"
+
+msgid "muestra lo que ocupa la caché; permite vaciarla o limitarla"
+msgstr "show how much space the cache uses; clear or limit it"
+
+msgid "JUEGO"
+msgstr "GAME"
+
+msgid "vacía la caché de un juego"
+msgstr "clear the cache of one game"
+
+msgid "vacía la caché de todos los juegos"
+msgstr "clear the cache of all games"
+
+msgid "tamaño máximo de la caché"
+msgstr "maximum cache size"
+
+msgid "no limitar el tamaño de la caché"
+msgstr "do not limit the cache size"
+
+msgid "añade vn-audiolibro al menú de aplicaciones (en Windows, al menú Inicio)"
+msgstr "add vn-audiolibro to the applications menu (the Start menu on Windows)"
+
+msgid "juega con un juego configurado"
+msgstr "play a configured game"
+
+msgid "juego"
+msgstr "game"
+
+msgid "nombre del juego"
+msgstr "name of the game"
+
+msgid "muestra cuánto tarda cada etapa de cada línea"
+msgstr "show how long each stage takes for each line"
+
+msgid "{orden} crear \"Mi juego\" --ventana \"título\""
+msgstr "{orden} crear \"My game\" --ventana \"title\""
+
+msgid "No hay juegos. Configura uno con: {orden}"
+msgstr "No games yet. Set one up with: {orden}"
+
+msgid "{nombre}  (ventana «{ventana}», {idioma} → {destino}, id {id})"
+msgstr "{nombre}  (window “{ventana}”, {idioma} → {destino}, id {id})"
+
+msgid "Acceso directo creado en {ruta}"
+msgstr "Shortcut created at {ruta}"
+
+msgid "Aviso: "
+msgstr "Note: "
+
+msgid "Todos los componentes están descargados."
+msgstr "All components are downloaded."
+
+msgid "Descargando {componente} ({tamano}, {licencia})…"
+msgstr "Downloading {componente} ({tamano}, {licencia})…"
+
+msgid "Todo listo."
+msgstr "All set."
+
+msgid "Vaciada la caché de «{nombre}»: {n} línea"
+msgid_plural "Vaciada la caché de «{nombre}»: {n} líneas"
+msgstr[0] "Cleared the cache of “{nombre}”: {n} line"
+msgstr[1] "Cleared the cache of “{nombre}”: {n} lines"
+
+msgid "Vaciada la caché: {n} línea"
+msgid_plural "Vaciada la caché: {n} líneas"
+msgstr[0] "Cleared the cache: {n} line"
+msgstr[1] "Cleared the cache: {n} lines"
+
+msgid "(juego borrado)"
+msgstr "(deleted game)"
+
+msgid "{nombre}: {n} línea, {tamano}"
+msgid_plural "{nombre}: {n} líneas, {tamano}"
+msgstr[0] "{nombre}: {n} line, {tamano}"
+msgstr[1] "{nombre}: {n} lines, {tamano}"
+
+msgid "vacía"
+msgstr "empty"
+
+msgid "sin límite"
+msgstr "no limit"
+
+msgid "máximo {limite} MB"
+msgstr "maximum {limite} MB"
+
+msgid "Total: {total} ({limite})"
+msgstr "Total: {total} ({limite})"
+
+msgid "Juego «{nombre}» guardado en {ruta}"
+msgstr "Game “{nombre}” saved to {ruta}"
+
+msgid " (no leída: llegó otra línea)"
+msgstr " (not read: another line arrived)"
+
+msgid "no se leyó"
+msgstr "not read"
+
+msgid "  OCR {ocr:.2f} s · traducción {traduccion:.2f} s · hasta la voz {voz}"
+msgstr "  OCR {ocr:.2f} s · translation {traduccion:.2f} s · until the voice {voz}"
+
+msgid "▶ Reanudado"
+msgstr "▶ Resumed"
+
+msgid "⏸ En pausa (p para seguir)"
+msgstr "⏸ Paused (p to resume)"
+
+msgid "El límite de la caché tiene que ser de al menos {minimo} MB"
+msgstr "The cache limit must be at least {minimo} MB"
+
+msgid "Solo se descarga por HTTPS: {url}"
+msgstr "Downloads are only allowed over HTTPS: {url}"
+
+msgid "Descarga cancelada: {fichero}"
+msgstr "Download cancelled: {fichero}"
+
+msgid "SHA-256 inesperado en {fichero}: {obtenido} (se esperaba {esperado})"
+msgstr "Unexpected SHA-256 for {fichero}: {obtenido} (expected {esperado})"
+
+msgid "No se pudo descargar {fichero}: {error}"
+msgstr "Could not download {fichero}: {error}"
+
+msgid "No se pudo extraer {fichero}: {error}"
+msgstr "Could not extract {fichero}: {error}"
+
+msgid "No se pudo extraer {fichero}: {entrada} sale del destino"
+msgstr "Could not extract {fichero}: {entrada} points outside the destination"
+
+msgid "Versión de formato no válida: {version!r}"
+msgstr "Invalid format version: {version!r}"
+
+msgid "Este juego se guardó con una versión más nueva de la app: actualízala"
+msgstr "This game was saved with a newer version of the app: please update it"
+
+msgid "Juego guardado con un valor no válido: {error}"
+msgstr "The saved game has an invalid value: {error}"
+
+msgid "Falta «{clave}» o no es un texto"
+msgstr "“{clave}” is missing or is not text"
+
+msgid "se esperaba un número: {valor!r}"
+msgstr "a number was expected: {valor!r}"
+
+msgid "el glosario tiene que ser de textos"
+msgstr "the glossary must contain text"
+
+msgid "«activo» tiene que ser verdadero o falso: {activo!r}"
+msgstr "“activo” must be true or false: {activo!r}"
+
+msgid "los nombres de las aplicaciones tienen que ser textos"
+msgstr "application names must be text"
+
+msgid "No hay ningún juego con el identificador {id_perfil}"
+msgstr "There is no game with the identifier {id_perfil}"
+
+msgid "No hay ningún juego llamado «{texto}»"
+msgstr "There is no game called “{texto}”"
+
+msgid "Ya hay un juego llamado «{nombre}»"
+msgstr "There is already a game called “{nombre}”"
+
+msgid "Identificador de juego no válido: {id_perfil}"
+msgstr "Invalid game identifier: {id_perfil}"
+
+msgid "No se pudo leer {fichero}: {error}"
+msgstr "Could not read {fichero}: {error}"
+
+msgid "{fichero} no contiene un juego"
+msgstr "{fichero} does not contain a game"
+
+msgid "{fichero} contiene el juego {id}"
+msgstr "{fichero} contains game {id}"
+
+msgid "El nivel de {que} tiene que estar entre 0 y 1: {nivel}"
+msgstr "The level for {que} must be between 0 and 1: {nivel}"
+
+msgid "La velocidad tiene que estar entre {minima} y {maxima}: {velocidad}"
+msgstr "The speed must be between {minima} and {maxima}: {velocidad}"
+
+msgid "La pausa entre líneas tiene que estar entre 0 y {maximo} s"
+msgstr "The pause between lines must be between 0 and {maximo} s"
+
+msgid "El juego necesita un nombre"
+msgstr "The game needs a name"
+
+msgid "El nombre no puede pasar de {maximo} caracteres"
+msgstr "The name cannot be longer than {maximo} characters"
+
+msgid "Falta el título de la ventana del juego"
+msgstr "The title of the game window is missing"
+
+msgid "Idioma no admitido: {idioma} (admitidos: {admitidos})"
+msgstr "Unsupported language: {idioma} (supported: {admitidos})"
+
+msgid "Idioma de traducción no admitido: {destino} (admitidos: {admitidos})"
+msgstr "Unsupported translation language: {destino} (supported: {admitidos})"
+
+msgid "Identificador de juego no válido: {id}"
+msgstr "Invalid game identifier: {id}"
+
+msgid "Error al procesar la línea: {error}"
+msgstr "Error while processing the line: {error}"
+
+msgid "No se pudo traducir la línea: {error}"
+msgstr "Could not translate the line: {error}"
+
+msgid "Buscando la ventana «{ventana}»…"
+msgstr "Looking for the window “{ventana}”…"
+
+msgid "Preparando los modelos (la primera vez se descargan)…"
+msgstr "Preparing the models (they are downloaded the first time)…"
+
+msgid "Arrancando el traductor…"
+msgstr "Starting the translator…"
+
+msgid "Calentando el traductor…"
+msgstr "Warming up the translator…"
+
+msgid "Leyendo «{ventana}»."
+msgstr "Reading “{ventana}”."
+
+msgid "No se podrá bajar el volumen del juego: {error}"
+msgstr "The game volume cannot be lowered: {error}"
+
+msgid "{que} todavía no está disponible en este sistema ({sistema})"
+msgstr "{que} is not available on this system yet ({sistema})"
+
+msgid "El listado de ventanas"
+msgstr "Listing windows"
+
+msgid "La captura de ventanas"
+msgstr "Window capture"
+
+msgid "La reproducción de audio"
+msgstr "Audio playback"
+
+msgid "El acceso directo en el menú"
+msgstr "The menu shortcut"
+
+msgid "El control del volumen"
+msgstr "Volume control"
+
+msgid "vn-audiolibro no incluye ningún juego ni textos de juegos. Las traducciones y el audio que genera se guardan solo en tu equipo y no se comparten con nadie."
+msgstr "vn-audiolibro does not include any games or game text. The translations and audio it creates are stored only on your computer and are never shared."
+
+msgid "Reconocimiento de texto (PP-OCRv5)"
+msgstr "Text recognition (PP-OCRv5)"
+
+msgid "Lee el texto chino o japonés de la pantalla"
+msgstr "Reads the Chinese or Japanese text on screen"
+
+msgid "Servidor de traducción (llama.cpp)"
+msgstr "Translation server (llama.cpp)"
+
+msgid "Ejecuta el modelo de traducción en tu equipo"
+msgstr "Runs the translation model on your computer"
+
+msgid "Voz en español (Piper, sharvard)"
+msgstr "Spanish voice (Piper, sharvard)"
+
+msgid "Lee las traducciones en voz alta, con voz de mujer u hombre"
+msgstr "Reads the translations aloud, with a female or male voice"
+
+msgid "Piper GPL-3.0; voz CC BY 3.0"
+msgstr "Piper GPL-3.0; voice CC BY 3.0"
+
+msgid "Modelo de traducción (Hy-MT2 1.8B, Tencent)"
+msgstr "Translation model (Hy-MT2 1.8B, Tencent)"
+
+msgid "Traduce sin conexión"
+msgstr "Translates offline"
+
+msgid "La sesión no es X11: no se podrá capturar la ventana del juego. Entra en una sesión «Xorg» o «X11» desde la pantalla de inicio de sesión."
+msgstr "This is not an X11 session: the game window cannot be captured. Choose an “Xorg” or “X11” session on the login screen."
+
+msgid "Falta «paplay»: no se oirá la voz. Instálalo con: sudo apt install pulseaudio-utils"
+msgstr "“paplay” is missing: the voice will not be heard. Install it with: sudo apt install pulseaudio-utils"
+
+msgid "Falta libpulse: no se podrá bajar el volumen del juego mientras habla la voz."
+msgstr "libpulse is missing: the game volume cannot be lowered while the voice speaks."
+
+msgctxt "nombre de este idioma"
+msgid "Español"
+msgstr "English"
+
+msgctxt "separador decimal"
+msgid ","
+msgstr "."
+
+msgid "Respuesta inesperada de llama-server: {respuesta}"
+msgstr "Unexpected response from llama-server: {respuesta}"
+
+msgid "Error al llamar a llama-server en streaming: {error}"
+msgstr "Error while streaming from llama-server: {error}"
+
+msgid "Error al llamar a llama-server ({ruta}): {error}"
+msgstr "Error while calling llama-server ({ruta}): {error}"
+
+msgid "Evento inesperado de llama-server: {datos}"
+msgstr "Unexpected event from llama-server: {datos}"
+
+msgid "llama-server no arrancó; detalles en {registro}"
+msgstr "llama-server did not start; details in {registro}"
+
+msgid "Audiolibro para novelas visuales"
+msgstr "Audiobook for visual novels"
+
+msgid "Traduce novelas visuales en chino y japonés y las lee en voz alta"
+msgstr "Translates Chinese and Japanese visual novels and reads them aloud"
+
+msgid "No se pudo crear el acceso directo: {error}"
+msgstr "Could not create the shortcut: {error}"
+
+msgid "El acceso directo del menú Inicio solo se puede crear desde la versión empaquetada ({exe})."
+msgstr "The Start menu shortcut can only be created from the packaged version ({exe})."
+
+msgid "Bajar a"
+msgstr "Lower to"
+
+msgid "Silenciar"
+msgstr "Mute"
+
+msgid "No tocar nunca"
+msgstr "Never touch"
+
+msgid "Ajustes de «{nombre}»"
+msgstr "Settings for “{nombre}”"
+
+msgid "Voz y lectura"
+msgstr "Voice and reading"
+
+msgid "Volumen"
+msgstr "Volume"
+
+msgid "Glosario"
+msgstr "Glossary"
+
+msgid "Mujer"
+msgstr "Female"
+
+msgid "Hombre"
+msgstr "Male"
+
+msgid "Escuchar"
+msgstr "Listen"
+
+msgid "En cola: leer todas las líneas en orden"
+msgstr "Queue: read every line in order"
+
+msgid "Saltar a la última: cortar al avanzar"
+msgstr "Jump to the latest: cut off when you advance"
+
+msgid "Voz"
+msgstr "Voice"
+
+msgid "Velocidad"
+msgstr "Speed"
+
+msgid "Al avanzar deprisa"
+msgstr "When advancing quickly"
+
+msgid "Pausa entre líneas"
+msgstr "Pause between lines"
+
+msgid "No se pudo probar la voz: {error}"
+msgstr "Could not test the voice: {error}"
+
+msgid "Bajar el volumen del juego mientras habla la voz"
+msgstr "Lower the game volume while the voice speaks"
+
+msgid "Aplicación"
+msgstr "Application"
+
+msgid "Qué hacer"
+msgstr "Action"
+
+msgid "Nivel"
+msgstr "Level"
+
+msgid "Nombre de la aplicación (p. ej. Firefox)"
+msgstr "Application name (e.g. Firefox)"
+
+msgid "Ver las que suenan"
+msgstr "Show those playing sound"
+
+msgid "Añadir"
+msgstr "Add"
+
+msgid "Quitar la elegida"
+msgstr "Remove selected"
+
+msgid "Volumen del juego"
+msgstr "Game volume"
+
+msgid "<b>Otras aplicaciones</b> (un vídeo, música…)"
+msgstr "<b>Other applications</b> (a video, music…)"
+
+msgid "Término en el juego"
+msgstr "Term in the game"
+
+msgid "Traducción"
+msgstr "Translation"
+
+msgid "Añadir término"
+msgstr "Add term"
+
+msgid "Quitar el elegido"
+msgstr "Remove selected"
+
+msgid "Nombres propios y términos que siempre se traducen igual, p. ej. 櫻 → Sakura. Escribe la traducción en el idioma al que se traduce el juego ({idioma})."
+msgstr "Names and terms that are always translated the same way, e.g. 櫻 → Sakura. Write the translation in the language the game is translated into ({idioma})."
+
+msgid "Glosario cambiado"
+msgstr "Glossary changed"
+
+msgid "Las líneas ya traducidas no usan el glosario nuevo.\n\n¿Borrar sus traducciones guardadas para que se vuelvan a traducir al jugar?"
+msgstr "Lines that were already translated do not use the new glossary.\n\nDelete their saved translations so they are translated again when you play?"
+
+msgid "Caché de traducciones y audio"
+msgstr "Translation and audio cache"
+
+msgid "Cada línea traducida se guarda con su audio: la segunda vez suena al instante y sin traducir. Vaciarla solo hace que se vuelva a traducir."
+msgstr "Each translated line is saved with its audio: the second time it plays instantly, without translating. Clearing it only means it will be translated again."
+
+msgid "Juego"
+msgstr "Game"
+
+msgid "Líneas"
+msgstr "Lines"
+
+msgid "Tamaño"
+msgstr "Size"
+
+msgid "Vaciar el elegido"
+msgstr "Clear selected"
+
+msgid "Vaciar todo"
+msgstr "Clear all"
+
+msgid "Tamaño máximo"
+msgstr "Maximum size"
+
+msgid "Al llegar al máximo se borra primero lo que se usó hace más tiempo."
+msgstr "When the maximum is reached, whatever was used longest ago is deleted first."
+
+msgid "Total: {total}"
+msgstr "Total: {total}"
+
+msgid "La caché está vacía."
+msgstr "The cache is empty."
+
+msgid "¿Vaciar la caché de «{nombre}»?"
+msgstr "Clear the cache of “{nombre}”?"
+
+msgid "¿Vaciar la caché de todos los juegos?"
+msgstr "Clear the cache of all games?"
+
+msgid "Se volverá a traducir al jugar."
+msgstr "It will be translated again when you play."
+
+msgid "Vaciar caché"
+msgstr "Clear cache"
+
+msgid "Chino tradicional"
+msgstr "Traditional Chinese"
+
+msgid "Chino simplificado"
+msgstr "Simplified Chinese"
+
+msgid "Japonés"
+msgstr "Japanese"
+
+msgid "Español"
+msgstr "Spanish"
+
+msgid "Inglés"
+msgstr "English"
+
+msgid "Claro sobre fondo oscuro"
+msgstr "Light on a dark background"
+
+msgid "Oscuro sobre fondo claro"
+msgstr "Dark on a light background"
+
+msgid "Horizontal"
+msgstr "Horizontal"
+
+msgid "Vertical (columnas)"
+msgstr "Vertical (columns)"
+
+msgid "Captura la ventana y dibuja con el ratón un recuadro sobre la caja de texto."
+msgstr "Capture the window and draw a box over the text box with the mouse."
+
+msgid "Editar juego"
+msgstr "Edit game"
+
+msgid "Añadir juego"
+msgstr "Add game"
+
+msgid "Cómo lo verás en la lista"
+msgstr "How it will appear in the list"
+
+msgid "Actualizar"
+msgstr "Refresh"
+
+msgid "Parte del título de la ventana que la identifica"
+msgstr "Part of the window title that identifies it"
+
+msgid "Nombre"
+msgstr "Name"
+
+msgid "Ventana del juego"
+msgstr "Game window"
+
+msgid "Buscar por el título"
+msgstr "Find by title"
+
+msgid "Idioma del juego"
+msgstr "Game language"
+
+msgid "Traducir y leer en"
+msgstr "Translate and read in"
+
+msgid "Texto"
+msgstr "Text"
+
+msgid "Orientación"
+msgstr "Orientation"
+
+msgid "Capturar ventana"
+msgstr "Capture window"
+
+msgid "Probar OCR"
+msgstr "Test OCR"
+
+msgid "Toda la ventana"
+msgstr "Whole window"
+
+msgid "Zona de texto"
+msgstr "Text area"
+
+msgid "No se pudieron listar las ventanas: {error}"
+msgstr "Could not list the windows: {error}"
+
+msgid "{titulo}  (proceso {pid})"
+msgstr "{titulo}  (process {pid})"
+
+msgid "No se pudo capturar la ventana: {error}"
+msgstr "Could not capture the window: {error}"
+
+msgid "Leyendo…"
+msgstr "Reading…"
+
+msgid "(no se ha reconocido texto en la zona)"
+msgstr "(no text recognized in the area)"
+
+msgid "No se pudo leer: {error}"
+msgstr "Could not read: {error}"
+
+msgid "Texto leído: {texto}"
+msgstr "Text read: {texto}"
+
+msgid "Pendiente"
+msgstr "Pending"
+
+msgid "Descargando…"
+msgstr "Downloading…"
+
+msgid "Listo"
+msgstr "Done"
+
+msgid "Error"
+msgstr "Error"
+
+msgid "Preparar vn-audiolibro"
+msgstr "Set up vn-audiolibro"
+
+msgid "Para funcionar sin conexión, la app necesita descargar estos componentes una sola vez ({total} en total). Después no hace falta Internet."
+msgstr "To work offline, the app needs to download these components once ({total} in total). After that, no Internet connection is needed."
+
+msgid "Componente"
+msgstr "Component"
+
+msgid "Licencia"
+msgstr "License"
+
+msgid "Estado"
+msgstr "Status"
+
+msgid "Descargar"
+msgstr "Download"
+
+msgid "Ahora no"
+msgstr "Not now"
+
+msgid "Añadir vn-audiolibro al menú Inicio"
+msgstr "Add vn-audiolibro to the Start menu"
+
+msgid "Cancelar"
+msgstr "Cancel"
+
+msgid "No se pudo descargar «{componente}»: {error}"
+msgstr "Could not download “{componente}”: {error}"
+
+msgid "{hecho} de {total}"
+msgstr "{hecho} of {total}"
+
+msgid "Reintentar"
+msgstr "Retry"
+
+msgid "Descarga cancelada."
+msgstr "Download cancelled."
+
+msgid "El idioma cambiará la próxima vez que abras vn-audiolibro."
+msgstr "The language will change the next time you open vn-audiolibro."
+
+msgid "(no leída)"
+msgstr "(not read)"
+
+msgid "Editar"
+msgstr "Edit"
+
+msgid "Ajustes"
+msgstr "Settings"
+
+msgid "Borrar"
+msgstr "Delete"
+
+msgid "Caché…"
+msgstr "Cache…"
+
+msgid "Juegos"
+msgstr "Games"
+
+msgid "El del sistema"
+msgstr "System default"
+
+msgid "Idioma de la app"
+msgstr "App language"
+
+msgid "Elige un juego y pulsa Jugar."
+msgstr "Choose a game and press Play."
+
+msgid "Pausa (P)"
+msgstr "Pause (P)"
+
+msgid "Repetir (R)"
+msgstr "Repeat (R)"
+
+msgid "Saltar (S)"
+msgstr "Skip (S)"
+
+msgid "Detener"
+msgstr "Stop"
+
+msgid "Mantener encima del juego"
+msgstr "Keep on top of the game"
+
+msgid "Ventana «{ventana}» · {idioma} → {destino}"
+msgstr "Window “{ventana}” · {idioma} → {destino}"
+
+msgid "Borrar juego"
+msgstr "Delete game"
+
+msgid "¿Borrar «{nombre}» de la lista?\n\nSus traducciones y su audio guardados también se borrarán."
+msgstr "Delete “{nombre}” from the list?\n\nIts saved translations and audio will also be deleted."
+
+msgid "Preparando «{nombre}»…"
+msgstr "Preparing “{nombre}”…"
+
+msgid "Parando…"
+msgstr "Stopping…"
+
+msgid "Leyendo «{nombre}». Juega con normalidad."
+msgstr "Reading “{nombre}”. Play as usual."
+
+msgid "Partida terminada. Elige un juego y pulsa Jugar."
+msgstr "Session finished. Choose a game and press Play."
+
+msgid "Seguir (P)"
+msgstr "Resume (P)"
+
+msgid "Error al parar: {error}"
+msgstr "Error while stopping: {error}"
+
+msgid "Pulsa «Capturar ventana»"
+msgstr "Press “Capture window”"
+
+msgid "No se pudo acceder al audio de Windows: {error}"
+msgstr "Could not access Windows audio: {error}"
+
+msgid "Audio ilegible en {fichero}: {error}"
+msgstr "Unreadable audio in {fichero}: {error}"
+
+msgid "Velocidad no válida: {velocidad}"
+msgstr "Invalid speed: {velocidad}"
+
+msgid "La voz {voz} no tiene el hablante {hablante}"
+msgstr "Voice {voz} does not have speaker {hablante}"
+
+msgid "No se pudo abrir la salida de audio: {error}"
+msgstr "Could not open the audio output: {error}"
+
+msgid "No se encuentra `paplay`: instala pulseaudio-utils"
+msgstr "`paplay` not found: install pulseaudio-utils"
+
+msgid "Falta libpulse: no se puede controlar el volumen"
+msgstr "libpulse is missing: the volume cannot be controlled"
+
+msgid "No se pudo conectar con el servidor de sonido: {error}"
+msgstr "Could not connect to the sound server: {error}"

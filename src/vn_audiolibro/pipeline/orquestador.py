@@ -19,6 +19,7 @@ from typing import Protocol
 from vn_audiolibro.cache.modelos import Clave, Entrada
 from vn_audiolibro.captura.modelos import Imagen, ZonaEstable
 from vn_audiolibro.ocr.lector import TextoLeido
+from vn_audiolibro.textos import _
 from vn_audiolibro.traduccion.local import LINEAS_CONTEXTO
 from vn_audiolibro.traduccion.modelos import (
     Glosario,
@@ -206,7 +207,7 @@ class Orquestador:
             except Exception as error:
                 # El hilo tiene que seguir vivo para la zona siguiente.
                 _registro.exception("No se pudo procesar la zona de texto")
-                self._al_error(f"Error al procesar la línea: {error}")
+                self._al_error(_("Error al procesar la línea: {error}").format(error=error))
             finally:
                 with self._condicion:
                     self._ocupado = False
@@ -261,7 +262,7 @@ class Orquestador:
             nueva = self._traductor.traducir(peticion)
         except TraduccionFallidaError as error:
             _registro.warning("No se pudo traducir «%s»: %s", texto, error)
-            self._al_error(f"No se pudo traducir la línea: {error}")
+            self._al_error(_("No se pudo traducir la línea: {error}").format(error=error))
             return None
         self._cache.guardar_traduccion(clave, nueva.texto, nueva.modelo)
         return _Resultado(nueva.texto, False, None)

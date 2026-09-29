@@ -5,6 +5,8 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 
+from vn_audiolibro.textos import _
+
 Imagen = npt.NDArray[np.uint8]
 """Imagen RGB con forma (alto, ancho, 3)."""
 
@@ -82,7 +84,7 @@ def buscar_por_titulo(ventanas: list["Ventana"], texto: str, excluir_pids: froze
     for ventana in ventanas:
         if ventana.pid not in excluir_pids and buscado in ventana.titulo.casefold():
             return ventana
-    raise VentanaNoEncontradaError(f"No hay ninguna ventana con «{texto}» en el título")
+    raise VentanaNoEncontradaError(_("No hay ninguna ventana con «{texto}» en el título").format(texto=texto))
 
 
 @dataclass(frozen=True)

@@ -17,6 +17,7 @@ from pathlib import Path
 
 from vn_audiolibro.cache.modelos import Clave, Entrada, ResumenPerfil
 from vn_audiolibro.rutas import directorio_datos
+from vn_audiolibro.textos import _
 
 VERSION_ESQUEMA = 1
 
@@ -153,7 +154,7 @@ class CacheSQLite:
                 "SELECT original, traduccion FROM entradas WHERE id = ?", (clave.id,)
             ).fetchone()
             if fila is None:
-                raise KeyError(f"No hay traducción guardada para «{clave.texto}»")
+                raise KeyError(_("No hay traducción guardada para «{texto}»").format(texto=clave.texto))
             temporal = ruta.with_name(nombre + ".parcial")
             temporal.write_bytes(datos)
             temporal.replace(ruta)
@@ -202,7 +203,7 @@ class CacheSQLite:
                 "UPDATE entradas SET audio = NULL, bytes = ? WHERE id = ?",
                 [(_bytes_texto(original, traduccion), id_) for id_, original, traduccion, _ in filas],
             )
-        for *_, audio in filas:
+        for *_campos, audio in filas:
             self._borrar_audio(audio)
         return len(filas)
 
@@ -242,6 +243,6 @@ class CacheSQLite:
                     sobrantes.append((id_, audio))
                     total -= bytes_
                 cursor.executemany("DELETE FROM entradas WHERE id = ?", [(id_,) for id_, _ in sobrantes])
-        for _, audio in sobrantes:
+        for _id, audio in sobrantes:
             if audio:
                 self._borrar_audio(audio)

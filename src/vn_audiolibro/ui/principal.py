@@ -5,12 +5,15 @@ En la interfaz los perfiles se llaman «juegos»: es lo que el usuario configura
 
 from collections import deque
 from collections.abc import Callable
+from dataclasses import replace
 from html import escape
+from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QHBoxLayout,
     QLabel,
@@ -25,10 +28,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from vn_audiolibro import plataforma, textos
 from vn_audiolibro.cache.sqlite import CacheSQLite
+from vn_audiolibro.configuracion import cargar_ajustes, guardar_ajustes
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
 from vn_audiolibro.perfiles.modelos import Perfil
 from vn_audiolibro.pipeline.orquestador import LineaJuego
+from vn_audiolibro.textos import N_, _
 from vn_audiolibro.ui.ajustes import AjustesJuego
 from vn_audiolibro.ui.cache import VentanaCache
 from vn_audiolibro.ui.editor import EditorJuego
@@ -37,6 +43,8 @@ from vn_audiolibro.ui.puente import PuenteSesion
 TITULO = "vn-audiolibro"
 MAX_LINEAS = 500
 """Líneas que se conservan en el historial de la partida."""
+AVISO_IDIOMA = N_("El idioma cambiará la próxima vez que abras vn-audiolibro.")
+"""Se muestra en el idioma recién elegido."""
 
 AbrirCache = Callable[[], CacheSQLite]
 AbrirEditor = Callable[[QWidget, AlmacenPerfiles, Perfil | None], EditorJuego]
@@ -46,7 +54,7 @@ AbrirVentanaCache = Callable[[QWidget, AlmacenPerfiles], VentanaCache]
 
 def _html(linea: LineaJuego) -> str:
     """Una línea del historial: el original pequeño y en gris, la traducción debajo y más grande."""
-    sufijo = "" if linea.leida else ' <span style="color: gray">(no leída)</span>'
+    sufijo = "" if linea.leida else f' <span style="color: gray">{escape(_("(no leída)"))}</span>'
     color = "" if linea.leida else " color: gray;"  # las no leídas, apagadas
     return (
         f'<p style="margin: 8px 0 0 0; color: gray">{escape(linea.original)}</p>'
@@ -65,8 +73,10 @@ class VentanaPrincipal(QMainWindow):
         abrir_editor: AbrirEditor | None = None,
         abrir_ajustes: AbrirAjustes | None = None,
         abrir_ventana_cache: AbrirVentanaCache | None = None,
+        ruta_ajustes: Path | None = None,
     ) -> None:
         super().__init__()
+        self._ruta_ajustes = ruta_ajustes
         self.setWindowTitle(TITULO)
         self.resize(900, 560)
         self._almacen = almacen
@@ -92,16 +102,16 @@ class VentanaPrincipal(QMainWindow):
 
     def _crear_widgets(self) -> None:
         self.lista_perfiles = QListWidget()
-        self.boton_jugar = QPushButton("Jugar")
-        self.boton_anadir = QPushButton("Añadir juego")
-        self.boton_editar = QPushButton("Editar")
-        self.boton_ajustes = QPushButton("Ajustes")
-        self.boton_borrar = QPushButton("Borrar")
-        self.boton_cache = QPushButton("Caché…")
+        self.boton_jugar = QPushButton(_("Jugar"))
+        self.boton_anadir = QPushButton(_("Añadir juego"))
+        self.boton_editar = QPushButton(_("Editar"))
+        self.boton_ajustes = QPushButton(_("Ajustes"))
+        self.boton_borrar = QPushButton(_("Borrar"))
+        self.boton_cache = QPushButton(_("Caché…"))
 
         izquierda = QWidget()
         columna = QVBoxLayout(izquierda)
-        columna.addWidget(QLabel("<b>Juegos</b>"))
+        columna.addWidget(QLabel(f"<b>{_('Juegos')}</b>"))
         columna.addWidget(self.lista_perfiles)
         columna.addWidget(self.boton_jugar)
         fila = QHBoxLayout()
@@ -109,16 +119,25 @@ class VentanaPrincipal(QMainWindow):
             fila.addWidget(boton)
         columna.addLayout(fila)
         columna.addWidget(self.boton_cache)
+        self.idioma = QComboBox()
+        self.idioma.addItem(_("El del sistema"), None)
+        for codigo in textos.disponibles():
+            self.idioma.addItem(textos.nombre_idioma(codigo), codigo)
+        self.idioma.setCurrentIndex(max(self.idioma.findData(cargar_ajustes(self._ruta_ajustes).idioma), 0))
+        fila = QHBoxLayout()
+        fila.addWidget(QLabel(_("Idioma de la app")))
+        fila.addWidget(self.idioma, 1)
+        columna.addLayout(fila)
 
-        self.estado = QLabel("Elige un juego y pulsa Jugar.")
+        self.estado = QLabel(_("Elige un juego y pulsa Jugar."))
         self.estado.setWordWrap(True)
         self.historial = QTextBrowser()
         self._lineas: deque[LineaJuego] = deque(maxlen=MAX_LINEAS)
-        self.boton_pausa = QPushButton("Pausa (P)")
-        self.boton_repetir = QPushButton("Repetir (R)")
-        self.boton_saltar = QPushButton("Saltar (S)")
-        self.boton_detener = QPushButton("Detener")
-        self.siempre_encima = QCheckBox("Mantener encima del juego")
+        self.boton_pausa = QPushButton(_("Pausa (P)"))
+        self.boton_repetir = QPushButton(_("Repetir (R)"))
+        self.boton_saltar = QPushButton(_("Saltar (S)"))
+        self.boton_detener = QPushButton(_("Detener"))
+        self.siempre_encima = QCheckBox(_("Mantener encima del juego"))
 
         derecha = QWidget()
         columna = QVBoxLayout(derecha)
@@ -150,6 +169,7 @@ class VentanaPrincipal(QMainWindow):
         self.boton_saltar.clicked.connect(self.puente.saltar)
         self.boton_detener.clicked.connect(self.detener)
         self.siempre_encima.toggled.connect(self._mantener_encima)
+        self.idioma.activated.connect(lambda _indice: self.cambiar_idioma(self.idioma.currentData()))
         atajos = {"P": self._alternar_pausa, "R": self.puente.repetir, "S": self.puente.saltar}
         for tecla, accion in atajos.items():
             QShortcut(QKeySequence(tecla), self, accion)
@@ -168,7 +188,10 @@ class VentanaPrincipal(QMainWindow):
         for perfil in self._almacen.listar():
             elemento = QListWidgetItem(perfil.nombre)
             elemento.setData(Qt.ItemDataRole.UserRole, perfil)
-            elemento.setToolTip(f"Ventana «{perfil.ventana}» · {perfil.idioma} → {perfil.destino}")
+            ayuda = _("Ventana «{ventana}» · {idioma} → {destino}")
+            elemento.setToolTip(
+                ayuda.format(ventana=perfil.ventana, idioma=perfil.idioma, destino=perfil.destino)
+            )
             self.lista_perfiles.addItem(elemento)
             if perfil.id == elegir:
                 self.lista_perfiles.setCurrentItem(elemento)
@@ -210,9 +233,11 @@ class VentanaPrincipal(QMainWindow):
             return
         respuesta = QMessageBox.question(
             self,
-            "Borrar juego",
-            f"¿Borrar «{perfil.nombre}» de la lista?\n\n"
-            "Sus traducciones y su audio guardados también se borrarán.",
+            _("Borrar juego"),
+            _(
+                "¿Borrar «{nombre}» de la lista?\n\n"
+                "Sus traducciones y su audio guardados también se borrarán."
+            ).format(nombre=perfil.nombre),
         )
         if respuesta != QMessageBox.StandardButton.Yes:
             return
@@ -225,6 +250,15 @@ class VentanaPrincipal(QMainWindow):
         self.recargar_perfiles()
         self._actualizar_botones()
 
+    def cambiar_idioma(self, idioma: str | None) -> None:
+        """Guarda el idioma de la app (None: el del sistema). Se aplica al volver a abrirla."""
+        ajustes = cargar_ajustes(self._ruta_ajustes)
+        if idioma == ajustes.idioma:
+            return
+        guardar_ajustes(replace(ajustes, idioma=idioma), self._ruta_ajustes)
+        nuevo = textos.catalogo(textos.elegir(idioma, plataforma.idiomas_sistema()))
+        QMessageBox.information(self, TITULO, nuevo.gettext(AVISO_IDIOMA))
+
     # Partida
 
     def jugar(self) -> None:
@@ -235,12 +269,12 @@ class VentanaPrincipal(QMainWindow):
         self._hubo_error = False
         self._lineas.clear()
         self.historial.clear()
-        self.estado.setText(f"Preparando «{perfil.nombre}»…")
+        self.estado.setText(_("Preparando «{nombre}»…").format(nombre=perfil.nombre))
         self.puente.iniciar(perfil)
         self._actualizar_botones()
 
     def detener(self) -> None:
-        self.estado.setText("Parando…")
+        self.estado.setText(_("Parando…"))
         self.puente.detener()
         self._actualizar_botones()
 
@@ -250,13 +284,14 @@ class VentanaPrincipal(QMainWindow):
 
     def _al_iniciar(self) -> None:
         if self._perfil_en_juego is not None:
-            self.estado.setText(f"Leyendo «{self._perfil_en_juego.nombre}». Juega con normalidad.")
+            texto = _("Leyendo «{nombre}». Juega con normalidad.")
+            self.estado.setText(texto.format(nombre=self._perfil_en_juego.nombre))
         self._actualizar_botones()
 
     def _al_terminar(self) -> None:
         self._perfil_en_juego = None
         if not self.puente.jugando and not self._hubo_error:
-            self.estado.setText("Partida terminada. Elige un juego y pulsa Jugar.")
+            self.estado.setText(_("Partida terminada. Elige un juego y pulsa Jugar."))
         self._actualizar_botones()
 
     def _mostrar_linea(self, linea: LineaJuego) -> None:
@@ -285,7 +320,7 @@ class VentanaPrincipal(QMainWindow):
         self.lista_perfiles.setEnabled(not jugando)
         for boton in (self.boton_pausa, self.boton_repetir, self.boton_saltar, self.boton_detener):
             boton.setEnabled(jugando)
-        self.boton_pausa.setText("Seguir (P)" if self.puente.pausado else "Pausa (P)")
+        self.boton_pausa.setText(_("Seguir (P)") if self.puente.pausado else _("Pausa (P)"))
 
     def closeEvent(self, evento: QCloseEvent) -> None:  # noqa: N802 - nombre de Qt
         """Al cerrar, para la partida y espera: devuelve el volumen del juego y para el traductor."""

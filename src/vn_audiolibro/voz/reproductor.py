@@ -9,6 +9,7 @@ import shutil
 import subprocess
 from collections.abc import Callable
 
+from vn_audiolibro.textos import _
 from vn_audiolibro.voz.modelos import Muestras, VozFallidaError
 
 NOMBRE_CLIENTE = "vn-audiolibro"
@@ -21,7 +22,7 @@ def comando_paplay(frecuencia: int) -> list[str]:
     """Orden de `paplay` para PCM mono de 16 bits a esa frecuencia."""
     ejecutable = shutil.which("paplay")
     if ejecutable is None:
-        raise VozFallidaError("No se encuentra `paplay`: instala pulseaudio-utils")
+        raise VozFallidaError(_("No se encuentra `paplay`: instala pulseaudio-utils"))
     return [
         ejecutable,
         "--raw",
@@ -77,5 +78,7 @@ class ReproductorProceso:
                 orden, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
         except OSError as error:
-            raise VozFallidaError(f"No se pudo abrir la salida de audio: {error}") from error
+            raise VozFallidaError(
+                _("No se pudo abrir la salida de audio: {error}").format(error=error)
+            ) from error
         return SalidaProceso(proceso)

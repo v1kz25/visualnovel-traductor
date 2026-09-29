@@ -12,7 +12,7 @@ AQUI = Path(SPECPATH)  # noqa: F821 - lo define PyInstaller
 ICONO = os.environ["VN_ICONO"]
 
 datos = [
-    *collect_data_files("vn_audiolibro"),  # el icono
+    *collect_data_files("vn_audiolibro"),  # el icono y los catálogos de idiomas
     # Solo la configuración: los modelos de OCR se descargan en el primer arranque.
     *collect_data_files("rapidocr", excludes=["**/*.onnx"]),
     # Solo los datos de espeak-ng, con los que Piper convierte el texto en fonemas.
