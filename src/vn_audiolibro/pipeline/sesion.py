@@ -16,6 +16,7 @@ from vn_audiolibro.ocr.reconocedor import ReconocedorRapidOCR
 from vn_audiolibro.perfiles.modelos import Perfil
 from vn_audiolibro.pipeline.orquestador import AjustesOrquestador, LineaJuego, Orquestador
 from vn_audiolibro.plataforma import capturador, cliente_audio, gestor_ventanas, juego_de_pid, reproductor
+from vn_audiolibro.textos import _
 from vn_audiolibro.traduccion.llama import ServidorLlama, asegurar_llama_server, asegurar_modelo_traduccion
 from vn_audiolibro.traduccion.local import TraductorLocal
 from vn_audiolibro.voz.locutor import Locutor
@@ -71,17 +72,17 @@ class Sesion:
 
     def _montar(self) -> Orquestador:
         perfil, pila = self.perfil, self._pila
-        self._al_estado(f"Buscando la ventana «{perfil.ventana}»…")
+        self._al_estado(_("Buscando la ventana «{ventana}»…").format(ventana=perfil.ventana))
         ventanas = gestor_ventanas()
         ventana = ventanas.buscar(perfil.ventana)
 
-        self._al_estado("Preparando los modelos (la primera vez se descargan)…")
+        self._al_estado(_("Preparando los modelos (la primera vez se descargan)…"))
         modelo_ocr = asegurar_descarga(REC_PPOCRV5_MOBILE)
         voz = elegir_voz(perfil.destino, perfil.voz.hablante)
         modelo_voz = asegurar_voz(voz.voz)
         llama, modelo_traduccion = asegurar_llama_server(), asegurar_modelo_traduccion()
 
-        self._al_estado("Arrancando el traductor…")
+        self._al_estado(_("Arrancando el traductor…"))
         servidor = ServidorLlama(llama, modelo_traduccion)
         cliente = servidor.iniciar()
         pila.callback(servidor.detener)
@@ -99,7 +100,7 @@ class Sesion:
         )
         pila.callback(locutor.cerrar)
 
-        self._al_estado("Calentando el traductor…")
+        self._al_estado(_("Calentando el traductor…"))
         traductor = TraductorLocal(cliente)
         traductor.calentar(perfil.idioma, perfil.destino)
 
@@ -125,7 +126,7 @@ class Sesion:
         )
         bucle.iniciar()
         pila.callback(bucle.detener)
-        self._al_estado(f"Leyendo «{ventana.titulo}».")
+        self._al_estado(_("Leyendo «{ventana}».").format(ventana=ventana.titulo))
         self.orquestador = orquestador
         return orquestador
 
@@ -138,7 +139,7 @@ class Sesion:
         except Exception as error:
             # Sin control del volumen se puede jugar igual.
             _registro.warning("No se podrá bajar el volumen del juego: %s", error)
-            self._al_error(f"No se podrá bajar el volumen del juego: {error}")
+            self._al_error(_("No se podrá bajar el volumen del juego: {error}").format(error=error))
             return None
         self._pila.callback(atenuador.cerrar)
         return atenuador

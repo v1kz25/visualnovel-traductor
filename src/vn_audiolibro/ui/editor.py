@@ -29,16 +29,25 @@ from vn_audiolibro.perfiles.almacen import AlmacenPerfiles, PerfilDuplicadoError
 from vn_audiolibro.perfiles.modelos import DESTINOS, IDIOMAS, Color, Perfil, PerfilInvalidoError
 from vn_audiolibro.plataforma import capturador, gestor_ventanas
 from vn_audiolibro.procesos import pids_propios
+from vn_audiolibro.textos import N_, _
 from vn_audiolibro.ui.zona import SelectorZona
 
 _registro = logging.getLogger(__name__)
 
-NOMBRES_IDIOMAS = {"zh-Hant": "Chino tradicional", "zh-Hans": "Chino simplificado", "ja": "Japonés"}
-NOMBRES_DESTINOS = {"es": "español", "en": "inglés"}
-NOMBRES_COLORES = {Color.CLARO: "Claro sobre fondo oscuro", Color.OSCURO: "Oscuro sobre fondo claro"}
-NOMBRES_ORIENTACIONES = {Orientacion.HORIZONTAL: "Horizontal", Orientacion.VERTICAL: "Vertical (columnas)"}
+# Se traducen al mostrarlos, con `_()`.
+NOMBRES_IDIOMAS = {
+    "zh-Hant": N_("Chino tradicional"),
+    "zh-Hans": N_("Chino simplificado"),
+    "ja": N_("Japonés"),
+}
+NOMBRES_DESTINOS = {"es": N_("Español"), "en": N_("Inglés")}
+NOMBRES_COLORES = {Color.CLARO: N_("Claro sobre fondo oscuro"), Color.OSCURO: N_("Oscuro sobre fondo claro")}
+NOMBRES_ORIENTACIONES = {
+    Orientacion.HORIZONTAL: N_("Horizontal"),
+    Orientacion.VERTICAL: N_("Vertical (columnas)"),
+}
 
-AYUDA_ZONA = "Captura la ventana y dibuja con el ratón un recuadro sobre la caja de texto."
+AYUDA_ZONA = N_("Captura la ventana y dibuja con el ratón un recuadro sobre la caja de texto.")
 
 ListarVentanas = Callable[[], list[Ventana]]
 CapturarVentana = Callable[[Ventana], Imagen]
@@ -91,7 +100,7 @@ class EditorJuego(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Editar juego" if perfil else "Añadir juego")
+        self.setWindowTitle(_("Editar juego") if perfil else _("Añadir juego"))
         self.resize(760, 640)
         self._almacen = almacen
         self._original = perfil
@@ -111,42 +120,42 @@ class EditorJuego(QDialog):
 
     def _crear_widgets(self) -> None:
         self.nombre = QLineEdit()
-        self.nombre.setPlaceholderText("Cómo lo verás en la lista")
+        self.nombre.setPlaceholderText(_("Cómo lo verás en la lista"))
         self.ventanas = QComboBox()
-        self.boton_actualizar = QPushButton("Actualizar")
+        self.boton_actualizar = QPushButton(_("Actualizar"))
         self.titulo = QLineEdit()
-        self.titulo.setPlaceholderText("Parte del título de la ventana que la identifica")
+        self.titulo.setPlaceholderText(_("Parte del título de la ventana que la identifica"))
         self.idioma = QComboBox()
         for codigo in IDIOMAS:
-            self.idioma.addItem(NOMBRES_IDIOMAS.get(codigo, codigo), codigo)
+            self.idioma.addItem(_(NOMBRES_IDIOMAS.get(codigo, codigo)), codigo)
         self.destino = QComboBox()
         for codigo in DESTINOS:
-            self.destino.addItem(NOMBRES_DESTINOS.get(codigo, codigo).capitalize(), codigo)
+            self.destino.addItem(_(NOMBRES_DESTINOS.get(codigo, codigo)), codigo)
         self.color = QComboBox()
         # Qt convierte los enum de texto en `str`: se guarda el valor y se convierte al leerlo.
         for color, texto in NOMBRES_COLORES.items():
-            self.color.addItem(texto, color.value)
+            self.color.addItem(_(texto), color.value)
         self.orientacion = QComboBox()
         for orientacion, texto in NOMBRES_ORIENTACIONES.items():
-            self.orientacion.addItem(texto, orientacion.value)
+            self.orientacion.addItem(_(texto), orientacion.value)
 
         fila_ventana = QHBoxLayout()
         fila_ventana.addWidget(self.ventanas, 1)
         fila_ventana.addWidget(self.boton_actualizar)
         formulario = QFormLayout()
-        formulario.addRow("Nombre", self.nombre)
-        formulario.addRow("Ventana del juego", fila_ventana)
-        formulario.addRow("Buscar por el título", self.titulo)
-        formulario.addRow("Idioma del juego", self.idioma)
-        formulario.addRow("Traducir y leer en", self.destino)
-        formulario.addRow("Texto", self.color)
-        formulario.addRow("Orientación", self.orientacion)
+        formulario.addRow(_("Nombre"), self.nombre)
+        formulario.addRow(_("Ventana del juego"), fila_ventana)
+        formulario.addRow(_("Buscar por el título"), self.titulo)
+        formulario.addRow(_("Idioma del juego"), self.idioma)
+        formulario.addRow(_("Traducir y leer en"), self.destino)
+        formulario.addRow(_("Texto"), self.color)
+        formulario.addRow(_("Orientación"), self.orientacion)
 
-        self.boton_capturar = QPushButton("Capturar ventana")
-        self.boton_probar = QPushButton("Probar OCR")
-        self.boton_toda = QPushButton("Toda la ventana")
+        self.boton_capturar = QPushButton(_("Capturar ventana"))
+        self.boton_probar = QPushButton(_("Probar OCR"))
+        self.boton_toda = QPushButton(_("Toda la ventana"))
         self.selector = SelectorZona()
-        self.resultado = QLabel(AYUDA_ZONA)
+        self.resultado = QLabel(_(AYUDA_ZONA))
         self.resultado.setWordWrap(True)
         self.resultado.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.error = QLabel()
@@ -161,7 +170,7 @@ class EditorJuego(QDialog):
         fila_zona.addStretch()
         columna = QVBoxLayout(self)
         columna.addLayout(formulario)
-        columna.addWidget(QLabel("<b>Zona de texto</b>"))
+        columna.addWidget(QLabel(f"<b>{_('Zona de texto')}</b>"))
         columna.addLayout(fila_zona)
         columna.addWidget(self.selector, 1)
         columna.addWidget(self.resultado)
@@ -212,10 +221,12 @@ class EditorJuego(QDialog):
             ventanas = self._listar()
         except Exception as error:
             _registro.exception("No se pudieron listar las ventanas")
-            self.error.setText(f"No se pudieron listar las ventanas: {error}")
+            self.error.setText(_("No se pudieron listar las ventanas: {error}").format(error=error))
             ventanas = []
         for ventana in ventanas:
-            self.ventanas.addItem(f"{ventana.titulo}  (proceso {ventana.pid})", ventana)
+            self.ventanas.addItem(
+                _("{titulo}  (proceso {pid})").format(titulo=ventana.titulo, pid=ventana.pid), ventana
+            )
             if anterior is not None and ventana.id == anterior.id:
                 self.ventanas.setCurrentIndex(self.ventanas.count() - 1)
         self._actualizar_botones()
@@ -240,7 +251,7 @@ class EditorJuego(QDialog):
             self._captura = self._capturar(ventana)
         except Exception as error:
             _registro.exception("No se pudo capturar la ventana")
-            self.error.setText(f"No se pudo capturar la ventana: {error}")
+            self.error.setText(_("No se pudo capturar la ventana: {error}").format(error=error))
             return
         self.error.clear()
         self.selector.mostrar(self._captura)
@@ -253,20 +264,20 @@ class EditorJuego(QDialog):
             return
         ajustes = AjustesLector(self.idioma.currentData(), self._color().color_texto, self._orientacion())
         self.boton_probar.setEnabled(False)
-        self.resultado.setText("Leyendo…")
+        self.resultado.setText(_("Leyendo…"))
 
         def leer() -> None:
             try:
-                texto = self._leer(recorte, ajustes) or "(no se ha reconocido texto en la zona)"
+                texto = self._leer(recorte, ajustes) or _("(no se ha reconocido texto en la zona)")
             except Exception as error:
                 _registro.exception("Falló el OCR de prueba")
-                texto = f"No se pudo leer: {error}"
+                texto = _("No se pudo leer: {error}").format(error=error)
             self.texto_leido.emit(texto)
 
         threading.Thread(target=leer, name="ocr-prueba", daemon=True).start()
 
     def _mostrar_texto(self, texto: str) -> None:
-        self.resultado.setText(f"Texto leído: {texto}")
+        self.resultado.setText(_("Texto leído: {texto}").format(texto=texto))
         self._actualizar_botones()
 
     def _recorte(self) -> Imagen | None:

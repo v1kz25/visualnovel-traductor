@@ -6,6 +6,7 @@ from PySide6.QtGui import QColor, QImage, QMouseEvent, QPainter, QPainterPath, Q
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
 from vn_audiolibro.captura.modelos import Imagen, ZonaRelativa
+from vn_audiolibro.textos import _
 
 LADO_MIN = 0.01
 """Ancho y alto mínimos de la zona, en proporción de la ventana: evita recuadros de un clic."""
@@ -107,7 +108,7 @@ class SelectorZona(QWidget):
         pintor = QPainter(self)
         pintor.fillRect(self.rect(), self.palette().window())
         if self._imagen is None:
-            pintor.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Pulsa «Capturar ventana»")
+            pintor.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, _("Pulsa «Capturar ventana»"))
             return
         area = self.area_imagen()
         pintor.drawPixmap(area.toRect(), self._imagen)

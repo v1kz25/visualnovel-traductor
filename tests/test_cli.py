@@ -1,6 +1,7 @@
 """Tests de la línea de comandos `vn-audiolibro`, con la sesión sustituida por una falsa."""
 
 import io
+import re
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -8,10 +9,12 @@ from typing import ClassVar
 
 import pytest
 
-from vn_audiolibro import cli
+from tests.conftest import parece_espanol
+from vn_audiolibro import cli, plataforma
 from vn_audiolibro.cache.modelos import Clave
 from vn_audiolibro.cache.sqlite import CacheSQLite
 from vn_audiolibro.captura.modelos import VentanaNoEncontradaError
+from vn_audiolibro.configuracion import AjustesApp, guardar_ajustes
 from vn_audiolibro.descargas import DescargaFallidaError
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
 from vn_audiolibro.perfiles.modelos import AjustesLectura, Color, Perfil
@@ -220,7 +223,7 @@ def test_cache_mostrar_vaciar_y_limitar(
 
     assert cli.main(["cache"]) == 0
     salida = capsys.readouterr().out
-    assert "Juego: 1 líneas" in salida
+    assert "Juego: 1 línea," in salida
     assert "(máximo 2048 MB)" in salida
 
     assert cli.main(["cache", "--limite", "500"]) == 0
@@ -231,7 +234,7 @@ def test_cache_mostrar_vaciar_y_limitar(
     assert "al menos 100 MB" in capsys.readouterr().err
 
     assert cli.main(["cache", "--vaciar", "juego"]) == 0
-    assert "Vaciada la caché de «Juego»: 1 líneas" in capsys.readouterr().out
+    assert "Vaciada la caché de «Juego»: 1 línea\n" in capsys.readouterr().out
     assert cli.main(["cache", "--vaciar-todo"]) == 0
     assert "Total: vacía" in capsys.readouterr().out
 
@@ -337,3 +340,25 @@ def test_en_windows_la_salida_es_utf8(
     monkeypatch.setattr(sys, "stderr", None)  # la interfaz empaquetada no tiene consola
     cli.salida_utf8()
     assert salida.encoding == codificacion
+
+
+@pytest.mark.parametrize("orden", [[], ["crear"], ["jugar"], ["cache"]])
+def test_ayuda_en_ingles_con_el_sistema_en_ingles(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], orden: list[str]
+) -> None:
+    monkeypatch.setattr(plataforma, "idiomas_sistema", lambda: ["en_US.UTF-8"])
+    with pytest.raises(SystemExit):
+        cli.main([*orden, "--help"])
+    ayuda = capsys.readouterr().out
+    # Sin el uso, que repite las opciones: ni las órdenes ni las opciones se traducen.
+    cuerpo = ayuda.split("\n\n", 1)[1]
+    sin_nombres = re.sub(
+        r"--?[\w-]+|\{[^}]*\}|\b(crear|jugar|juegos|preparar|cache|instalar-acceso)\b", "", cuerpo
+    )
+    assert not parece_espanol(sin_nombres), sin_nombres
+
+
+def test_idioma_elegido_en_la_app_manda_sobre_el_del_sistema(capsys: pytest.CaptureFixture[str]) -> None:
+    guardar_ajustes(AjustesApp(idioma="en"))
+    assert cli.main(["juegos"]) == 0
+    assert "No games yet" in capsys.readouterr().out

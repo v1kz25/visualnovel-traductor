@@ -60,3 +60,20 @@ def test_fichero_en_la_configuracion(monkeypatch: pytest.MonkeyPatch, tmp_path: 
 )
 def test_formato_tamano(bytes_: int, texto: str) -> None:
     assert formato_tamano(bytes_) == texto
+
+
+def test_guardar_y_cargar_el_idioma(tmp_path: Path) -> None:
+    ruta = tmp_path / "ajustes.json"
+    guardar_ajustes(AjustesApp(idioma="en"), ruta)
+    assert cargar_ajustes(ruta) == AjustesApp(idioma="en")
+
+
+def test_idioma_no_valido(tmp_path: Path) -> None:
+    ruta = tmp_path / "ajustes.json"
+    ruta.write_text('{"idioma": 3}', encoding="utf-8")
+    assert cargar_ajustes(ruta) == AjustesApp()
+
+
+@pytest.mark.usefixtures("en_ingles")
+def test_formato_tamano_en_ingles() -> None:
+    assert formato_tamano(int(1.5 * 1024**2)) == "1.5 MB"

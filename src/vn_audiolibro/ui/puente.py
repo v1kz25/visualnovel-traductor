@@ -15,6 +15,7 @@ from PySide6.QtCore import QObject, Signal
 from vn_audiolibro.perfiles.modelos import Perfil
 from vn_audiolibro.pipeline.orquestador import LineaJuego
 from vn_audiolibro.pipeline.sesion import Sesion
+from vn_audiolibro.textos import _
 
 _registro = logging.getLogger(__name__)
 
@@ -154,5 +155,5 @@ class PuenteSesion(QObject):
             sesion.detener()
         except Exception as error:
             _registro.exception("Error al parar la partida")
-            self.error.emit(f"Error al parar: {error}")
+            self.error.emit(_("Error al parar: {error}").format(error=error))
         self.terminada.emit()
