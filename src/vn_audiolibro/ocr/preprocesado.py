@@ -11,6 +11,10 @@ RapidOCR lo parte mal. Aquí se hace a mano, que es más rápido y preciso con t
 4. Las rayas (——) se sacan como texto: el reconocedor las pierde cuando van muy espaciadas.
 5. El resto se recompone sin el espaciado original, en negro sobre blanco y ampliado si la
    letra es pequeña.
+
+En los idiomas que separan las palabras con espacios (inglés) se saltan los pasos 3 a 5: la fila va entera al
+reconocedor, con su espaciado, porque al juntar los glifos se pierden los espacios
+(`I toldyoualready`). El reconocedor ya lee bien la raya (—) en el texto latino.
 """
 
 from dataclasses import dataclass
@@ -232,11 +236,18 @@ def _segmentos(fila: Mascara, tinta: Gris, alto: int, vertical: bool, ajustes: A
     return tuple(resultado)
 
 
+def _fila_entera(fila: Mascara, tinta: Gris, alto: int, ajustes: AjustesPreprocesado) -> Linea:
+    """La fila tal cual, recortada a lo escrito, para el reconocedor."""
+    columnas = np.flatnonzero(fila.any(axis=0))
+    return (recomponer([tinta[:, columnas[0] : columnas[-1] + 1]], alto, ajustes),)
+
+
 def lineas(
     imagen: Imagen,
     color: ColorTexto,
     orientacion: Orientacion = Orientacion.HORIZONTAL,
     ajustes: AjustesPreprocesado | None = None,
+    por_glifos: bool = True,
 ) -> list[Linea]:
     """Líneas de texto en orden de lectura, partidas en segmentos listos para el reconocedor.
 
@@ -246,6 +257,8 @@ def lineas(
     El texto vertical se transpone para buscar las columnas y los glifos igual que en horizontal,
     pero cada glifo se recorta de la columna sin transponer para no deformarlo. Las columnas se
     leen de derecha a izquierda y sus glifos se colocan en fila.
+
+    Con `por_glifos=False` (idiomas con espacios, solo en horizontal) cada fila va entera.
     """
     ajustes = ajustes or AjustesPreprocesado()
     mascara = color.laxa(imagen)
@@ -257,6 +270,11 @@ def lineas(
     if not tramos_filas:
         return []
     alto = max(fin - inicio for inicio, fin in tramos_filas)
+    if not por_glifos and not vertical:
+        return [
+            _fila_entera(mascara[inicio:fin], tinta[inicio:fin], alto, ajustes)
+            for inicio, fin in tramos_filas
+        ]
     return [
         _segmentos(mascara[inicio:fin], tinta[inicio:fin], alto, vertical, ajustes)
         for inicio, fin in tramos_filas

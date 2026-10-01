@@ -342,6 +342,12 @@ msgstr "Unsupported language: {idioma} (supported: {admitidos})"
 msgid "Idioma de traducción no admitido: {destino} (admitidos: {admitidos})"
 msgstr "Unsupported translation language: {destino} (supported: {admitidos})"
 
+msgid "Un juego en inglés solo se puede traducir al español"
+msgstr "A game in English can only be translated into Spanish"
+
+msgid "El texto en inglés no puede ir en columnas verticales"
+msgstr "English text cannot be in vertical columns"
+
 msgid "Si se traduce desde el inglés del guion, no se puede traducir al inglés"
 msgstr "If translating from the script's English, the translation cannot be into English"
 
@@ -632,11 +638,11 @@ msgstr "Simplified Chinese"
 msgid "Japonés"
 msgstr "Japanese"
 
-msgid "Español"
-msgstr "Spanish"
-
 msgid "Inglés"
 msgstr "English"
+
+msgid "Español"
+msgstr "Spanish"
 
 msgid "Claro sobre fondo oscuro"
 msgstr "Light on a dark background"

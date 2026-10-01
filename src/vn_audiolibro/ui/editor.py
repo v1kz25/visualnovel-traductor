@@ -30,7 +30,15 @@ from vn_audiolibro.ocr.modelos import DET_PPOCRV5_MOBILE, REC_PPOCRV5_MOBILE
 from vn_audiolibro.ocr.preprocesado import BusquedaTexto, Orientacion
 from vn_audiolibro.ocr.reconocedor import ReconocedorRapidOCR
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles, PerfilDuplicadoError
-from vn_audiolibro.perfiles.modelos import DESTINOS, IDIOMAS, AjustesGuion, Color, Perfil, PerfilInvalidoError
+from vn_audiolibro.perfiles.modelos import (
+    DESTINOS,
+    IDIOMAS,
+    INGLES,
+    AjustesGuion,
+    Color,
+    Perfil,
+    PerfilInvalidoError,
+)
 from vn_audiolibro.plataforma import capturador, carpeta_de_proceso, gestor_ventanas
 from vn_audiolibro.procesos import pids_propios
 from vn_audiolibro.textos import N_, _, ngettext
@@ -43,6 +51,7 @@ NOMBRES_IDIOMAS = {
     "zh-Hant": N_("Chino tradicional"),
     "zh-Hans": N_("Chino simplificado"),
     "ja": N_("Japonés"),
+    "en": N_("Inglés"),
 }
 NOMBRES_DESTINOS = {"es": N_("Español"), "en": N_("Inglés")}
 NOMBRES_COLORES = {Color.CLARO: N_("Claro sobre fondo oscuro"), Color.OSCURO: N_("Oscuro sobre fondo claro")}
@@ -242,6 +251,7 @@ class EditorJuego(QDialog):
 
     def _conectar(self) -> None:
         self.boton_actualizar.clicked.connect(self.actualizar_ventanas)
+        self.idioma.currentIndexChanged.connect(lambda _: self._al_cambiar_idioma())
         self.ventanas.activated.connect(lambda _: self._al_elegir_ventana())
         self.titulo.textChanged.connect(lambda _: self._actualizar_botones())
         self.nombre.textChanged.connect(lambda _: self._actualizar_botones())
@@ -441,6 +451,15 @@ class EditorJuego(QDialog):
             return
         self.guardado = perfil
         self.accept()
+
+    def _al_cambiar_idioma(self) -> None:
+        """Un juego en inglés solo se traduce al español y en horizontal: se fijan y se bloquean."""
+        ingles = self.idioma.currentData() == INGLES
+        if ingles:
+            self._elegir(self.destino, DESTINOS[0])
+            self._elegir(self.orientacion, Orientacion.HORIZONTAL.value)
+        self.destino.setEnabled(not ingles)
+        self.orientacion.setEnabled(not ingles)
 
     def _actualizar_botones(self) -> None:
         self.origen_guion.setEnabled(bool(self.carpeta_guion.text().strip()))

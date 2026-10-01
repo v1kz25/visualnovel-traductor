@@ -15,6 +15,14 @@ from vn_audiolibro.captura.modelos import Imagen
 CARPETAS_FUENTES = (Path("/usr/share/fonts/opentype/noto"), Path("/usr/share/fonts/noto-cjk"))
 FAMILIAS = {"zh-Hant": "Noto Sans CJK TC", "zh-Hans": "Noto Sans CJK SC", "ja": "Noto Sans CJK JP"}
 
+CARPETA_TRUETYPE = Path("/usr/share/fonts/truetype")
+FUENTES_LATINAS = {
+    "DejaVu Sans": "dejavu/DejaVuSans.ttf",  # fonts-dejavu-core
+    "Liberation Serif": "liberation/LiberationSerif-Regular.ttf",  # fonts-liberation
+    "Liberation Sans": "liberation/LiberationSans-Regular.ttf",
+}
+"""Fuentes latinas libres para el texto en inglés, relativas a `CARPETA_TRUETYPE`."""
+
 
 def falta(motivo: str) -> NoReturn:
     """Salta el test por falta de un recurso, salvo en la CI, donde tiene que estar."""
@@ -66,6 +74,27 @@ def _fondo(ancho: int, alto: int, estilo: Estilo) -> Image.Image:
     t = np.linspace(0, 1, ancho)[np.newaxis, :, np.newaxis]
     filas = inicio + (fin - inicio) * t
     return Image.fromarray(np.repeat(filas, alto, axis=0).astype(np.uint8))
+
+
+def latina(nombre: str, tamano: int) -> ImageFont.FreeTypeFont:
+    """Fuente latina libre; salta el test si no está instalada."""
+    ruta = CARPETA_TRUETYPE / FUENTES_LATINAS[nombre]
+    if not ruta.is_file():
+        falta(f"falta la fuente {nombre} ({ruta})")
+    return ImageFont.truetype(str(ruta), tamano)
+
+
+def texto_latino(lineas: list[str], cara: ImageFont.FreeTypeFont, estilo: Estilo | None = None) -> Imagen:
+    """Líneas de texto latino escritas de seguido, con el espaciado propio de la fuente."""
+    estilo = estilo or Estilo()
+    tamano = round(cara.size)
+    salto = round(tamano * estilo.interlineado)
+    ancho = 30 + max(round(cara.getlength(linea)) for linea in lineas)
+    imagen = _fondo(ancho, 20 + salto * len(lineas), estilo)
+    dibujo = ImageDraw.Draw(imagen)
+    for n, linea in enumerate(lineas):
+        dibujo.text((15, 10 + n * salto), linea, font=cara, fill=estilo.color)
+    return np.asarray(imagen).copy()
 
 
 def horizontal(lineas: list[str], cara: ImageFont.FreeTypeFont, estilo: Estilo) -> Imagen:

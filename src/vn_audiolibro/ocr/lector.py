@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 from vn_audiolibro.captura.mascara import TEXTO_CLARO, ColorTexto
 from vn_audiolibro.captura.modelos import Imagen
-from vn_audiolibro.ocr.normalizacion import normalizar
+from vn_audiolibro.ocr.normalizacion import normalizar, separa_palabras
 from vn_audiolibro.ocr.preprocesado import AjustesPreprocesado, BusquedaTexto, Linea, Orientacion, lineas
 from vn_audiolibro.ocr.reconocedor import Detector, Reconocedor, TextoDetectado
 
@@ -27,11 +27,13 @@ class TextoLeido:
     """Texto reconocido en la zona, línea a línea y en orden de lectura."""
 
     lineas: tuple[str, ...]
+    separador: str = ""
+    """Lo que va entre línea y línea: nada en chino y japonés, un espacio en inglés."""
 
     @property
     def texto(self) -> str:
-        """Las líneas unidas sin separador: en chino y japonés una frase sigue en la línea siguiente."""
-        return "".join(self.lineas)
+        """Las líneas unidas: una frase puede seguir en la línea siguiente."""
+        return self.separador.join(self.lineas)
 
 
 class LectorOCR:
@@ -53,15 +55,17 @@ class LectorOCR:
         """Texto de la imagen, descartando las líneas en las que no se reconoce nada."""
         ajustes = self._ajustes
         textos = (normalizar(texto, ajustes.idioma) for texto in self._lineas(imagen))
-        return TextoLeido(tuple(texto for texto in textos if texto))
+        return TextoLeido(tuple(texto for texto in textos if texto), _separador(ajustes.idioma))
 
     def _lineas(self, imagen: Imagen) -> Iterable[str]:
         ajustes = self._ajustes
         if self._detector is not None and ajustes.busqueda is BusquedaTexto.DETECTOR:
-            return lineas_detectadas(self._detector.detectar(imagen), ajustes.orientacion)
+            detectados = self._detector.detectar(imagen)
+            return lineas_detectadas(detectados, ajustes.orientacion, _separador(ajustes.idioma))
+        por_glifos = not separa_palabras(ajustes.idioma)
         return (
             self._leer_linea(linea)
-            for linea in lineas(imagen, ajustes.color, ajustes.orientacion, ajustes.preprocesado)
+            for linea in lineas(imagen, ajustes.color, ajustes.orientacion, ajustes.preprocesado, por_glifos)
         )
 
     def _leer_linea(self, linea: Linea) -> str:
@@ -71,13 +75,20 @@ class LectorOCR:
         )
 
 
-def lineas_detectadas(detectados: Iterable[TextoDetectado], orientacion: Orientacion) -> list[str]:
+def _separador(idioma: str) -> str:
+    return " " if separa_palabras(idioma) else ""
+
+
+def lineas_detectadas(
+    detectados: Iterable[TextoDetectado], orientacion: Orientacion, separador: str = ""
+) -> list[str]:
     """Une los trozos del detector en líneas, en orden de lectura.
 
     El detector puede partir una línea en varios trozos (si hay un hueco grande entre
     caracteres). Los trozos que se solapan en altura (en anchura si el texto es vertical) son de
     la misma línea y se leen de izquierda a derecha (de arriba abajo). Las líneas van de arriba
-    abajo, o de derecha a izquierda las columnas verticales.
+    abajo, o de derecha a izquierda las columnas verticales. Los trozos de una línea se unen con
+    `separador` (un espacio en inglés).
     """
     vertical = orientacion is Orientacion.VERTICAL
 
@@ -94,7 +105,7 @@ def lineas_detectadas(detectados: Iterable[TextoDetectado], orientacion: Orienta
         else:
             grupos.append(((inicio, fin), [detectado]))
     return [
-        "".join(d.texto for d in sorted(trozos, key=lambda d: d.caja.y if vertical else d.caja.x))
+        separador.join(d.texto for d in sorted(trozos, key=lambda d: d.caja.y if vertical else d.caja.x))
         for _, trozos in grupos
     ]
 

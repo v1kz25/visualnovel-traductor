@@ -14,8 +14,11 @@ from vn_audiolibro.voz.modelos import PAUSA_ENTRE_LINEAS_S, ModoLectura
 from vn_audiolibro.voz.piper import HABLANTE_POR_DEFECTO, Hablante
 from vn_audiolibro.voz.volumen import NIVEL_POR_DEFECTO, Juego, Seleccion
 
-IDIOMAS = ("zh-Hant", "zh-Hans", "ja")
-"""Idiomas de origen admitidos: chino tradicional, chino simplificado y japonés."""
+IDIOMAS = ("zh-Hant", "zh-Hans", "ja", "en")
+"""Idiomas de origen admitidos: chino tradicional, chino simplificado, japonés e inglés."""
+
+INGLES = "en"
+"""Un juego en inglés solo se traduce al español y su texto va en horizontal."""
 
 DESTINOS = ("es", "en")
 """Idiomas a los que se traduce y en los que se lee: español (por defecto) e inglés."""
@@ -171,6 +174,10 @@ class Perfil:
                     destino=self.destino, admitidos=", ".join(DESTINOS)
                 )
             )
+        if self.idioma == INGLES and self.destino == INGLES:
+            raise PerfilInvalidoError(_("Un juego en inglés solo se puede traducir al español"))
+        if self.idioma == INGLES and self.orientacion is Orientacion.VERTICAL:
+            raise PerfilInvalidoError(_("El texto en inglés no puede ir en columnas verticales"))
         if self.guion is not None and self.guion.origen is OrigenGuion.INGLES and self.destino == "en":
             raise PerfilInvalidoError(
                 _("Si se traduce desde el inglés del guion, no se puede traducir al inglés")
