@@ -74,6 +74,15 @@ en `%LOCALAPPDATA%\vn-audiolibro` y los ajustes en `%APPDATA%\vn-audiolibro`.
 3. **Ajustes**: voz (mujer u hombre) y velocidad, cómo leer cuando avanzas deprisa, volumen del juego
    y de otras aplicaciones, y glosario de nombres propios.
 
+**Juegos con el guion legible.** Algunos juegos guardan su guion en ficheros de texto (por ahora,
+los hechos con Unity que lo tienen en `StreamingAssets/Scripts` con órdenes `OutputLine`). Al
+añadirlos, la app encuentra el guion sola o puedes elegir su carpeta en **Guion del juego**. Así el
+texto sale exacto del guion aunque el OCR falle, el OCR solo sirve para saber por dónde vas, y los
+párrafos siguientes se traducen por adelantado mientras escuchas el actual. Si el guion trae una
+traducción oficial al inglés, puedes traducir desde ella. Para traducir el guion entero antes de
+jugar: `vn-audiolibro traducir-guion "Mi juego"` (se puede cortar con Ctrl+C y seguir otro día).
+La app solo lee los ficheros del juego: no los modifica.
+
 La interfaz está en español y en inglés: sigue el idioma del sistema y se puede cambiar en
 **Idioma de la app**, en la ventana principal.
 

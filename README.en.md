@@ -49,6 +49,14 @@ and progress. After that it works offline.
 3. **Settings**: voice (female or male) and speed, what to do when you advance quickly, the volume
    of the game and other applications, and a glossary of names.
 
+**Games with a readable script.** Some games store their script in text files (for now, Unity games
+that keep it in `StreamingAssets/Scripts` with `OutputLine` commands). For those, the app finds the
+script by itself or you can choose its folder in **Game script**: the text comes exactly from the
+script even if OCR fails, OCR is only used to know where you are, and the next paragraphs are
+translated in advance while you listen. If the script includes an official English translation, you
+can translate from it. To translate the whole script before playing:
+`vn-audiolibro traducir-guion "My game"`. The app only reads the game files: it never changes them.
+
 From the terminal: `vn-audiolibro --help` (`vn-audiolibro-consola.exe --help` on Windows).
 
 ## Translating the app
