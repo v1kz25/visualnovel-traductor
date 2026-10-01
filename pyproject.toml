@@ -10,6 +10,7 @@ authors = [
 ]
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "keyring>=25.7.0",
     "mss>=10.2.0",
     "numpy>=2.5.3",
     "onnxruntime>=1.30.0",
