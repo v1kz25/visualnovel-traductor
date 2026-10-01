@@ -27,7 +27,7 @@ def main(argv: list[str] | None = None) -> int:
     """Punto de entrada de la herramienta."""
     parser = argparse.ArgumentParser(prog="python -m vn_audiolibro.ocr", description=__doc__.splitlines()[0])
     parser.add_argument("imagenes", nargs="+", type=Path, help="imágenes PNG de la zona de texto")
-    parser.add_argument("--idioma", default="zh-Hant", help="idioma de origen (zh-Hant, zh-Hans, ja)")
+    parser.add_argument("--idioma", default="zh-Hant", help="idioma de origen (zh-Hant, zh-Hans, ja, en)")
     parser.add_argument("--oscuro", action="store_true", help="el texto es oscuro sobre fondo claro")
     parser.add_argument("--vertical", action="store_true", help="el texto va en columnas verticales")
     parser.add_argument("--detector", action="store_true", help="buscar el texto con el detector")

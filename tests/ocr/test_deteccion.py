@@ -59,6 +59,18 @@ def test_las_columnas_verticales_van_de_derecha_a_izquierda() -> None:
     assert lineas_detectadas(trozos, Orientacion.VERTICAL) == ["先輩、一緒に", "帰ろう"]
 
 
+def test_en_ingles_los_trozos_de_una_linea_se_unen_con_un_espacio() -> None:
+    trozos = [trozo("already.", 230, 20), trozo("I told you", 20, 20, 200), trozo("Fine.", 20, 60)]
+    assert lineas_detectadas(trozos, Orientacion.HORIZONTAL, " ") == ["I told you already.", "Fine."]
+
+
+def test_lee_en_ingles_con_el_detector() -> None:
+    detector = DetectorFalso([trozo("Fine.", 0, 60), trozo("I told  you", 0, 20)])
+    lector = LectorOCR(SinReconocedor(), AjustesLector("en", busqueda=DETECTOR), detector)
+
+    assert lector.leer(IMAGEN).texto == "I told you Fine."
+
+
 def test_sin_texto_no_hay_lineas() -> None:
     assert lineas_detectadas([], Orientacion.HORIZONTAL) == []
 

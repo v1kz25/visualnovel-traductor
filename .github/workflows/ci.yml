@@ -19,10 +19,10 @@ jobs:
           enable-cache: true
       - name: Instalar dependencias
         run: uv sync --locked
-      - name: Fuente CJK (OCR), libpulse (volumen) y bibliotecas de Qt (interfaz)
+      - name: Fuentes CJK y latinas (OCR), libpulse (volumen) y bibliotecas de Qt (interfaz)
         run: >-
           sudo apt-get update && sudo apt-get install -y --no-install-recommends
-          fonts-noto-cjk libpulse0 libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+          fonts-noto-cjk fonts-dejavu-core fonts-liberation libpulse0 libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
       - name: Caché de los modelos de OCR y voz
         uses: actions/cache@v4
         with:

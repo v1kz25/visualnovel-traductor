@@ -119,6 +119,18 @@ def test_recompone_cada_fila_en_negro_sobre_blanco_y_sin_espaciado() -> None:
     assert primera[margen, margen].tolist() == [0, 0, 0]
 
 
+def test_sin_partir_en_glifos_la_fila_conserva_su_espaciado() -> None:
+    """Los idiomas con espacios: la fila va entera para no perder los espacios entre palabras."""
+    resultado = lineas(pantalla(fondo=30, texto=255), TEXTO_CLARO, ajustes=SIN_AMPLIAR, por_glifos=False)
+
+    assert len(resultado) == 2
+    (primera,) = resultado[0]
+    assert isinstance(primera, np.ndarray)
+    margen = round(0.25 * 30)
+    assert primera.shape == (30 + 2 * margen, 150 + 2 * margen, 3)  # de x=10 a x=160, huecos incluidos
+    assert primera[margen + 5, margen + 45].tolist() == [255, 255, 255]  # el hueco entre glifos
+
+
 def test_amplia_la_letra_pequena() -> None:
     (normal,), _ = lineas(pantalla(fondo=30, texto=255), TEXTO_CLARO, ajustes=SIN_AMPLIAR)
     (ampliada,), _ = lineas(pantalla(fondo=30, texto=255), TEXTO_CLARO, ajustes=AJUSTES)

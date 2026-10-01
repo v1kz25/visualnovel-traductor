@@ -2,7 +2,7 @@
 
 import pytest
 
-from vn_audiolibro.ocr.normalizacion import normalizar
+from vn_audiolibro.ocr.normalizacion import normalizar, separa_palabras
 
 
 @pytest.mark.parametrize(
@@ -42,3 +42,22 @@ def test_pasa_a_simplificado_si_el_juego_es_zh_hans() -> None:
 
 def test_no_convierte_el_japones() -> None:
     assert normalizar("学校へ行く", "ja") == "学校へ行く"
+
+
+@pytest.mark.parametrize(
+    ("leido", "esperado"),
+    [
+        ("  I  told you\talready ", "I told you already"),
+        ("a well-known secret", "a well-known secret"),  # los guiones no son rayas
+        ("She smiled - and left.", "She smiled - and left."),
+        ("Well... really?!", "Well... really?!"),  # la puntuación ASCII se queda
+        ("Wait，what？", "Wait,what?"),  # la de ancho completo vuelve a ASCII
+    ],
+)
+def test_en_ingles_conserva_espacios_guiones_y_puntuacion(leido: str, esperado: str) -> None:
+    assert normalizar(leido, "en") == esperado
+
+
+def test_solo_el_ingles_separa_las_palabras() -> None:
+    assert separa_palabras("en")
+    assert not any(separa_palabras(idioma) for idioma in ("zh-Hant", "zh-Hans", "ja"))
