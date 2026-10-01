@@ -56,6 +56,11 @@ class GestorVentanasX11:
             ) from error
         return Rectangulo(x=-origen.x, y=-origen.y, ancho=tamano.width, alto=tamano.height)
 
+    def activa(self) -> int | None:
+        """Ventana que tiene el foco según el gestor de ventanas (EWMH), o None si no se sabe."""
+        valor = self._propiedad(self._raiz, "_NET_ACTIVE_WINDOW")
+        return int(valor[0]) if isinstance(valor, list) and valor and valor[0] else None
+
     def _leer(self, id_ventana: int) -> Ventana:
         ventana = self._pantalla.create_resource_object("window", id_ventana)
         titulo = self._propiedad(ventana, "_NET_WM_NAME", self._atomo("UTF8_STRING"))
