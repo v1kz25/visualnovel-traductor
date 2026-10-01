@@ -6,6 +6,10 @@ si el jugador avanza deprisa, las intermedias se descartan sin leerlas.
 
 Si el traductor traduce por partes, la voz empieza con la primera frase mientras se traduce el
 resto, y una traducción que ya no hace falta (llega otra línea, se pausa) se cancela.
+
+Con el guion del juego, el texto del OCR solo sirve para encontrar en él los párrafos nuevos, que
+se traducen y leen con su texto exacto. Mientras no llega otra zona, se traducen por adelantado
+los párrafos siguientes.
 """
 
 import logging
@@ -18,6 +22,8 @@ from typing import Protocol
 
 from vn_audiolibro.cache.modelos import Clave, Entrada
 from vn_audiolibro.captura.modelos import Imagen, ZonaEstable
+from vn_audiolibro.guion.buscador import SeguidorGuion
+from vn_audiolibro.guion.previa import PreparadorGuion
 from vn_audiolibro.ocr.lector import TextoLeido
 from vn_audiolibro.textos import _
 from vn_audiolibro.traduccion.local import LINEAS_CONTEXTO
@@ -97,6 +103,16 @@ class LineaJuego:
 
 
 @dataclass(frozen=True)
+class GuionJuego:
+    """El guion del juego mientras se juega: dónde va el jugador y cómo se traduce cada párrafo."""
+
+    seguidor: SeguidorGuion
+    preparador: PreparadorGuion
+    anticipo: int = 5
+    """Párrafos siguientes que se traducen por adelantado."""
+
+
+@dataclass(frozen=True)
 class AjustesOrquestador:
     """Lo que el orquestador necesita saber del juego (sale del perfil)."""
 
@@ -127,8 +143,11 @@ class Orquestador:
         voz: Voz,
         al_linea: Callable[[LineaJuego], None] = lambda _: None,
         al_error: Callable[[str], None] = lambda _: None,
+        guion: GuionJuego | None = None,
     ) -> None:
         self._ajustes = ajustes
+        self._guion = guion
+        self._anticipar = False
         self._lector = lector
         self._traductor = traductor
         self._cache = cache
@@ -177,6 +196,7 @@ class Orquestador:
     def reanudar(self) -> None:
         with self._condicion:
             self._pausado = False
+            self._condicion.notify_all()
 
     def silenciar(self) -> None:
         """Calla la voz, pero sigue traduciendo y avisando de cada línea hasta `quitar_silencio`."""
@@ -215,14 +235,18 @@ class Orquestador:
     def _bucle(self) -> None:
         while True:
             with self._condicion:
-                self._condicion.wait_for(lambda: bool(self._pendientes) or self._cerrado)
+                self._condicion.wait_for(
+                    lambda: bool(self._pendientes) or self._cerrado or self._toca_anticipar()
+                )
                 if self._cerrado:
                     return
-                zona = self._pendientes.popleft()
-                self._ocupado = True
+                zona = self._pendientes.popleft() if self._pendientes else None
+                self._ocupado = zona is not None
             try:
                 if zona is not None:
                     self._procesar(zona)
+                else:
+                    self._anticipar_siguiente()
             except Exception as error:
                 # El hilo tiene que seguir vivo para la zona siguiente.
                 _registro.exception("No se pudo procesar la zona de texto")
@@ -239,13 +263,27 @@ class Orquestador:
         if not texto or texto == self._ultimo_texto:
             return  # sin texto, o la misma línea redibujada
         anterior, self._ultimo_texto = self._ultimo_texto, texto
+        if self._guion is not None and (parrafos := self._guion.seguidor.nuevos(texto)) is not None:
+            preparador = self._guion.preparador
+            for parrafo in parrafos:
+                if preparador.hay_que_leer(parrafo):
+                    self._leer(preparador.clave(parrafo), preparador.peticion(parrafo), zona, inicio, ocr_s)
+            with self._condicion:
+                self._anticipar = True
+            return
         if anterior and texto.startswith(anterior):
             # El juego ha añadido texto a la línea anterior, que ya se leyó: solo va lo nuevo.
             texto = texto[len(anterior) :].strip()
-        clave = Clave(self._ajustes.perfil, self._ajustes.idioma, texto, self._ajustes.destino)
+        ajustes = self._ajustes
+        clave = Clave(ajustes.perfil, ajustes.idioma, texto, ajustes.destino)
+        peticion = Peticion(texto, ajustes.idioma, tuple(self._contexto), ajustes.glosario, ajustes.destino)
+        self._leer(clave, peticion, zona, inicio, ocr_s)
 
+    def _leer(self, clave: Clave, peticion: Peticion, zona: ZonaEstable, inicio: float, ocr_s: float) -> None:
+        """Traduce la línea (o la saca de la caché), la lee y avisa de ella."""
+        texto = clave.texto
         entrada = self._cache.consultar(clave)
-        resultado = _Resultado(entrada.traduccion, True, None) if entrada else self._traducir(clave, texto)
+        resultado = _Resultado(entrada.traduccion, True, None) if entrada else self._traducir(clave, peticion)
         if resultado is None:
             return
         traduccion_s = time.monotonic() - inicio - ocr_s
@@ -277,9 +315,46 @@ class Orquestador:
         with self._condicion:
             return self._llega_tarde_sin_cerrojo()
 
-    def _traducir(self, clave: Clave, texto: str) -> _Resultado | None:
-        ajustes = self._ajustes
-        peticion = Peticion(texto, ajustes.idioma, tuple(self._contexto), ajustes.glosario, ajustes.destino)
+    def _toca_anticipar(self) -> bool:
+        """Si hay que traducir por adelantado (se llama con el cerrojo tomado)."""
+        return self._anticipar and not self._pausado and not self._cerrado
+
+    def _anticipar_siguiente(self) -> None:
+        """Traduce el primer párrafo siguiente que falte; si ya están todos, deja de anticipar.
+
+        Se cancela en cuanto llega otra zona, para no hacerla esperar.
+        """
+        guion = self._guion
+        try:
+            seguir = guion is not None and self._traducir_por_adelantado(guion)
+        except Exception:
+            # Hasta la próxima zona: si no, se repetiría el mismo fallo sin parar.
+            _registro.exception("Falló la traducción por adelantado")
+            seguir = False
+        if not seguir:
+            with self._condicion:
+                self._anticipar = False
+
+    def _traducir_por_adelantado(self, guion: GuionJuego) -> bool:
+        """Traduce el primer párrafo siguiente que falte. False si no queda ninguno o falla."""
+        preparador = guion.preparador
+        siguientes = guion.seguidor.siguientes(guion.anticipo)
+        siguiente = next((parrafo for parrafo in siguientes if preparador.pendiente(parrafo)), None)
+        if siguiente is None:
+            return False
+        try:
+            preparador.traducir(siguiente, self._llega_otra)
+        except TraduccionFallidaError as error:
+            _registro.warning("No se pudo traducir por adelantado: %s", error)
+            return False
+        return True
+
+    def _llega_otra(self) -> bool:
+        with self._condicion:
+            return bool(self._pendientes) or self._pausado or self._cerrado
+
+    def _traducir(self, clave: Clave, peticion: Peticion) -> _Resultado | None:
+        texto = clave.texto
         try:
             if isinstance(self._traductor, TraductorPorPartes):
                 return self._traducir_por_partes(clave, peticion, self._traductor)

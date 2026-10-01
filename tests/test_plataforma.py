@@ -1,7 +1,9 @@
 """Tests de la elección de implementación según el sistema operativo."""
 
+import os
 import subprocess
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -114,3 +116,16 @@ def test_idiomas_del_sistema_en_windows(monkeypatch: pytest.MonkeyPatch) -> None
     assert IDIOMAS_SISTEMA() == ["es_ES"]
     monkeypatch.delattr(ctypes, "windll")
     assert IDIOMAS_SISTEMA() == []
+
+
+def test_carpeta_de_proceso() -> None:
+    carpeta = plataforma.carpeta_de_proceso(os.getpid())
+
+    assert carpeta is not None
+    assert carpeta.is_dir()
+    if plataforma.es_linux():
+        assert carpeta == Path.cwd()
+
+
+def test_carpeta_de_proceso_que_no_existe() -> None:
+    assert plataforma.carpeta_de_proceso(2**30) is None

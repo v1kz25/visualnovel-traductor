@@ -6,6 +6,7 @@ from enum import StrEnum
 
 from vn_audiolibro.captura.mascara import TEXTO_CLARO, TEXTO_OSCURO, ColorTexto
 from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, ZonaRelativa
+from vn_audiolibro.guion.modelos import OrigenGuion
 from vn_audiolibro.ocr.preprocesado import Orientacion
 from vn_audiolibro.textos import _
 from vn_audiolibro.traduccion.modelos import Glosario
@@ -104,6 +105,19 @@ class AjustesVolumen:
         return Seleccion.de_nombres(juego, self.nivel_juego, dict(self.otras), self.excluir)
 
 
+@dataclass(frozen=True)
+class AjustesGuion:
+    """Guion del juego como fuente del texto (ver `vn_audiolibro.guion`)."""
+
+    carpeta: str
+    """Carpeta del juego (o la de los ficheros del guion)."""
+    origen: OrigenGuion = OrigenGuion.ORIGINAL
+
+    def __post_init__(self) -> None:
+        if not self.carpeta.strip():
+            raise PerfilInvalidoError(_("Falta la carpeta del juego para leer su guion"))
+
+
 def nuevo_id() -> str:
     """Identificador de un perfil nuevo."""
     return uuid.uuid4().hex
@@ -130,6 +144,8 @@ class Perfil:
     voz: AjustesVoz = field(default_factory=AjustesVoz)
     lectura: AjustesLectura = field(default_factory=AjustesLectura)
     volumen: AjustesVolumen = field(default_factory=AjustesVolumen)
+    guion: AjustesGuion | None = None
+    """Si está, el texto sale del guion del juego y el OCR solo sirve para saber por dónde va."""
     id: str = field(default_factory=nuevo_id)
 
     def __post_init__(self) -> None:
@@ -152,6 +168,10 @@ class Perfil:
                 _("Idioma de traducción no admitido: {destino} (admitidos: {admitidos})").format(
                     destino=self.destino, admitidos=", ".join(DESTINOS)
                 )
+            )
+        if self.guion is not None and self.guion.origen is OrigenGuion.INGLES and self.destino == "en":
+            raise PerfilInvalidoError(
+                _("Si se traduce desde el inglés del guion, no se puede traducir al inglés")
             )
         if len(self.id) != 32 or any(c not in "0123456789abcdef" for c in self.id):
             raise PerfilInvalidoError(_("Identificador de juego no válido: {id}").format(id=self.id))

@@ -100,6 +100,15 @@ msgstr "SECONDS"
 msgid "segundos de silencio entre líneas"
 msgstr "seconds of silence between lines"
 
+msgid "CARPETA"
+msgstr "FOLDER"
+
+msgid "carpeta del juego: el texto se saca de su guion y el OCR solo sirve para seguirlo"
+msgstr "game folder: the text is taken from its script and OCR is only used to follow it"
+
+msgid "traducir desde la traducción oficial al inglés que trae el guion"
+msgstr "translate from the official English translation included in the script"
+
 msgid "muestra lo que ocupa la caché; permite vaciarla o limitarla"
 msgstr "show how much space the cache uses; clear or limit it"
 
@@ -121,14 +130,17 @@ msgstr "do not limit the cache size"
 msgid "añade vn-audiolibro al menú de aplicaciones (en Windows, al menú Inicio)"
 msgstr "add vn-audiolibro to the applications menu (the Start menu on Windows)"
 
-msgid "juega con un juego configurado"
-msgstr "play a configured game"
+msgid "traduce por adelantado el guion de un juego (se puede cortar con Ctrl+C y seguir otro día)"
+msgstr "translates a game's script in advance (you can stop with Ctrl+C and continue another day)"
 
 msgid "juego"
 msgstr "game"
 
 msgid "nombre del juego"
 msgstr "name of the game"
+
+msgid "juega con un juego configurado"
+msgstr "play a configured game"
 
 msgid "muestra cuánto tarda cada etapa de cada línea"
 msgstr "show how long each stage takes for each line"
@@ -190,6 +202,23 @@ msgstr "Total: {total} ({limite})"
 msgid "Juego «{nombre}» guardado en {ruta}"
 msgstr "Game “{nombre}” saved to {ruta}"
 
+msgid "--desde-ingles necesita --guion"
+msgstr "--desde-ingles needs --guion"
+
+msgid "{hechos} de {total} párrafos ({porcentaje} %) · {minutos:.0f} min"
+msgstr "{hechos} of {total} paragraphs ({porcentaje} %) · {minutos:.0f} min"
+
+msgid "Traduciendo el guion. Ctrl+C para cortar: lo traducido se conserva."
+msgstr "Translating the script. Ctrl+C to stop: what has been translated is kept."
+
+msgid "Cortado. La próxima vez seguirá por donde lo ha dejado."
+msgstr "Stopped. Next time it will continue where it left off."
+
+msgid "Listo: {n} párrafo traducido."
+msgid_plural "Listo: {n} párrafos traducidos."
+msgstr[0] "Done: {n} paragraph translated."
+msgstr[1] "Done: {n} paragraphs translated."
+
 msgid " (no leída: llegó otra línea)"
 msgstr " (not read: another line arrived)"
 
@@ -232,6 +261,15 @@ msgstr "Could not extract {fichero}: {error}"
 msgid "No se pudo extraer {fichero}: {entrada} sale del destino"
 msgstr "Could not extract {fichero}: {entrada} points outside the destination"
 
+msgid "No se ha encontrado el guion del juego en {carpeta}"
+msgstr "The game's script was not found in {carpeta}"
+
+msgid "El guion de {carpeta} no tiene texto"
+msgstr "The script in {carpeta} has no text"
+
+msgid "No se pudo leer {fichero}: {error}"
+msgstr "Could not read {fichero}: {error}"
+
 msgid "Versión de formato no válida: {version!r}"
 msgstr "Invalid format version: {version!r}"
 
@@ -268,9 +306,6 @@ msgstr "There is already a game called “{nombre}”"
 msgid "Identificador de juego no válido: {id_perfil}"
 msgstr "Invalid game identifier: {id_perfil}"
 
-msgid "No se pudo leer {fichero}: {error}"
-msgstr "Could not read {fichero}: {error}"
-
 msgid "{fichero} no contiene un juego"
 msgstr "{fichero} does not contain a game"
 
@@ -285,6 +320,9 @@ msgstr "The speed must be between {minima} and {maxima}: {velocidad}"
 
 msgid "La pausa entre líneas tiene que estar entre 0 y {maximo} s"
 msgstr "The pause between lines must be between 0 and {maximo} s"
+
+msgid "Falta la carpeta del juego para leer su guion"
+msgstr "The game folder is missing to read its script"
 
 msgid "El juego necesita un nombre"
 msgstr "The game needs a name"
@@ -301,6 +339,9 @@ msgstr "Unsupported language: {idioma} (supported: {admitidos})"
 msgid "Idioma de traducción no admitido: {destino} (admitidos: {admitidos})"
 msgstr "Unsupported translation language: {destino} (supported: {admitidos})"
 
+msgid "Si se traduce desde el inglés del guion, no se puede traducir al inglés"
+msgstr "If translating from the script's English, the translation cannot be into English"
+
 msgid "Identificador de juego no válido: {id}"
 msgstr "Invalid game identifier: {id}"
 
@@ -310,20 +351,32 @@ msgstr "Error while processing the line: {error}"
 msgid "No se pudo traducir la línea: {error}"
 msgstr "Could not translate the line: {error}"
 
+msgid "«{nombre}» no tiene configurado el guion del juego"
+msgstr "“{nombre}” has no game script configured"
+
+msgid "Leyendo el guion del juego…"
+msgstr "Reading the game's script…"
+
+msgid "Preparando el traductor (la primera vez se descarga)…"
+msgstr "Preparing the translator (downloaded the first time)…"
+
+msgid "Arrancando el traductor…"
+msgstr "Starting the translator…"
+
 msgid "Buscando la ventana «{ventana}»…"
 msgstr "Looking for the window “{ventana}”…"
 
 msgid "Preparando los modelos (la primera vez se descargan)…"
 msgstr "Preparing the models (they are downloaded the first time)…"
 
-msgid "Arrancando el traductor…"
-msgstr "Starting the translator…"
-
 msgid "Calentando el traductor…"
 msgstr "Warming up the translator…"
 
 msgid "Leyendo «{ventana}»."
 msgstr "Reading “{ventana}”."
+
+msgid "No se usará el guion, solo el OCR: {error}"
+msgstr "The script will not be used, only OCR: {error}"
 
 msgid "No se podrá bajar el volumen del juego: {error}"
 msgstr "The game volume cannot be lowered: {error}"
@@ -594,8 +647,20 @@ msgstr "Horizontal"
 msgid "Vertical (columnas)"
 msgstr "Vertical (columns)"
 
+msgid "El texto del juego"
+msgstr "The game's text"
+
+msgid "La traducción oficial al inglés del guion"
+msgstr "The script's official English translation"
+
+msgid "Opcional. Si el juego guarda su guion en ficheros legibles, elige su carpeta: el texto sale exacto del guion, se traduce por adelantado y el OCR solo sirve para saber por dónde vas."
+msgstr "Optional. If the game stores its script in readable files, choose its folder: the text comes exactly from the script, it is translated in advance and OCR is only used to know where you are."
+
 msgid "Captura la ventana y dibuja con el ratón un recuadro sobre la caja de texto."
 msgstr "Capture the window and draw a box over the text box with the mouse."
+
+msgid "Carpeta del juego"
+msgstr "Game folder"
 
 msgid "Editar juego"
 msgstr "Edit game"
@@ -611,6 +676,12 @@ msgstr "Refresh"
 
 msgid "Parte del título de la ventana que la identifica"
 msgstr "Part of the window title that identifies it"
+
+msgid "Ninguno: solo OCR"
+msgstr "None: OCR only"
+
+msgid "Elegir…"
+msgstr "Choose…"
 
 msgid "Nombre"
 msgstr "Name"
@@ -632,6 +703,12 @@ msgstr "Text"
 
 msgid "Orientación"
 msgstr "Orientation"
+
+msgid "Guion del juego"
+msgstr "Game script"
+
+msgid "Traducir desde"
+msgstr "Translate from"
 
 msgid "Capturar ventana"
 msgstr "Capture window"
@@ -665,6 +742,16 @@ msgstr "Could not read: {error}"
 
 msgid "Texto leído: {texto}"
 msgstr "Text read: {texto}"
+
+msgid "Guion encontrado: {n} párrafo, con la traducción oficial al inglés."
+msgid_plural "Guion encontrado: {n} párrafos, con la traducción oficial al inglés."
+msgstr[0] "Script found: {n} paragraph, with the official English translation."
+msgstr[1] "Script found: {n} paragraphs, with the official English translation."
+
+msgid "Guion encontrado: {n} párrafo."
+msgid_plural "Guion encontrado: {n} párrafos."
+msgstr[0] "Script found: {n} paragraph."
+msgstr[1] "Script found: {n} paragraphs."
 
 msgid "Pendiente"
 msgstr "Pending"

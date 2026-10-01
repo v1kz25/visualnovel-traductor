@@ -138,6 +138,33 @@ def cliente_audio() -> ClienteAudio:
     return ClientePulse()
 
 
+def carpeta_de_proceso(pid: int) -> Path | None:
+    """Carpeta donde está el juego, a partir del proceso de su ventana; None si no se sabe.
+
+    En Linux es su carpeta de trabajo, que con Proton es la del juego; en Windows, la de su
+    ejecutable.
+    """
+    if sys.platform == "win32":  # así, mypy sabe que existe `windll`
+        import ctypes
+
+        acceso_limitado = 0x1000  # PROCESS_QUERY_LIMITED_INFORMATION
+        proceso = ctypes.windll.kernel32.OpenProcess(acceso_limitado, False, pid)
+        if not proceso:
+            return None
+        try:
+            largo = ctypes.c_ulong(32768)
+            ruta = ctypes.create_unicode_buffer(largo.value)
+            if not ctypes.windll.kernel32.QueryFullProcessImageNameW(proceso, 0, ruta, ctypes.byref(largo)):
+                return None
+            return Path(ruta.value).parent
+        finally:
+            ctypes.windll.kernel32.CloseHandle(proceso)
+    try:
+        return Path(f"/proc/{pid}/cwd").readlink()
+    except OSError:
+        return None
+
+
 def juego_de_pid(pid: int) -> Juego:
     """Procesos del juego a partir del de su ventana, para reconocer su audio."""
     from vn_audiolibro.voz.volumen import juego_de_pid as juego
