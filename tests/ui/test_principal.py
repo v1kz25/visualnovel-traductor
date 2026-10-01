@@ -118,6 +118,18 @@ def test_controles(qtbot: QtBot, ventana: VentanaPrincipal, fabrica: Fabrica) ->
     assert fabrica.sesiones[0].control.acciones == ["pausar", "reanudar", "repetir", "saltar"]
 
 
+def test_silenciar_voz(qtbot: QtBot, ventana: VentanaPrincipal, fabrica: Fabrica) -> None:
+    jugar(qtbot, ventana)
+    ventana.silenciar.click()
+    assert ventana.puente.silenciado
+    ventana.puente.linea.emit(LineaJuego("二", "dos", desde_cache=False, leida=False, silenciada=True))
+    assert textos(ventana)[-1] == "dos"  # sin «(no leída)»: con la voz silenciada se lee aquí
+
+    ventana.silenciar.click()
+    assert not ventana.puente.silenciado
+    assert fabrica.sesiones[0].control.acciones == ["silenciar", "quitar_silencio"]
+
+
 def test_detener(qtbot: QtBot, ventana: VentanaPrincipal, fabrica: Fabrica) -> None:
     jugar(qtbot, ventana)
     with qtbot.waitSignal(ventana.puente.terminada, timeout=ESPERA_MS):

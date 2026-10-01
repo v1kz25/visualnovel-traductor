@@ -54,8 +54,9 @@ AbrirVentanaCache = Callable[[QWidget, AlmacenPerfiles], VentanaCache]
 
 def _html(linea: LineaJuego) -> str:
     """Una línea del historial: el original pequeño y en gris, la traducción debajo y más grande."""
-    sufijo = "" if linea.leida else f' <span style="color: gray">{escape(_("(no leída)"))}</span>'
-    color = "" if linea.leida else " color: gray;"  # las no leídas, apagadas
+    normal = linea.leida or linea.silenciada  # con la voz silenciada, el texto es lo que se lee
+    sufijo = "" if normal else f' <span style="color: gray">{escape(_("(no leída)"))}</span>'
+    color = "" if normal else " color: gray;"  # las no leídas, apagadas
     return (
         f'<p style="margin: 8px 0 0 0; color: gray">{escape(linea.original)}</p>'
         f'<p style="margin: 0; font-size: large;{color}">{escape(linea.traduccion)}{sufijo}</p>'
@@ -137,6 +138,8 @@ class VentanaPrincipal(QMainWindow):
         self.boton_repetir = QPushButton(_("Repetir (R)"))
         self.boton_saltar = QPushButton(_("Saltar (S)"))
         self.boton_detener = QPushButton(_("Detener"))
+        self.silenciar = QCheckBox(_("Silenciar voz (M)"))
+        self.silenciar.setToolTip(_("Sigue traduciendo y mostrando cada línea, pero sin leerla."))
         self.siempre_encima = QCheckBox(_("Mantener encima del juego"))
 
         derecha = QWidget()
@@ -147,6 +150,7 @@ class VentanaPrincipal(QMainWindow):
         for boton in (self.boton_pausa, self.boton_repetir, self.boton_saltar, self.boton_detener):
             fila.addWidget(boton)
         columna.addLayout(fila)
+        columna.addWidget(self.silenciar)
         columna.addWidget(self.siempre_encima)
 
         divisor = QSplitter()
@@ -168,9 +172,15 @@ class VentanaPrincipal(QMainWindow):
         self.boton_repetir.clicked.connect(self.puente.repetir)
         self.boton_saltar.clicked.connect(self.puente.saltar)
         self.boton_detener.clicked.connect(self.detener)
+        self.silenciar.toggled.connect(self.puente.silenciar)
         self.siempre_encima.toggled.connect(self._mantener_encima)
         self.idioma.activated.connect(lambda _indice: self.cambiar_idioma(self.idioma.currentData()))
-        atajos = {"P": self._alternar_pausa, "R": self.puente.repetir, "S": self.puente.saltar}
+        atajos = {
+            "P": self._alternar_pausa,
+            "R": self.puente.repetir,
+            "S": self.puente.saltar,
+            "M": self.silenciar.toggle,
+        }
         for tecla, accion in atajos.items():
             QShortcut(QKeySequence(tecla), self, accion)
 

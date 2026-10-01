@@ -74,6 +74,26 @@ def test_controles_y_parada(qtbot: QtBot) -> None:
     puente.detener()  # ya parada: no hace nada
 
 
+def test_el_silencio_se_aplica_a_la_partida_y_a_las_siguientes(qtbot: QtBot) -> None:
+    fabrica = Fabrica()
+    puente = PuenteSesion(fabrica)
+    puente.silenciar(True)  # sin partida: se recuerda
+    assert puente.silenciado
+
+    with qtbot.waitSignal(puente.iniciada, timeout=ESPERA_MS):
+        puente.iniciar(PERFIL)
+    puente.silenciar(False)
+    puente.silenciar(True)
+    with qtbot.waitSignal(puente.terminada, timeout=ESPERA_MS):
+        puente.detener()
+    with qtbot.waitSignal(puente.iniciada, timeout=ESPERA_MS):
+        puente.iniciar(PERFIL)
+
+    primera, segunda = fabrica.sesiones
+    assert primera.control.acciones == ["silenciar", "quitar_silencio", "silenciar"]
+    assert segunda.control.acciones == ["silenciar"]
+
+
 def test_detener_mientras_arranca_no_bloquea_y_la_para_al_terminar(qtbot: QtBot) -> None:
     puerta = threading.Event()
     fabrica = Fabrica(puerta=puerta)

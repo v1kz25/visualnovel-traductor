@@ -9,7 +9,8 @@
     uv run vn-audiolibro instalar-acceso
 
 Mientras se juega, se controla escribiendo en la terminal y pulsando Intro:
-`p` pausa o reanuda, `r` repite la última línea, `s` la calla y `q` sale.
+`p` pausa o reanuda, `r` repite la última línea, `s` la calla, `m` silencia la voz o se la
+devuelve (sin dejar de traducir) y `q` sale.
 """
 
 import argparse
@@ -44,7 +45,9 @@ from vn_audiolibro.traduccion.modelos import TraduccionFallidaError
 from vn_audiolibro.voz.modelos import ModoLectura, VozFallidaError
 from vn_audiolibro.voz.piper import Hablante
 
-AYUDA_CONTROLES = N_("Controles (escribe y pulsa Intro): p pausa/reanuda · r repite · s calla · q sale")
+AYUDA_CONTROLES = N_(
+    "Controles (escribe y pulsa Intro): p pausa/reanuda · r repite · s calla · m silencia la voz · q sale"
+)
 
 
 def _zona(texto: str) -> ZonaRelativa:
@@ -309,7 +312,7 @@ def _crear(almacen: AlmacenPerfiles, args: argparse.Namespace) -> int:
 
 
 def _mostrar(linea: LineaJuego, tiempos: bool = False) -> None:
-    marcas = "" if linea.leida else _(" (no leída: llegó otra línea)")
+    marcas = "" if linea.leida or linea.silenciada else _(" (no leída: llegó otra línea)")
     print(f"\n{linea.original}\n→ {linea.traduccion}{marcas}", flush=True)
     if tiempos and linea.tiempos is not None:
         t = linea.tiempos
@@ -344,6 +347,7 @@ def _controlar(orquestador: Orquestador, entrada: Iterable[str]) -> None:
         "p": lambda: _pausar_o_reanudar(orquestador),
         "r": orquestador.repetir,
         "s": orquestador.saltar,
+        "m": lambda: _silenciar_o_no(orquestador),
     }
     for linea in entrada:
         orden = linea.strip().lower()[:1]
@@ -363,3 +367,12 @@ def _pausar_o_reanudar(orquestador: Orquestador) -> None:
     else:
         orquestador.pausar()
         print(_("⏸ En pausa (p para seguir)"), flush=True)
+
+
+def _silenciar_o_no(orquestador: Orquestador) -> None:
+    if orquestador.silenciado:
+        orquestador.quitar_silencio()
+        print(_("🔊 Voz activada"), flush=True)
+    else:
+        orquestador.silenciar()
+        print(_("🔇 Voz silenciada: se sigue traduciendo (m para oírla)"), flush=True)
