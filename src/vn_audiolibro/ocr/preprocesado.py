@@ -14,7 +14,7 @@ RapidOCR lo parte mal. Aquí se hace a mano, que es más rápido y preciso con t
 """
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, StrEnum
 from math import ceil
 
 import numpy as np
@@ -41,6 +41,16 @@ class Orientacion(Enum):
     HORIZONTAL = "horizontal"
     VERTICAL = "vertical"
     """Columnas de arriba abajo, de derecha a izquierda (japonés tradicional)."""
+
+
+class BusquedaTexto(StrEnum):
+    """Cómo se encuentran las líneas de texto en la zona."""
+
+    COLOR = "color"
+    """Por el color del texto (preprocesado propio): rápido y preciso en cajas de texto lisas."""
+    DETECTOR = "detector"
+    """Con el detector de PP-OCRv5: para el texto escrito sobre la imagen, que la máscara de
+    color confunde con las zonas claras del fondo (cielo, nubes, ropa)."""
 
 
 @dataclass(frozen=True)
