@@ -5,6 +5,7 @@
     uv run vn-audiolibro juegos
     uv run vn-audiolibro crear "Mi juego" --ventana "mi juego" --zona 0.1,0.7,0.8,0.25 --idioma ja
     uv run vn-audiolibro jugar "Mi juego"
+    uv run vn-audiolibro traducir-guion "Mi juego"
     uv run vn-audiolibro cache [--vaciar "Mi juego" | --vaciar-todo | --limite MB | --sin-limite]
     uv run vn-audiolibro instalar-acceso
 
@@ -17,6 +18,7 @@ import argparse
 import io
 import logging
 import sys
+import time
 from collections.abc import Callable, Iterable
 from dataclasses import replace
 from importlib.metadata import version
@@ -26,11 +28,13 @@ from vn_audiolibro.cache.sqlite import CacheSQLite
 from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, VentanaNoEncontradaError, ZonaRelativa
 from vn_audiolibro.configuracion import AjustesApp, cargar_ajustes, formato_tamano, guardar_ajustes
 from vn_audiolibro.descargas import DescargaFallidaError
+from vn_audiolibro.guion.modelos import GuionNoEncontradoError, OrigenGuion
 from vn_audiolibro.ocr.preprocesado import Orientacion
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles, PerfilDuplicadoError
 from vn_audiolibro.perfiles.modelos import (
     DESTINOS,
     IDIOMAS,
+    AjustesGuion,
     AjustesLectura,
     AjustesVolumen,
     AjustesVoz,
@@ -39,7 +43,7 @@ from vn_audiolibro.perfiles.modelos import (
     PerfilInvalidoError,
 )
 from vn_audiolibro.pipeline.orquestador import LineaJuego, Orquestador
-from vn_audiolibro.pipeline.sesion import Sesion
+from vn_audiolibro.pipeline.sesion import Sesion, traductor_guion
 from vn_audiolibro.textos import N_, _, ngettext
 from vn_audiolibro.traduccion.modelos import TraduccionFallidaError
 from vn_audiolibro.voz.modelos import ModoLectura, VozFallidaError
@@ -112,6 +116,16 @@ def _parser() -> argparse.ArgumentParser:
         metavar=_("SEGUNDOS"),
         help=_("segundos de silencio entre líneas"),
     )
+    crear.add_argument(
+        "--guion",
+        metavar=_("CARPETA"),
+        help=_("carpeta del juego: el texto se saca de su guion y el OCR solo sirve para seguirlo"),
+    )
+    crear.add_argument(
+        "--desde-ingles",
+        action="store_true",
+        help=_("traducir desde la traducción oficial al inglés que trae el guion"),
+    )
 
     cache = ordenes.add_parser("cache", help=_("muestra lo que ocupa la caché; permite vaciarla o limitarla"))
     accion = cache.add_mutually_exclusive_group()
@@ -123,6 +137,12 @@ def _parser() -> argparse.ArgumentParser:
     ordenes.add_parser(
         "instalar-acceso", help=_("añade vn-audiolibro al menú de aplicaciones (en Windows, al menú Inicio)")
     )
+
+    traducir = ordenes.add_parser(
+        "traducir-guion",
+        help=_("traduce por adelantado el guion de un juego (se puede cortar con Ctrl+C y seguir otro día)"),
+    )
+    traducir.add_argument("juego", metavar=_("juego"), help=_("nombre del juego"))
 
     jugar = ordenes.add_parser("jugar", help=_("juega con un juego configurado"))
     jugar.add_argument("juego", metavar=_("juego"), help=_("nombre del juego"))
@@ -169,6 +189,8 @@ def main(argv: list[str] | None = None, entrada: Iterable[str] = sys.stdin) -> i
             return _crear(almacen, args)
         if args.orden == "jugar":
             return _jugar(almacen.buscar(args.juego), entrada, args.tiempos)
+        if args.orden == "traducir-guion":
+            return _traducir_guion(almacen.buscar(args.juego))
         if args.orden == "preparar":
             return _preparar()
         if args.orden == "juegos":
@@ -305,9 +327,46 @@ def _crear(almacen: AlmacenPerfiles, args: argparse.Namespace) -> int:
             ModoLectura.ULTIMA if args.saltar_a_la_ultima else ModoLectura.COLA, args.pausa
         ),
         volumen=replace(AjustesVolumen(), activo=not args.sin_bajar_volumen, nivel_juego=args.nivel),
+        guion=_ajustes_guion(args),
     )
     ruta = almacen.guardar(perfil)
     print(_("Juego «{nombre}» guardado en {ruta}").format(nombre=perfil.nombre, ruta=ruta))
+    return 0
+
+
+def _ajustes_guion(args: argparse.Namespace) -> AjustesGuion | None:
+    if args.guion is None:
+        if args.desde_ingles:
+            raise ValueError(_("--desde-ingles necesita --guion"))
+        return None
+    origen = OrigenGuion.INGLES if args.desde_ingles else OrigenGuion.ORIGINAL
+    return AjustesGuion(args.guion, origen)
+
+
+def _traducir_guion(perfil: Perfil) -> int:
+    inicio = time.monotonic()
+
+    def progreso(hechos: int, total: int) -> None:
+        texto = _("{hechos} de {total} párrafos ({porcentaje} %) · {minutos:.0f} min").format(
+            hechos=hechos,
+            total=total,
+            porcentaje=100 * hechos // total,
+            minutos=(time.monotonic() - inicio) / 60,
+        )
+        print(f"\r  {texto}", end="", flush=True)
+
+    try:
+        with traductor_guion(perfil, _avisar) as preparador:
+            print(_("Traduciendo el guion. Ctrl+C para cortar: lo traducido se conserva."), flush=True)
+            traducidos = preparador.traducir_todo(progreso)
+    except (GuionNoEncontradoError, DescargaFallidaError, TraduccionFallidaError) as error:
+        print(f"\n{error}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print("\n" + _("Cortado. La próxima vez seguirá por donde lo ha dejado."))
+        return 0
+    texto = ngettext("Listo: {n} párrafo traducido.", "Listo: {n} párrafos traducidos.", traducidos)
+    print("\n" + texto.format(n=traducidos))
     return 0
 
 

@@ -1,9 +1,10 @@
 """Tests de la línea de comandos `vn-audiolibro`, con la sesión sustituida por una falsa."""
 
+import contextlib
 import io
 import re
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import ClassVar
 
@@ -16,8 +17,9 @@ from vn_audiolibro.cache.sqlite import CacheSQLite
 from vn_audiolibro.captura.modelos import VentanaNoEncontradaError
 from vn_audiolibro.configuracion import AjustesApp, guardar_ajustes
 from vn_audiolibro.descargas import DescargaFallidaError
+from vn_audiolibro.guion.modelos import GuionNoEncontradoError, OrigenGuion
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
-from vn_audiolibro.perfiles.modelos import AjustesLectura, Color, Perfil
+from vn_audiolibro.perfiles.modelos import AjustesGuion, AjustesLectura, Color, Perfil
 from vn_audiolibro.pipeline.orquestador import LineaJuego, Tiempos
 from vn_audiolibro.preparacion import Aviso, Componente
 from vn_audiolibro.voz.modelos import ModoLectura
@@ -149,6 +151,69 @@ def test_crear_repetido_o_no_valido(capsys: pytest.CaptureFixture[str]) -> None:
     assert "Ya hay un juego" in capsys.readouterr().err
     assert cli.main(["crear", "Otro", "--ventana", "juego", "--velocidad", "5"]) == 1
     assert "velocidad" in capsys.readouterr().err
+
+
+def test_crear_con_guion(configuracion: AlmacenPerfiles, capsys: pytest.CaptureFixture[str]) -> None:
+    assert cli.main(["crear", "Juego", "--ventana", "juego", "--guion", "/juegos/uno", "--desde-ingles"]) == 0
+    assert configuracion.buscar("Juego").guion == AjustesGuion("/juegos/uno", OrigenGuion.INGLES)
+
+    assert cli.main(["crear", "Otro", "--ventana", "otro", "--guion", "/juegos/dos"]) == 0
+    assert configuracion.buscar("Otro").guion == AjustesGuion("/juegos/dos", OrigenGuion.ORIGINAL)
+
+    assert cli.main(["crear", "Mal", "--ventana", "mal", "--desde-ingles"]) == 1
+    assert "--guion" in capsys.readouterr().err
+
+
+class PreparadorFalso:
+    def __init__(self, cortar: bool = False) -> None:
+        self._cortar = cortar
+
+    def traducir_todo(self, al_progreso: Callable[[int, int], None]) -> int:
+        al_progreso(1, 4)
+        if self._cortar:
+            raise KeyboardInterrupt
+        al_progreso(4, 4)
+        return 3
+
+
+def _traductor_guion(
+    monkeypatch: pytest.MonkeyPatch, preparador: PreparadorFalso | None = None, error: Exception | None = None
+) -> None:
+    @contextlib.contextmanager
+    def falso(perfil: Perfil, al_estado: Callable[[str], None]) -> Iterator[PreparadorFalso]:
+        al_estado("Arrancando")
+        if error is not None:
+            raise error
+        yield preparador or PreparadorFalso()
+
+    monkeypatch.setattr(cli, "traductor_guion", falso)
+
+
+def test_traducir_guion(
+    configuracion: AlmacenPerfiles, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    configuracion.guardar(Perfil("Juego", "juego", guion=AjustesGuion("/j")))
+    _traductor_guion(monkeypatch)
+
+    assert cli.main(["traducir-guion", "Juego"]) == 0
+
+    salida = capsys.readouterr()
+    assert "4 de 4 párrafos (100 %)" in salida.out
+    assert "3 párrafos traducidos" in salida.out
+    assert "Arrancando" in salida.err
+
+
+def test_traducir_guion_cortado_o_sin_guion(
+    configuracion: AlmacenPerfiles, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    configuracion.guardar(Perfil("Juego", "juego", guion=AjustesGuion("/j")))
+    _traductor_guion(monkeypatch, PreparadorFalso(cortar=True))
+    assert cli.main(["traducir-guion", "Juego"]) == 0
+    assert "Cortado" in capsys.readouterr().out
+
+    _traductor_guion(monkeypatch, error=GuionNoEncontradoError("sin guion"))
+    assert cli.main(["traducir-guion", "Juego"]) == 1
+    assert "sin guion" in capsys.readouterr().err
 
 
 def test_zona_mal_escrita(capsys: pytest.CaptureFixture[str]) -> None:
