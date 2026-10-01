@@ -228,6 +228,25 @@ def test_pausar_mientras_traduce_no_la_lee(cache: CacheSQLite) -> None:
     assert not montaje.lineas[0].leida
 
 
+def test_silenciada_sigue_traduciendo_sin_leer(montaje: Montaje) -> None:
+    orquestador = montaje.orquestador
+    orquestador.silenciar()
+    assert orquestador.silenciado
+    assert montaje.voz.calladas == 1  # corta lo que suena
+
+    montaje.llega("一")
+    orquestador.repetir()  # silenciada, tampoco repite
+    assert montaje.voz.dichas == []
+    assert montaje.lineas == [LineaJuego("一", "es:一", desde_cache=False, leida=False, silenciada=True)]
+    assert montaje.cache.consultar(Clave(PERFIL, "zh-Hant", "一")) is not None
+
+    orquestador.quitar_silencio()
+    assert not orquestador.silenciado
+    montaje.llega("二")
+    assert montaje.voz.dichas == ["es:二"]
+    assert not montaje.lineas[-1].silenciada
+
+
 def test_repetir_y_saltar(montaje: Montaje) -> None:
     montaje.orquestador.repetir()  # sin líneas todavía: nada
     montaje.llega("一", "二")
@@ -351,6 +370,20 @@ def test_por_partes_la_voz_empieza_con_la_primera_parte(cache: CacheSQLite) -> N
     assert (linea.traduccion, linea.leida) == ("es:一 es:二", True)
     assert linea.tiempos is not None
     assert linea.tiempos.hasta_voz_s is not None
+
+
+def test_por_partes_silenciada_no_empieza_a_leer(cache: CacheSQLite) -> None:
+    montaje = por_partes(cache)
+    montaje.orquestador.silenciar()
+    montaje.llega("一|二")
+    montaje.orquestador.cerrar()
+
+    voz = montaje.voz
+    assert isinstance(voz, VozPorPartesFalsa)
+    assert (voz.partes, voz.dichas) == ([], [])
+    (linea,) = montaje.lineas
+    assert (linea.traduccion, linea.leida, linea.silenciada) == ("es:一 es:二", False, True)
+    assert cache.consultar(Clave(PERFIL, "zh-Hant", "一|二")) is not None
 
 
 def test_por_partes_en_modo_ultima_si_llega_otra_linea_se_cancela_y_se_calla(cache: CacheSQLite) -> None:

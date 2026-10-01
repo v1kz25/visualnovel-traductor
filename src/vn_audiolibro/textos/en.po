@@ -25,8 +25,8 @@ msgstr "Windows does not provide the contents of window {id_ventana:#x}"
 msgid "El servidor X no tiene la extensión Composite"
 msgstr "The X server does not have the Composite extension"
 
-msgid "Controles (escribe y pulsa Intro): p pausa/reanuda · r repite · s calla · q sale"
-msgstr "Controls (type and press Enter): p pause/resume · r repeat · s skip · q quit"
+msgid "Controles (escribe y pulsa Intro): p pausa/reanuda · r repite · s calla · m silencia la voz · q sale"
+msgstr "Controls (type and press Enter): p pause/resume · r repeat · s skip · m mute voice · q quit"
 
 msgid "zona no válida (x,y,ancho,alto entre 0 y 1): {zona}"
 msgstr "invalid area (x,y,width,height between 0 and 1): {zona}"
@@ -204,6 +204,12 @@ msgstr "▶ Resumed"
 
 msgid "⏸ En pausa (p para seguir)"
 msgstr "⏸ Paused (p to resume)"
+
+msgid "🔊 Voz activada"
+msgstr "🔊 Voice on"
+
+msgid "🔇 Voz silenciada: se sigue traduciendo (m para oírla)"
+msgstr "🔇 Voice muted: still translating (m to hear it)"
 
 msgid "El límite de la caché tiene que ser de al menos {minimo} MB"
 msgstr "The cache limit must be at least {minimo} MB"
@@ -752,6 +758,12 @@ msgstr "Skip (S)"
 
 msgid "Detener"
 msgstr "Stop"
+
+msgid "Silenciar voz (M)"
+msgstr "Mute voice (M)"
+
+msgid "Sigue traduciendo y mostrando cada línea, pero sin leerla."
+msgstr "Keeps translating and showing each line, without reading it aloud."
 
 msgid "Mantener encima del juego"
 msgstr "Keep on top of the game"

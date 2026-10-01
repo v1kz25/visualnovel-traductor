@@ -30,6 +30,10 @@ class Control(Protocol):
 
     def reanudar(self) -> None: ...
 
+    def silenciar(self) -> None: ...
+
+    def quitar_silencio(self) -> None: ...
+
     def repetir(self) -> None: ...
 
     def saltar(self) -> None: ...
@@ -72,6 +76,7 @@ class PuenteSesion(QObject):
         self._sesion: SesionJuego | None = None
         self._control: Control | None = None
         self._arrancando = False
+        self._silenciado = False
         self._cerrojo = threading.Lock()
         self._hilo: threading.Thread | None = None
 
@@ -82,6 +87,11 @@ class PuenteSesion(QObject):
     @property
     def pausado(self) -> bool:
         return self._control is not None and self._control.pausado
+
+    @property
+    def silenciado(self) -> bool:
+        """La voz está silenciada. Se mantiene entre partidas mientras la app siga abierta."""
+        return self._silenciado
 
     def iniciar(self, perfil: Perfil) -> None:
         """Arranca la partida en segundo plano. Avisa con `iniciada`, o con `error` y `terminada`."""
@@ -116,6 +126,15 @@ class PuenteSesion(QObject):
             else:
                 self._control.pausar()
 
+    def silenciar(self, silenciar: bool) -> None:
+        """Silencia la voz (o le quita el silencio), en la partida en curso y en las siguientes."""
+        self._silenciado = silenciar
+        control = self._control
+        if control is not None and silenciar:
+            control.silenciar()
+        elif control is not None:
+            control.quitar_silencio()
+
     def repetir(self) -> None:
         if self._control is not None:
             self._control.repetir()
@@ -145,6 +164,8 @@ class PuenteSesion(QObject):
             cancelada = self._sesion is not sesion
             if not cancelada:
                 self._control = control
+                if self._silenciado:
+                    control.silenciar()
         if cancelada:
             self._parar(sesion)  # se pidió detener mientras arrancaba
         else:

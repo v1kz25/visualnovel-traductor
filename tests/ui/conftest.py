@@ -16,6 +16,7 @@ ESPERA_MS = 5000
 class ControlFalso:
     def __init__(self) -> None:
         self.pausado = False
+        self.silenciado = False
         self.acciones: list[str] = []
 
     def pausar(self) -> None:
@@ -25,6 +26,14 @@ class ControlFalso:
     def reanudar(self) -> None:
         self.pausado = False
         self.acciones.append("reanudar")
+
+    def silenciar(self) -> None:
+        self.silenciado = True
+        self.acciones.append("silenciar")
+
+    def quitar_silencio(self) -> None:
+        self.silenciado = False
+        self.acciones.append("quitar_silencio")
 
     def repetir(self) -> None:
         self.acciones.append("repetir")

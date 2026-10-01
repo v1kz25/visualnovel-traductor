@@ -33,6 +33,7 @@ def configuracion(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> AlmacenPer
 class OrquestadorFalso:
     def __init__(self) -> None:
         self.pausado = False
+        self.silenciado = False
         self.acciones: list[str] = []
 
     def pausar(self) -> None:
@@ -42,6 +43,14 @@ class OrquestadorFalso:
     def reanudar(self) -> None:
         self.pausado = False
         self.acciones.append("reanudar")
+
+    def silenciar(self) -> None:
+        self.silenciado = True
+        self.acciones.append("silenciar")
+
+    def quitar_silencio(self) -> None:
+        self.silenciado = False
+        self.acciones.append("quitar_silencio")
 
     def repetir(self) -> None:
         self.acciones.append("repetir")
@@ -153,16 +162,24 @@ def test_jugar_muestra_las_lineas_y_atiende_las_ordenes(
 ) -> None:
     assert cli.main(["crear", "Juego", "--ventana", "juego"]) == 0
 
-    assert cli.main(["jugar", "juego"], entrada=["p\n", "p\n", "r\n", "s\n", "\n", "?\n", "q\n", "r\n"]) == 0
+    assert (
+        cli.main(
+            ["jugar", "juego"], entrada=["p\n", "p\n", "r\n", "s\n", "m\n", "m\n", "\n", "?\n", "q\n", "r\n"]
+        )
+        == 0
+    )
 
     (sesion,) = sesion_falsa.creadas
-    assert sesion.orquestador.acciones == ["pausar", "reanudar", "repetir", "saltar"]  # nada tras «q»
+    acciones = ["pausar", "reanudar", "repetir", "saltar", "silenciar", "quitar_silencio"]
+    assert sesion.orquestador.acciones == acciones  # nada tras «q»
     assert sesion.detenida
     salida = capsys.readouterr()
     assert "一\n→ uno\n" in salida.out
     assert "二\n→ dos (no leída: llegó otra línea)" in salida.out
     assert "⏸ En pausa" in salida.out
     assert "▶ Reanudado" in salida.out
+    assert "🔇 Voz silenciada" in salida.out
+    assert "🔊 Voz activada" in salida.out
     assert salida.out.count("Controles") == 2  # al empezar y tras la orden desconocida
     assert "! Arrancando…" in salida.err
 

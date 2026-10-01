@@ -89,8 +89,11 @@ class LineaJuego:
     traduccion: str
     desde_cache: bool
     leida: bool
-    """False si llegó otra línea mientras se traducía: se guarda, pero no se lee."""
+    """False si llegó otra línea mientras se traducía (se guarda, pero no se lee) o si la voz está
+    silenciada."""
     tiempos: Tiempos | None = field(default=None, compare=False)
+    silenciada: bool = False
+    """True si no se leyó porque la voz estaba silenciada: se muestra como una línea normal."""
 
 
 @dataclass(frozen=True)
@@ -136,6 +139,7 @@ class Orquestador:
         self._pendientes: deque[ZonaEstable] = deque(maxlen=max(1, ajustes.max_en_espera))
         self._ocupado = False
         self._pausado = False
+        self._silenciado = False
         self._cerrado = False
         self._ultimo_texto = ""
         self._ultima: tuple[Clave, str] | None = None
@@ -147,6 +151,11 @@ class Orquestador:
     def pausado(self) -> bool:
         with self._condicion:
             return self._pausado
+
+    @property
+    def silenciado(self) -> bool:
+        with self._condicion:
+            return self._silenciado
 
     def recibir_zona(self, zona: ZonaEstable) -> None:
         """Nueva zona estable (se llama desde el hilo de la captura)."""
@@ -169,10 +178,20 @@ class Orquestador:
         with self._condicion:
             self._pausado = False
 
-    def repetir(self) -> None:
-        """Vuelve a leer la última línea."""
+    def silenciar(self) -> None:
+        """Calla la voz, pero sigue traduciendo y avisando de cada línea hasta `quitar_silencio`."""
         with self._condicion:
-            ultima = self._ultima
+            self._silenciado = True
+        self._voz.callar()
+
+    def quitar_silencio(self) -> None:
+        with self._condicion:
+            self._silenciado = False
+
+    def repetir(self) -> None:
+        """Vuelve a leer la última línea (salvo con la voz silenciada)."""
+        with self._condicion:
+            ultima = None if self._silenciado else self._ultima
         if ultima is not None:
             self._voz.decir(*ultima)
 
@@ -234,14 +253,19 @@ class Orquestador:
         self._contexto.append(LineaPrevia(texto, resultado.texto))
         with self._condicion:
             # Si ya espera otra línea o se ha pausado, esta llega tarde: se guarda pero no se lee.
-            leer = resultado.voz is None and not self._llega_tarde_sin_cerrojo()
+            silenciada = self._silenciado
+            leer = resultado.voz is None and not silenciada and not self._llega_tarde_sin_cerrojo()
             self._ultima = (clave, resultado.texto)
         voz = resultado.voz
         if leer:
             self._voz.decir(clave, resultado.texto)
             voz = time.monotonic()
         tiempos = Tiempos(ocr_s, traduccion_s, None if voz is None else voz - zona.instante)
-        self._al_linea(LineaJuego(texto, resultado.texto, resultado.desde_cache, voz is not None, tiempos))
+        leida = voz is not None
+        linea = LineaJuego(
+            texto, resultado.texto, resultado.desde_cache, leida, tiempos, silenciada and not leida
+        )
+        self._al_linea(linea)
 
     def _llega_tarde_sin_cerrojo(self) -> bool:
         if self._pausado or self._cerrado:
@@ -275,7 +299,7 @@ class Orquestador:
 
         def al_parte(parte: str) -> None:
             nonlocal voz
-            if voz is None:
+            if voz is None and not self.silenciado:
                 self._voz.decir_por_partes(clave, partes)
                 voz = time.monotonic()
             partes.anadir(parte)
