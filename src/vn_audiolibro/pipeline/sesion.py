@@ -16,7 +16,8 @@ from vn_audiolibro.guion.modelos import GuionNoEncontradoError, OrigenGuion
 from vn_audiolibro.guion.outputline import leer_guion
 from vn_audiolibro.guion.previa import IDIOMA_INGLES, AjustesTraduccionGuion, PreparadorGuion
 from vn_audiolibro.ocr.lector import AjustesLector, LectorOCR
-from vn_audiolibro.ocr.modelos import REC_PPOCRV5_MOBILE
+from vn_audiolibro.ocr.modelos import DET_PPOCRV5_MOBILE, REC_PPOCRV5_MOBILE
+from vn_audiolibro.ocr.preprocesado import BusquedaTexto
 from vn_audiolibro.ocr.reconocedor import ReconocedorRapidOCR
 from vn_audiolibro.perfiles.modelos import Perfil
 from vn_audiolibro.pipeline.orquestador import AjustesOrquestador, GuionJuego, LineaJuego, Orquestador
@@ -115,6 +116,8 @@ class Sesion:
 
         self._al_estado(_("Preparando los modelos (la primera vez se descargan)…"))
         modelo_ocr = asegurar_descarga(REC_PPOCRV5_MOBILE)
+        con_detector = perfil.busqueda is BusquedaTexto.DETECTOR
+        modelo_detector = asegurar_descarga(DET_PPOCRV5_MOBILE) if con_detector else None
         voz = elegir_voz(perfil.destino, perfil.voz.hablante)
         modelo_voz = asegurar_voz(voz.voz)
         llama, modelo_traduccion = asegurar_llama_server(), asegurar_modelo_traduccion()
@@ -143,9 +146,11 @@ class Sesion:
         traductor.calentar(IDIOMA_INGLES if desde_ingles else perfil.idioma, perfil.destino)
         guion = self._guion(traductor, cache)
 
+        reconocedor = ReconocedorRapidOCR(modelo_ocr, modelo_detector)
         lector = LectorOCR(
-            ReconocedorRapidOCR(modelo_ocr),
-            AjustesLector(perfil.idioma, perfil.color.color_texto, perfil.orientacion),
+            reconocedor,
+            AjustesLector(perfil.idioma, perfil.color.color_texto, perfil.orientacion, perfil.busqueda),
+            reconocedor if con_detector else None,
         )
         orquestador = Orquestador(
             AjustesOrquestador(

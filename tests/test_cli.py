@@ -18,6 +18,7 @@ from vn_audiolibro.captura.modelos import VentanaNoEncontradaError
 from vn_audiolibro.configuracion import AjustesApp, guardar_ajustes
 from vn_audiolibro.descargas import DescargaFallidaError
 from vn_audiolibro.guion.modelos import GuionNoEncontradoError, OrigenGuion
+from vn_audiolibro.ocr.preprocesado import BusquedaTexto
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
 from vn_audiolibro.perfiles.modelos import AjustesGuion, AjustesLectura, Color, Perfil
 from vn_audiolibro.pipeline.orquestador import LineaJuego, Tiempos
@@ -118,6 +119,7 @@ def test_crear_y_listar(configuracion: AlmacenPerfiles, capsys: pytest.CaptureFi
     opciones = [
         "--oscuro",
         "--vertical",
+        "--detector",
         "--hombre",
         "--velocidad",
         "1.2",
@@ -131,6 +133,7 @@ def test_crear_y_listar(configuracion: AlmacenPerfiles, capsys: pytest.CaptureFi
     (perfil,) = configuracion.listar()
     assert (perfil.nombre, perfil.ventana, perfil.idioma, perfil.destino) == ("Mi juego", "juego", "ja", "en")
     assert perfil.color == Color.OSCURO
+    assert perfil.busqueda is BusquedaTexto.DETECTOR
     assert perfil.zona.y == 0.7
     assert (perfil.voz.hablante, perfil.voz.velocidad) == (Hablante.HOMBRE, 1.2)
     assert (perfil.volumen.activo, perfil.volumen.nivel_juego) == (False, 0.5)
@@ -140,6 +143,7 @@ def test_crear_y_listar(configuracion: AlmacenPerfiles, capsys: pytest.CaptureFi
     otro = configuracion.buscar("Otro")
     assert otro.lectura == AjustesLectura(ModoLectura.ULTIMA, 0.5)
     assert otro.destino == "es"
+    assert otro.busqueda is BusquedaTexto.COLOR
 
     assert cli.main(["juegos"]) == 0
     assert "Mi juego  (ventana «juego», ja → en" in capsys.readouterr().out

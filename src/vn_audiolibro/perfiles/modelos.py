@@ -7,7 +7,7 @@ from enum import StrEnum
 from vn_audiolibro.captura.mascara import TEXTO_CLARO, TEXTO_OSCURO, ColorTexto
 from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, ZonaRelativa
 from vn_audiolibro.guion.modelos import OrigenGuion
-from vn_audiolibro.ocr.preprocesado import Orientacion
+from vn_audiolibro.ocr.preprocesado import BusquedaTexto, Orientacion
 from vn_audiolibro.textos import _
 from vn_audiolibro.traduccion.modelos import Glosario
 from vn_audiolibro.voz.modelos import PAUSA_ENTRE_LINEAS_S, ModoLectura
@@ -140,6 +140,8 @@ class Perfil:
     zona: ZonaRelativa = TODA_LA_VENTANA
     color: Color = Color.CLARO
     orientacion: Orientacion = Orientacion.HORIZONTAL
+    busqueda: BusquedaTexto = BusquedaTexto.COLOR
+    """Cómo se busca el texto en la zona: por color (caja de texto lisa) o con el detector."""
     glosario: Glosario = field(default_factory=Glosario)
     voz: AjustesVoz = field(default_factory=AjustesVoz)
     lectura: AjustesLectura = field(default_factory=AjustesLectura)

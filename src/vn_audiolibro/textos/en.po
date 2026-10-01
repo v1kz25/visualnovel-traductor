@@ -73,6 +73,9 @@ msgstr "the text is dark on a light background"
 msgid "el texto va en columnas verticales"
 msgstr "the text runs in vertical columns"
 
+msgid "buscar el texto con el detector: para el texto escrito sobre la imagen, sin caja de texto"
+msgstr "find the text with the detector: for text written over the picture, with no text box"
+
 msgid "voz de hombre (por defecto, de mujer)"
 msgstr "male voice (female by default)"
 
@@ -647,6 +650,12 @@ msgstr "Horizontal"
 msgid "Vertical (columnas)"
 msgstr "Vertical (columns)"
 
+msgid "Por color (caja de texto lisa)"
+msgstr "By color (plain text box)"
+
+msgid "Con el detector (texto sobre la imagen)"
+msgstr "With the detector (text over the picture)"
+
 msgid "El texto del juego"
 msgstr "The game's text"
 
@@ -655,6 +664,9 @@ msgstr "The script's official English translation"
 
 msgid "Opcional. Si el juego guarda su guion en ficheros legibles, elige su carpeta: el texto sale exacto del guion, se traduce por adelantado y el OCR solo sirve para saber por dónde vas."
 msgstr "Optional. If the game stores its script in readable files, choose its folder: the text comes exactly from the script, it is translated in advance and OCR is only used to know where you are."
+
+msgid "Por color va bien con una caja de texto lisa. Si el juego escribe el texto directamente sobre la imagen y el OCR lee mal o nada, usa el detector: es más lento y la primera vez descarga un modelo de 5 MB."
+msgstr "By color works well with a plain text box. If the game writes the text directly over the picture and the OCR reads it wrong or not at all, use the detector: it is slower and downloads a 5 MB model the first time."
 
 msgid "Captura la ventana y dibuja con el ratón un recuadro sobre la caja de texto."
 msgstr "Capture the window and draw a box over the text box with the mouse."
@@ -703,6 +715,9 @@ msgstr "Text"
 
 msgid "Orientación"
 msgstr "Orientation"
+
+msgid "Buscar el texto"
+msgstr "Find the text"
 
 msgid "Guion del juego"
 msgstr "Game script"

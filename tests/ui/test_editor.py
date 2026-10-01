@@ -11,7 +11,7 @@ from pytestqt.qtbot import QtBot
 from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, Imagen, Rectangulo, Ventana, ZonaRelativa
 from vn_audiolibro.guion.modelos import OrigenGuion
 from vn_audiolibro.ocr.lector import AjustesLector, TextoLeido
-from vn_audiolibro.ocr.preprocesado import Orientacion
+from vn_audiolibro.ocr.preprocesado import BusquedaTexto, Orientacion
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
 from vn_audiolibro.perfiles.modelos import AjustesGuion, AjustesVoz, Color, Perfil
 from vn_audiolibro.ui import editor as modulo
@@ -91,6 +91,8 @@ def test_anadir_un_juego(qtbot: QtBot, almacen: AlmacenPerfiles, falsos: Falsos)
     editor.destino.setCurrentIndex(editor.destino.findData("en"))
     editor.color.setCurrentIndex(editor.color.findData(Color.OSCURO.value))
     editor.orientacion.setCurrentIndex(editor.orientacion.findData(Orientacion.VERTICAL.value))
+    assert editor.busqueda.currentData() == BusquedaTexto.COLOR.value
+    editor.busqueda.setCurrentIndex(editor.busqueda.findData(BusquedaTexto.DETECTOR.value))
 
     editor.boton_capturar.click()
     assert editor.selector.hay_imagen
@@ -101,6 +103,7 @@ def test_anadir_un_juego(qtbot: QtBot, almacen: AlmacenPerfiles, falsos: Falsos)
     forma, ajustes = falsos.leidos[0]
     assert forma == (50, 100, 3)  # solo la zona
     assert (ajustes.idioma, ajustes.orientacion) == ("ja", Orientacion.VERTICAL)
+    assert ajustes.busqueda is BusquedaTexto.DETECTOR
 
     editor.botones.button(QDialogButtonBox.StandardButton.Save).click()
 
@@ -110,6 +113,7 @@ def test_anadir_un_juego(qtbot: QtBot, almacen: AlmacenPerfiles, falsos: Falsos)
     assert (guardado.nombre, guardado.ventana, guardado.idioma) == ("Mi juego", "mi juego", "ja")
     assert guardado.destino == "en"
     assert (guardado.color, guardado.orientacion) == (Color.OSCURO, Orientacion.VERTICAL)
+    assert guardado.busqueda is BusquedaTexto.DETECTOR
     assert guardado.zona == ZonaRelativa(0.1, 0.5, 0.5, 0.5)
 
 
@@ -210,18 +214,30 @@ def test_actualizar_conserva_la_ventana_elegida(
 
 
 def test_lector_bajo_demanda_carga_el_modelo_una_vez(monkeypatch: pytest.MonkeyPatch) -> None:
-    cargas: list[Path] = []
-    monkeypatch.setattr(modulo, "asegurar_descarga", lambda _: Path("rec.onnx"))
-    monkeypatch.setattr(modulo, "ReconocedorRapidOCR", lambda modelo: cargas.append(modelo) or "reconocedor")
-    monkeypatch.setattr(
-        modulo, "LectorOCR", lambda r, a: SimpleNamespace(leer=lambda _: TextoLeido((f"{r}:{a.idioma}",)))
-    )
+    cargas: list[tuple[Path, Path | None]] = []
+
+    def reconocedor(modelo: Path, detector: Path | None) -> SimpleNamespace:
+        cargas.append((modelo, detector))
+        return SimpleNamespace(con_detector=detector is not None, nombre=f"r{len(cargas)}")
+
+    def lector_ocr(r: SimpleNamespace, a: AjustesLector, d: SimpleNamespace | None) -> SimpleNamespace:
+        texto = f"{r.nombre}:{a.idioma}:{d is r}"
+        return SimpleNamespace(leer=lambda _: TextoLeido((texto,)))
+
+    monkeypatch.setattr(modulo, "asegurar_descarga", lambda descarga: Path(descarga.fichero))
+    monkeypatch.setattr(modulo, "ReconocedorRapidOCR", reconocedor)
+    monkeypatch.setattr(modulo, "LectorOCR", lector_ocr)
     lector = LectorBajoDemanda()
     imagen = np.zeros((4, 4, 3), dtype=np.uint8)
+    detector = AjustesLector("ja", busqueda=BusquedaTexto.DETECTOR)
 
-    assert lector(imagen, AjustesLector("ja")) == "reconocedor:ja"
-    assert lector(imagen, AjustesLector("zh-Hant")) == "reconocedor:zh-Hant"
-    assert cargas == [Path("rec.onnx")]
+    assert lector(imagen, AjustesLector("ja")) == "r1:ja:False"
+    assert lector(imagen, AjustesLector("zh-Hant")) == "r1:zh-Hant:False"
+    # El detector solo se carga al hacer falta, y después sirve también para buscar por color.
+    assert lector(imagen, detector) == "r2:ja:True"
+    assert lector(imagen, AjustesLector("ja")) == "r2:ja:False"
+    rec, det = Path("ch_PP-OCRv5_rec_mobile.onnx"), Path("ch_PP-OCRv5_det_mobile.onnx")
+    assert cargas == [(rec, None), (rec, det)]
 
 
 def test_listar_ventanas_quita_las_propias(monkeypatch: pytest.MonkeyPatch) -> None:
