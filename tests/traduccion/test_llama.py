@@ -137,6 +137,22 @@ def test_servidor_arranca_en_localhost_y_se_para(tmp_path: Path) -> None:
 
 
 @SOLO_UNIX
+def test_pasa_las_opciones_extra_a_llama_server(tmp_path: Path) -> None:
+    argumentos = tmp_path / "argumentos"
+    codigo = (
+        f"import runpy, sys\nopen({str(argumentos)!r}, 'w').write(' '.join(sys.argv[1:]))\n"
+        f"runpy.run_path({str(FALSO)!r}, run_name='__main__')\n"
+    )
+    ajustes = AjustesServidor(hilos=2, opciones=("--poll", "0"))
+    with ServidorLlama(ejecutable_falso(tmp_path, codigo), tmp_path / "m.gguf", ajustes, tmp_path / "log"):
+        pass
+
+    orden = argumentos.read_text()
+    assert "--threads 2" in orden
+    assert orden.endswith("--parallel 1 --poll 0")
+
+
+@SOLO_UNIX
 def test_error_si_el_servidor_termina_al_arrancar(tmp_path: Path) -> None:
     ejecutable = ejecutable_falso(tmp_path, "import sys\nprint('modelo no encontrado')\nsys.exit(1)\n")
     servidor = ServidorLlama(ejecutable, tmp_path / "modelo.gguf", registro=tmp_path / "log")

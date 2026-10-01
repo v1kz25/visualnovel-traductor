@@ -224,6 +224,8 @@ class AjustesServidor:
     """Hilos de CPU: la mitad de los núcleos, hasta 4, para dejar sitio al juego."""
     arranque_s: float = 120
     """Tiempo máximo para cargar el modelo."""
+    opciones: tuple[str, ...] = ()
+    """Opciones extra de `llama-server` (`--poll 0`…), para probar ajustes con el banco de pruebas."""
 
 
 class ServidorLlama:
@@ -256,6 +258,7 @@ class ServidorLlama:
             *("--ctx-size", str(self.ajustes.contexto)),
             *("--threads", str(self.ajustes.hilos)),
             *("--parallel", "1"),
+            *self.ajustes.opciones,
         ]
         self.registro.parent.mkdir(parents=True, exist_ok=True)
         with self.registro.open("wb") as registro:
