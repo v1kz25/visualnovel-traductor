@@ -8,10 +8,12 @@ from pathlib import Path
 from typing import Any
 
 from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, ZonaRelativa
+from vn_audiolibro.guion.modelos import OrigenGuion
 from vn_audiolibro.ocr.preprocesado import Orientacion
 from vn_audiolibro.perfiles.modelos import (
     DESTINOS,
     IDIOMAS,
+    AjustesGuion,
     AjustesLectura,
     AjustesVolumen,
     AjustesVoz,
@@ -62,6 +64,9 @@ def a_dict(perfil: Perfil) -> dict[str, Any]:
             "otras": dict(perfil.volumen.otras),
             "excluir": list(perfil.volumen.excluir),
         },
+        "guion": None
+        if perfil.guion is None
+        else {"carpeta": perfil.guion.carpeta, "origen": perfil.guion.origen.value},
     }
 
 
@@ -86,6 +91,7 @@ def desde_dict(datos: Mapping[str, Any]) -> Perfil:
             voz=_voz(datos.get("voz", {})),
             lectura=_lectura(datos.get("lectura", {})),
             volumen=_volumen(datos.get("volumen", {})),
+            guion=_guion(datos.get("guion")),
             id=datos.get("id") or nuevo_id(),
         )
     except (KeyError, TypeError, ValueError, AttributeError) as error:
@@ -150,6 +156,15 @@ def _volumen(datos: Mapping[str, Any]) -> AjustesVolumen:
         nivel_juego=_numero(datos.get("nivel_juego", por_defecto.nivel_juego)),
         otras=tuple((nombre, _numero(nivel)) for nombre, nivel in otras.items()),
         excluir=tuple(excluir),
+    )
+
+
+def _guion(datos: Mapping[str, Any] | None) -> AjustesGuion | None:
+    if datos is None:
+        return None
+    return AjustesGuion(
+        carpeta=_texto(datos, "carpeta"),
+        origen=OrigenGuion(datos.get("origen", OrigenGuion.ORIGINAL.value)),
     )
 
 

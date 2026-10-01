@@ -8,6 +8,7 @@ import pytest
 
 from vn_audiolibro.captura.mascara import TEXTO_OSCURO
 from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, ZonaRelativa
+from vn_audiolibro.guion.modelos import OrigenGuion
 from vn_audiolibro.ocr.preprocesado import Orientacion
 from vn_audiolibro.perfiles.almacen import (
     VERSION_FORMATO,
@@ -18,6 +19,7 @@ from vn_audiolibro.perfiles.almacen import (
     directorio_perfiles,
 )
 from vn_audiolibro.perfiles.modelos import (
+    AjustesGuion,
     AjustesLectura,
     AjustesVolumen,
     AjustesVoz,
@@ -42,6 +44,7 @@ COMPLETO = Perfil(
     voz=AjustesVoz(Hablante.HOMBRE, 1.25),
     lectura=AjustesLectura(ModoLectura.ULTIMA, 0.5),
     volumen=AjustesVolumen(activo=False, nivel_juego=0.5, otras=(("Firefox", 0.0),), excluir=("Discord",)),
+    guion=AjustesGuion("/juegos/mi juego"),
 )
 
 
@@ -86,6 +89,14 @@ def test_perfil_no_valido(campos: dict[str, Any], mensaje: str) -> None:
         Perfil(**datos)
 
 
+def test_guion_no_valido() -> None:
+    with pytest.raises(PerfilInvalidoError, match="carpeta"):
+        AjustesGuion(" ")
+    with pytest.raises(PerfilInvalidoError, match="inglés"):
+        Perfil("Juego", "juego", destino="en", guion=AjustesGuion("/j", OrigenGuion.INGLES))
+    assert Perfil("Juego", "juego", guion=AjustesGuion("/j", OrigenGuion.INGLES)).guion is not None
+
+
 def test_velocidad_y_niveles_fuera_de_rango() -> None:
     with pytest.raises(PerfilInvalidoError, match="velocidad"):
         AjustesVoz(velocidad=3)
@@ -121,6 +132,10 @@ def test_ida_y_vuelta_por_json() -> None:
     assert datos["voz"] == {"hablante": "hombre", "velocidad": 1.25}
     assert datos["lectura"] == {"modo": "ultima", "pausa_s": 0.5}
     assert datos["destino"] == "en"
+    assert datos["guion"] == {"carpeta": "/juegos/mi juego", "origen": "original"}
+    sin_guion = a_dict(Perfil("J", "j"))
+    assert sin_guion["guion"] is None
+    assert desde_dict(sin_guion).guion is None
 
 
 def test_los_campos_que_faltan_toman_su_valor_por_defecto() -> None:
@@ -129,6 +144,9 @@ def test_los_campos_que_faltan_toman_su_valor_por_defecto() -> None:
     assert perfil.color == Color.CLARO
     assert perfil.glosario == Glosario()
     assert perfil.volumen == AjustesVolumen()
+    assert perfil.guion is None
+    con_guion = desde_dict({"version": 1, "nombre": "J", "ventana": "j", "guion": {"carpeta": "/j"}})
+    assert con_guion.guion == AjustesGuion("/j", OrigenGuion.ORIGINAL)
 
 
 def test_ajustes_parciales() -> None:
@@ -166,6 +184,9 @@ def test_version_mas_nueva() -> None:
         {"volumen": {"otras": {"Firefox": "alto"}}},
         {"volumen": {"excluir": [1]}},
         {"id": 5},
+        {"guion": {"carpeta": 3}},
+        {"guion": {"carpeta": "/j", "origen": "klingon"}},
+        {"guion": "/j"},
     ],
 )
 def test_datos_no_validos(cambio: dict[str, Any]) -> None:
