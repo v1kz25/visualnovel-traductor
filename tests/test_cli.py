@@ -23,6 +23,7 @@ from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
 from vn_audiolibro.perfiles.modelos import AjustesGuion, AjustesLectura, Color, Perfil
 from vn_audiolibro.pipeline.orquestador import LineaJuego, Tiempos
 from vn_audiolibro.preparacion import Aviso, Componente
+from vn_audiolibro.traduccion.gemini import URL_CLAVES
 from vn_audiolibro.traduccion.modelos import Motor
 from vn_audiolibro.voz.modelos import ModoLectura
 from vn_audiolibro.voz.piper import Hablante
@@ -469,7 +470,7 @@ def test_gemini_guarda_la_clave_sin_mostrarla(capsys: pytest.CaptureFixture[str]
     salida = capsys.readouterr().out
     assert "clave-123" not in salida
     assert "se envía a Google" in salida
-    assert "aistudio.google.com" in salida
+    assert URL_CLAVES in salida  # dónde crear la clave
 
     assert cli.main(["gemini", "--borrar"]) == 0
     assert claves.leer() is None

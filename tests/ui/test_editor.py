@@ -14,6 +14,7 @@ from vn_audiolibro.ocr.lector import AjustesLector, TextoLeido
 from vn_audiolibro.ocr.preprocesado import BusquedaTexto, Orientacion
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
 from vn_audiolibro.perfiles.modelos import AjustesGuion, AjustesVoz, Color, Perfil
+from vn_audiolibro.traduccion.gemini import URL_CLAVES
 from vn_audiolibro.traduccion.modelos import Motor
 from vn_audiolibro.ui import editor as modulo
 from vn_audiolibro.ui.editor import EditorJuego, LectorBajoDemanda, capturar_ventana, listar_ventanas
@@ -187,7 +188,7 @@ def test_gemini_pide_la_clave_y_la_guarda_en_el_llavero(
     editor.traductor.setCurrentIndex(editor.traductor.findData(Motor.GEMINI.value))
     assert not editor.clave.isHidden()
     assert editor.clave.echoMode() is QLineEdit.EchoMode.Password
-    assert "aistudio.google.com" in editor.aviso_gemini.text()
+    assert f'<a href="{URL_CLAVES}">' in editor.aviso_gemini.text()  # el enlace para crear la clave
     editor.guardar()
     assert "clave de API" in editor.error.text()  # sin clave no se puede elegir Gemini
     assert almacen.listar() == []
