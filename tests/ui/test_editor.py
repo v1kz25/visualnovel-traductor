@@ -9,14 +9,16 @@ from PySide6.QtWidgets import QDialog, QDialogButtonBox
 from pytestqt.qtbot import QtBot
 
 from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, Imagen, Rectangulo, Ventana, ZonaRelativa
+from vn_audiolibro.guion.modelos import OrigenGuion
 from vn_audiolibro.ocr.lector import AjustesLector, TextoLeido
 from vn_audiolibro.ocr.preprocesado import Orientacion
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
-from vn_audiolibro.perfiles.modelos import AjustesVoz, Color, Perfil
+from vn_audiolibro.perfiles.modelos import AjustesGuion, AjustesVoz, Color, Perfil
 from vn_audiolibro.ui import editor as modulo
 from vn_audiolibro.ui.editor import EditorJuego, LectorBajoDemanda, capturar_ventana, listar_ventanas
 from vn_audiolibro.voz.piper import Hablante
 
+from ..guion.sinteticos import juego
 from .conftest import ESPERA_MS
 
 JUEGO = Ventana(0x10, "Mi juego ver. 1.0", 100, Rectangulo(0, 0, 200, 100))
@@ -48,9 +50,22 @@ def falsos() -> Falsos:
 
 
 def abrir(
-    qtbot: QtBot, almacen: AlmacenPerfiles, falsos: Falsos, perfil: Perfil | None = None
+    qtbot: QtBot,
+    almacen: AlmacenPerfiles,
+    falsos: Falsos,
+    perfil: Perfil | None = None,
+    carpeta_juego: Path | None = None,
+    elegida: str = "",
 ) -> EditorJuego:
-    editor = EditorJuego(almacen, perfil, lambda: [JUEGO, OTRA], falsos.capturar, falsos.leer)
+    editor = EditorJuego(
+        almacen,
+        perfil,
+        lambda: [JUEGO, OTRA],
+        falsos.capturar,
+        falsos.leer,
+        pedir_carpeta=lambda _padre, _desde: elegida,
+        carpeta_juego=lambda _pid: carpeta_juego,
+    )
     qtbot.addWidget(editor)
     return editor
 
@@ -232,3 +247,94 @@ def test_capturar_ventana_entera(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert capturar_ventana(JUEGO).shape == (150, 300, 3)
     assert pedidas == [(0x10, Rectangulo(0, 0, 300, 150))]
+
+
+# Guion
+
+
+def test_elegir_el_guion_y_guardarlo(
+    qtbot: QtBot, almacen: AlmacenPerfiles, falsos: Falsos, tmp_path: Path
+) -> None:
+    carpeta = juego(tmp_path)
+    editor = abrir(qtbot, almacen, falsos, elegida=str(carpeta))
+    editor.nombre.setText("Juego")
+    editor.titulo.setText("juego")
+    assert not editor.origen_guion.isEnabled()
+
+    editor.boton_guion.click()
+
+    assert editor.carpeta_guion.text() == str(carpeta)
+    assert "7 párrafos, con la traducción oficial al inglés" in editor.estado_guion.text()
+    assert editor.origen_guion.isEnabled()
+    editor.origen_guion.setCurrentIndex(editor.origen_guion.findData(OrigenGuion.INGLES.value))
+    boton_guardar(editor).click()  # type: ignore[attr-defined]
+
+    assert almacen.buscar("Juego").guion == AjustesGuion(str(carpeta), OrigenGuion.INGLES)
+
+
+def test_carpeta_sin_guion_o_cancelar(
+    qtbot: QtBot, almacen: AlmacenPerfiles, falsos: Falsos, tmp_path: Path
+) -> None:
+    editor = abrir(qtbot, almacen, falsos)
+    editor.boton_guion.click()  # cancelado: no cambia nada
+    assert editor.carpeta_guion.text() == ""
+
+    editor.carpeta_guion.setText(str(tmp_path))
+    editor.comprobar_guion()
+    assert "No se ha encontrado el guion" in editor.estado_guion.text()
+
+    editor.carpeta_guion.setText("")
+    editor.comprobar_guion()
+    assert "Opcional" in editor.estado_guion.text()
+    editor.nombre.setText("Juego")
+    editor.titulo.setText("juego")
+    boton_guardar(editor).click()  # type: ignore[attr-defined]
+    assert almacen.buscar("Juego").guion is None
+
+
+def test_al_elegir_la_ventana_encuentra_el_guion_del_juego(
+    qtbot: QtBot, almacen: AlmacenPerfiles, falsos: Falsos, tmp_path: Path
+) -> None:
+    carpeta = juego(tmp_path)
+    editor = abrir(qtbot, almacen, falsos, carpeta_juego=carpeta)
+
+    editor.ventanas.setCurrentIndex(0)
+    editor.ventanas.activated.emit(0)
+
+    assert editor.carpeta_guion.text() == str(carpeta)
+    assert "Guion encontrado" in editor.estado_guion.text()
+
+
+def test_al_elegir_la_ventana_sin_guion_no_pone_nada(
+    qtbot: QtBot, almacen: AlmacenPerfiles, falsos: Falsos, tmp_path: Path
+) -> None:
+    editor = abrir(qtbot, almacen, falsos, carpeta_juego=tmp_path)
+
+    editor.ventanas.setCurrentIndex(0)
+    editor.ventanas.activated.emit(0)
+
+    assert editor.carpeta_guion.text() == ""
+
+
+def test_editar_muestra_el_guion(
+    qtbot: QtBot, almacen: AlmacenPerfiles, falsos: Falsos, tmp_path: Path
+) -> None:
+    carpeta = juego(tmp_path)
+    perfil = Perfil("Juego", "juego", guion=AjustesGuion(str(carpeta), OrigenGuion.INGLES))
+    editor = abrir(qtbot, almacen, falsos, perfil, carpeta_juego=tmp_path / "otra")
+
+    assert editor.carpeta_guion.text() == str(carpeta)
+    assert editor.origen_guion.currentData() == OrigenGuion.INGLES.value
+    assert "Guion encontrado" in editor.estado_guion.text()
+
+
+def test_elegir_carpeta_parte_de_steam(monkeypatch: pytest.MonkeyPatch, qtbot: QtBot, tmp_path: Path) -> None:
+    pedidas: list[str] = []
+    monkeypatch.setattr(modulo, "STEAM", tmp_path)
+    monkeypatch.setattr(
+        modulo.QFileDialog, "getExistingDirectory", lambda _padre, _titulo, desde: pedidas.append(desde) or ""
+    )
+
+    assert modulo.elegir_carpeta(None, "") == ""  # type: ignore[arg-type]
+    assert modulo.elegir_carpeta(None, "/juegos") == ""  # type: ignore[arg-type]
+    assert pedidas == [str(tmp_path), "/juegos"]
