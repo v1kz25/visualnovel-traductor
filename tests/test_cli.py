@@ -155,6 +155,9 @@ def test_crear_repetido_o_no_valido(capsys: pytest.CaptureFixture[str]) -> None:
     assert "Ya hay un juego" in capsys.readouterr().err
     assert cli.main(["crear", "Otro", "--ventana", "juego", "--velocidad", "5"]) == 1
     assert "velocidad" in capsys.readouterr().err
+    assert cli.main(["crear", "Otro", "--ventana", "otro", "--idioma", "en", "--destino", "en"]) == 1
+    assert "solo se puede traducir al español" in capsys.readouterr().err
+    assert cli.main(["crear", "Otro", "--ventana", "otro", "--idioma", "en"]) == 0
 
 
 def test_crear_con_guion(configuracion: AlmacenPerfiles, capsys: pytest.CaptureFixture[str]) -> None:

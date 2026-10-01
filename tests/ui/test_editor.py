@@ -155,6 +155,24 @@ def test_editar_conserva_el_resto_de_ajustes(qtbot: QtBot, almacen: AlmacenPerfi
     assert (guardado.color, guardado.destino) == (Color.OSCURO, "en")
 
 
+def test_un_juego_en_ingles_solo_se_traduce_al_espanol_y_en_horizontal(
+    qtbot: QtBot, almacen: AlmacenPerfiles, falsos: Falsos
+) -> None:
+    editor = abrir(qtbot, almacen, falsos)
+    editor.destino.setCurrentIndex(editor.destino.findData("en"))
+    editor.orientacion.setCurrentIndex(editor.orientacion.findData(Orientacion.VERTICAL.value))
+
+    editor.idioma.setCurrentIndex(editor.idioma.findData("en"))
+    assert editor.idioma.currentText() == "Inglés"
+    assert (editor.destino.currentData(), editor.orientacion.currentData()) == ("es", "horizontal")
+    assert not editor.destino.isEnabled()
+    assert not editor.orientacion.isEnabled()
+
+    editor.idioma.setCurrentIndex(editor.idioma.findData("ja"))
+    assert editor.destino.isEnabled()
+    assert editor.orientacion.isEnabled()
+
+
 def test_nombre_repetido_o_no_valido_no_cierra(
     qtbot: QtBot, almacen: AlmacenPerfiles, falsos: Falsos
 ) -> None:

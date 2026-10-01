@@ -32,6 +32,12 @@ LINEAS = {
         "「うん」",
         "「先輩、待ってるよ」",
     ],
+    "en": [
+        '"...Hey, are you still awake?"',
+        "Outside the window, the rain kept falling quietly.",
+        '"Yeah."',
+        "You bastard! I'll never forgive you!",
+    ],
 }
 
 
@@ -56,6 +62,8 @@ def traductor() -> Iterator[TraductorLocal]:
 @pytest.mark.parametrize("destino", ["es", "en"])
 @pytest.mark.parametrize("idioma", LINEAS)
 def test_traduce_en_menos_de_3_s(traductor: TraductorLocal, idioma: str, destino: str) -> None:
+    if idioma == destino:
+        pytest.skip("un juego en inglés solo se traduce al español")
     previas: list[LineaPrevia] = []
     tiempos = []
     for linea in LINEAS[idioma]:
@@ -67,6 +75,8 @@ def test_traduce_en_menos_de_3_s(traductor: TraductorLocal, idioma: str, destino
         assert "\n" not in traduccion.texto
         if destino == "en":
             assert not ESPANOL.search(traduccion.texto), traduccion.texto
+        if idioma == "en":
+            assert traduccion.texto.casefold() != linea.casefold(), traduccion.texto
         previas.append(LineaPrevia(linea, traduccion.texto))
 
     assert statistics.median(tiempos) < TIEMPO_MAX_S

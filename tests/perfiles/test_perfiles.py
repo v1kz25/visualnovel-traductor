@@ -81,6 +81,8 @@ def test_cada_perfil_nuevo_tiene_su_id() -> None:
         ({"ventana": ""}, "ventana"),
         ({"idioma": "ko"}, "Idioma no admitido"),
         ({"destino": "fr"}, "Idioma de traducción no admitido"),
+        ({"idioma": "en", "destino": "en"}, "solo se puede traducir al español"),
+        ({"idioma": "en", "orientacion": Orientacion.VERTICAL}, "columnas verticales"),
         ({"id": "../../etc"}, "Identificador"),
     ],
 )
@@ -88,6 +90,12 @@ def test_perfil_no_valido(campos: dict[str, Any], mensaje: str) -> None:
     datos: dict[str, Any] = {"nombre": "Juego", "ventana": "juego", **campos}
     with pytest.raises(PerfilInvalidoError, match=mensaje):
         Perfil(**datos)
+
+
+def test_un_juego_en_ingles_se_traduce_al_espanol() -> None:
+    perfil = Perfil("Juego", "juego", idioma="en")
+    assert (perfil.destino, perfil.orientacion) == ("es", Orientacion.HORIZONTAL)
+    assert desde_dict(a_dict(perfil)) == perfil
 
 
 def test_guion_no_valido() -> None:
