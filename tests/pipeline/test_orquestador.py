@@ -1,6 +1,7 @@
 """Tests del orquestador con lector, traductor y voz falsos y la caché real en una carpeta temporal."""
 
 import threading
+import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
@@ -10,8 +11,11 @@ import pytest
 from vn_audiolibro.cache.modelos import Clave
 from vn_audiolibro.cache.sqlite import CacheSQLite
 from vn_audiolibro.captura.modelos import Imagen, ZonaEstable
+from vn_audiolibro.guion.buscador import BuscadorGuion, SeguidorGuion
+from vn_audiolibro.guion.modelos import Guion
+from vn_audiolibro.guion.previa import AjustesTraduccionGuion, PreparadorGuion
 from vn_audiolibro.ocr.lector import TextoLeido
-from vn_audiolibro.pipeline.orquestador import AjustesOrquestador, LineaJuego, Orquestador
+from vn_audiolibro.pipeline.orquestador import AjustesOrquestador, GuionJuego, LineaJuego, Orquestador
 from vn_audiolibro.traduccion.modelos import (
     Glosario,
     Peticion,
@@ -21,6 +25,9 @@ from vn_audiolibro.traduccion.modelos import (
 )
 from vn_audiolibro.voz.locutor import TextoPorPartes
 from vn_audiolibro.voz.modelos import ModoLectura
+
+from ..guion.sinteticos import guion as guion_sintetico
+from ..guion.sinteticos import pantalla
 
 ESPERA_S = 5.0
 PERFIL = "0" * 32
@@ -89,22 +96,34 @@ class Montaje:
         puerta: threading.Event | None = None,
         modo: ModoLectura = ModoLectura.COLA,
         destino: str = "es",
+        guion: Guion | None = None,
+        por_partes: bool = False,
     ) -> None:
         self.lector = LectorFalso()
-        self.traductor: TraductorFalso | TraductorPorPartesFalso = TraductorFalso(puerta)
-        self.voz: VozFalsa = VozFalsa()
+        self.traductor: TraductorFalso | TraductorPorPartesFalso = (
+            TraductorPorPartesFalso(puerta) if por_partes else TraductorFalso(puerta)
+        )
+        self.voz: VozFalsa = VozPorPartesFalsa(cache) if por_partes else VozFalsa()
         self.cache = cache
         self.lineas: list[LineaJuego] = []
         self.errores: list[str] = []
         glosario = Glosario.desde_dict({"櫻": "Sakura"})
+        idioma = "zh-Hant" if guion is None else "ja"
+        self.guion = None
+        if guion is not None:
+            preparador = PreparadorGuion(guion, AjustesTraduccionGuion(PERFIL, idioma), self.traductor, cache)
+            self.guion = GuionJuego(
+                SeguidorGuion(guion, BuscadorGuion(guion, idioma)), preparador, anticipo=2
+            )
         self.orquestador = Orquestador(
-            AjustesOrquestador(PERFIL, "zh-Hant", glosario, modo, destino=destino),
+            AjustesOrquestador(PERFIL, idioma, glosario, modo, destino=destino),
             self.lector,
             self.traductor,
             cache,
             self.voz,
             self.lineas.append,
             self.errores.append,
+            self.guion,
         )
 
     def llega(self, *textos: str) -> None:
@@ -488,3 +507,119 @@ def test_por_partes_en_cola_otra_linea_no_cancela_la_traduccion(cache: CacheSQLi
     assert voz.partes == ["es:一", "es:二", "es:三"]
     assert voz.calladas == 0
     assert [linea.original for linea in montaje.lineas] == ["一|二", "三"]
+
+
+# Con el guion del juego
+
+
+def _hasta(condicion: Callable[[], bool]) -> None:
+    limite = time.monotonic() + ESPERA_S
+    while not condicion():
+        assert time.monotonic() < limite, "no se cumplió a tiempo"
+        time.sleep(0.01)
+
+
+def _traducido(cache: CacheSQLite, g: Guion, indice: int) -> bool:
+    return cache.consultar(Clave(PERFIL, "ja", g.parrafos[indice].original)) is not None
+
+
+def test_con_guion_lee_el_parrafo_exacto(cache: CacheSQLite) -> None:
+    g = guion_sintetico()
+    montaje = Montaje(cache, guion=g)
+    try:
+        montaje.llega("セーブ" + pantalla(g, 0).replace("光", "米") + "ロード")
+    finally:
+        montaje.orquestador.cerrar()
+
+    original = g.parrafos[0].original
+    assert montaje.voz.dichas == [f"es:{original}"]
+    assert montaje.lineas[0].original == original
+
+
+def test_con_guion_el_dialogo_se_lee_entero_con_su_primer_fragmento(cache: CacheSQLite) -> None:
+    g = guion_sintetico()
+    montaje = Montaje(cache, guion=g)
+    try:
+        montaje.llega(pantalla(g, 0), pantalla(g, 1), pantalla(g, 2))
+    finally:
+        montaje.orquestador.cerrar()
+
+    assert [linea.original for linea in montaje.lineas] == [g.parrafos[0].original, g.parrafos[1].original]
+
+
+def test_con_guion_traduce_por_adelantado_los_siguientes(cache: CacheSQLite) -> None:
+    g = guion_sintetico()
+    montaje = Montaje(cache, guion=g, por_partes=True)
+    try:
+        montaje.llega(pantalla(g, 0))
+        _hasta(lambda: _traducido(cache, g, 1) and _traducido(cache, g, 2))
+        montaje.llega(pantalla(g, 1))
+    finally:
+        montaje.orquestador.cerrar()
+
+    assert not _traducido(cache, g, 3)  # solo los dos siguientes
+    assert montaje.lineas[1].desde_cache
+    assert montaje.lineas[1].original == g.parrafos[1].original
+
+
+def test_con_guion_si_falla_por_adelantado_sigue_jugando(cache: CacheSQLite) -> None:
+    g = guion_sintetico(
+        [[[("最初の場面の長い文章です。", "")]], [[("fallo", "")]], [[("最後の場面の長い文章です。", "")]]]
+    )
+    montaje = Montaje(cache, guion=g)
+    try:
+        montaje.llega(pantalla(g, 0))
+        _hasta(lambda: any(p.texto == "fallo" for p in montaje.traductor.peticiones))
+        montaje.llega(pantalla(g, 2))
+    finally:
+        montaje.orquestador.cerrar()
+
+    assert montaje.voz.dichas[-1] == "es:最後の場面の長い文章です。"
+
+
+def test_con_guion_lo_que_no_esta_en_el_guion_se_traduce_como_siempre(cache: CacheSQLite) -> None:
+    montaje = Montaje(cache, guion=guion_sintetico())
+    try:
+        montaje.llega("設定画面を開きます")
+    finally:
+        montaje.orquestador.cerrar()
+
+    assert montaje.voz.dichas == ["es:設定画面を開きます"]
+
+
+def test_con_guion_en_pausa_no_traduce_por_adelantado(cache: CacheSQLite) -> None:
+    g = guion_sintetico()
+    montaje = Montaje(cache, guion=g)
+    try:
+        montaje.orquestador.pausar()
+        montaje.orquestador.reanudar()
+        montaje.llega(pantalla(g, 0))
+        montaje.orquestador.pausar()
+        peticiones = len(montaje.traductor.peticiones)
+        time.sleep(0.1)
+        assert len(montaje.traductor.peticiones) <= peticiones + 1  # como mucho, la que ya estaba en marcha
+    finally:
+        montaje.orquestador.cerrar()
+
+
+def test_con_guion_un_error_inesperado_por_adelantado_no_se_repite(
+    cache: CacheSQLite, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    g = guion_sintetico()
+    montaje = Montaje(cache, guion=g)
+    assert montaje.guion is not None
+    fallos: list[int] = []
+
+    def pendiente(_parrafo: object) -> bool:
+        fallos.append(1)
+        raise RuntimeError("caché rota")
+
+    monkeypatch.setattr(montaje.guion.preparador, "pendiente", pendiente)
+    try:
+        montaje.llega(pantalla(g, 0))
+        time.sleep(0.1)
+    finally:
+        montaje.orquestador.cerrar()
+
+    assert len(fallos) == 1
+    assert montaje.voz.dichas == [f"es:{g.parrafos[0].original}"]

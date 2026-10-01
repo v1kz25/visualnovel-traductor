@@ -6,12 +6,16 @@ from typing import Any
 import pytest
 
 from vn_audiolibro.captura.modelos import Rectangulo, Ventana, VentanaNoEncontradaError
-from vn_audiolibro.perfiles.modelos import AjustesVolumen, AjustesVoz, Perfil
+from vn_audiolibro.guion.modelos import GuionNoEncontradoError, OrigenGuion
+from vn_audiolibro.perfiles.modelos import AjustesGuion, AjustesVolumen, AjustesVoz, Perfil
 from vn_audiolibro.pipeline import sesion as modulo
-from vn_audiolibro.pipeline.sesion import Sesion
+from vn_audiolibro.pipeline.orquestador import GuionJuego
+from vn_audiolibro.pipeline.sesion import Sesion, ajustes_guion, traductor_guion
 from vn_audiolibro.voz.modelos import VozFallidaError
 from vn_audiolibro.voz.piper import Hablante
 from vn_audiolibro.voz.volumen import Juego
+
+from ..guion.sinteticos import juego
 
 
 class Registro:
@@ -165,3 +169,49 @@ def test_sin_servidor_de_sonido_se_juega_sin_bajar_el_volumen(
         pass
     assert errores == ["No se podrá bajar el volumen del juego: pulse no disponible"]
     assert registro.creados["locutor"][3] is None
+
+
+# Guion del juego
+
+
+def test_con_guion_lo_lee_y_se_lo_pasa_al_orquestador(registro: Registro, tmp_path: Path) -> None:
+    carpeta = juego(tmp_path)
+    perfil = Perfil("Juego", "juego", idioma="ja", guion=AjustesGuion(str(carpeta), OrigenGuion.INGLES))
+    estados: list[str] = []
+    with Sesion(perfil, lambda _: None, lambda _: None, estados.append):
+        pass
+
+    guion = registro.creados["orquestador"][7]
+    assert isinstance(guion, GuionJuego)
+    assert guion.preparador.ajustes == ajustes_guion(perfil)
+    assert guion.preparador.ajustes.origen is OrigenGuion.INGLES
+    assert "Leyendo el guion del juego…" in estados
+
+
+def test_si_no_encuentra_el_guion_avisa_y_juega_con_el_ocr(registro: Registro, tmp_path: Path) -> None:
+    errores: list[str] = []
+    perfil = Perfil("Juego", "juego", idioma="ja", guion=AjustesGuion(str(tmp_path)))
+    with sesion(perfil, errores):
+        pass
+
+    assert registro.creados["orquestador"][7] is None
+    assert any("No se usará el guion" in error for error in errores)
+
+
+def test_traductor_guion_arranca_y_para_el_traductor(registro: Registro, tmp_path: Path) -> None:
+    perfil = Perfil("Juego", "juego", idioma="ja", guion=AjustesGuion(str(juego(tmp_path))))
+
+    with traductor_guion(perfil) as preparador:
+        assert len(preparador.guion.parrafos) == 7
+        assert "detener servidor" not in registro.eventos
+
+    assert registro.eventos[-2:] == ["cerrar cache", "detener servidor"]
+
+
+def test_traductor_guion_sin_guion(registro: Registro) -> None:
+    with (
+        pytest.raises(GuionNoEncontradoError, match="no tiene configurado"),
+        traductor_guion(Perfil("J", "j")),
+    ):
+        pass
+    assert registro.eventos == []
