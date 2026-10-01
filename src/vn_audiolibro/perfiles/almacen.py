@@ -15,11 +15,13 @@ from vn_audiolibro.perfiles.modelos import (
     IDIOMAS,
     AjustesGuion,
     AjustesLectura,
+    AjustesSubtitulos,
     AjustesVolumen,
     AjustesVoz,
     Color,
     Perfil,
     PerfilInvalidoError,
+    PosicionSubtitulos,
     nuevo_id,
 )
 from vn_audiolibro.rutas import directorio_config
@@ -66,6 +68,12 @@ def a_dict(perfil: Perfil) -> dict[str, Any]:
             "otras": dict(perfil.volumen.otras),
             "excluir": list(perfil.volumen.excluir),
         },
+        "subtitulos": {
+            "activo": perfil.subtitulos.activo,
+            "posicion": perfil.subtitulos.posicion.value,
+            "tamano": perfil.subtitulos.tamano,
+            "opacidad": perfil.subtitulos.opacidad,
+        },
         "guion": None
         if perfil.guion is None
         else {"carpeta": perfil.guion.carpeta, "origen": perfil.guion.origen.value},
@@ -95,6 +103,7 @@ def desde_dict(datos: Mapping[str, Any]) -> Perfil:
             voz=_voz(datos.get("voz", {})),
             lectura=_lectura(datos.get("lectura", {})),
             volumen=_volumen(datos.get("volumen", {})),
+            subtitulos=_subtitulos(datos.get("subtitulos", {})),
             guion=_guion(datos.get("guion")),
             id=datos.get("id") or nuevo_id(),
         )
@@ -160,6 +169,20 @@ def _volumen(datos: Mapping[str, Any]) -> AjustesVolumen:
         nivel_juego=_numero(datos.get("nivel_juego", por_defecto.nivel_juego)),
         otras=tuple((nombre, _numero(nivel)) for nombre, nivel in otras.items()),
         excluir=tuple(excluir),
+    )
+
+
+def _subtitulos(datos: Mapping[str, Any]) -> AjustesSubtitulos:
+    por_defecto = AjustesSubtitulos()
+    activo = datos.get("activo", por_defecto.activo)
+    tamano = datos.get("tamano", por_defecto.tamano)
+    if not isinstance(activo, bool) or isinstance(tamano, bool) or not isinstance(tamano, int):
+        raise TypeError(_("subtítulos no válidos: {datos!r}").format(datos=dict(datos)))
+    return AjustesSubtitulos(
+        activo=activo,
+        posicion=PosicionSubtitulos(datos.get("posicion", por_defecto.posicion.value)),
+        tamano=tamano,
+        opacidad=_numero(datos.get("opacidad", por_defecto.opacidad)),
     )
 
 

@@ -21,11 +21,13 @@ from vn_audiolibro.perfiles.almacen import (
 from vn_audiolibro.perfiles.modelos import (
     AjustesGuion,
     AjustesLectura,
+    AjustesSubtitulos,
     AjustesVolumen,
     AjustesVoz,
     Color,
     Perfil,
     PerfilInvalidoError,
+    PosicionSubtitulos,
 )
 from vn_audiolibro.traduccion.modelos import Glosario, Motor
 from vn_audiolibro.voz.modelos import ModoLectura
@@ -46,6 +48,7 @@ COMPLETO = Perfil(
     voz=AjustesVoz(Hablante.HOMBRE, 1.25),
     lectura=AjustesLectura(ModoLectura.ULTIMA, 0.5),
     volumen=AjustesVolumen(activo=False, nivel_juego=0.5, otras=(("Firefox", 0.0),), excluir=("Discord",)),
+    subtitulos=AjustesSubtitulos(activo=True, posicion=PosicionSubtitulos.TAPAR, tamano=30, opacidad=0.5),
     guion=AjustesGuion("/juegos/mi juego"),
 )
 
@@ -99,6 +102,21 @@ def test_un_juego_en_ingles_se_traduce_al_espanol() -> None:
     assert desde_dict(a_dict(perfil)) == perfil
 
 
+@pytest.mark.parametrize(
+    ("campos", "mensaje"),
+    [({"tamano": 5}, "tamaño de los subtítulos"), ({"opacidad": 1.5}, "opacidad")],
+)
+def test_subtitulos_no_validos(campos: dict[str, Any], mensaje: str) -> None:
+    with pytest.raises(PerfilInvalidoError, match=mensaje):
+        AjustesSubtitulos(**campos)
+
+
+def test_subtitulos_guardados_con_tipos_erroneos() -> None:
+    base = {"version": 1, "nombre": "J", "ventana": "j"}
+    with pytest.raises(PerfilInvalidoError, match="subtítulos"):
+        desde_dict({**base, "subtitulos": {"activo": "sí"}})
+
+
 def test_guion_no_valido() -> None:
     with pytest.raises(PerfilInvalidoError, match="carpeta"):
         AjustesGuion(" ")
@@ -144,6 +162,7 @@ def test_ida_y_vuelta_por_json() -> None:
     assert datos["destino"] == "en"
     assert datos["busqueda"] == "detector"
     assert datos["traductor"] == "gemini"
+    assert datos["subtitulos"] == {"activo": True, "posicion": "tapar", "tamano": 30, "opacidad": 0.5}
     assert "clave" not in json.dumps(datos).lower()  # la clave nunca va en el fichero del juego
     assert datos["guion"] == {"carpeta": "/juegos/mi juego", "origen": "original"}
     sin_guion = a_dict(Perfil("J", "j"))
@@ -157,6 +176,7 @@ def test_los_campos_que_faltan_toman_su_valor_por_defecto() -> None:
     assert perfil.color == Color.CLARO
     assert perfil.busqueda is BusquedaTexto.COLOR  # los juegos de antes buscaban por color
     assert perfil.traductor is Motor.LOCAL
+    assert perfil.subtitulos == AjustesSubtitulos()  # desactivados
     assert perfil.glosario == Glosario()
     assert perfil.volumen == AjustesVolumen()
     assert perfil.guion is None
