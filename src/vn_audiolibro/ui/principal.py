@@ -39,6 +39,7 @@ from vn_audiolibro.ui.ajustes import AjustesJuego
 from vn_audiolibro.ui.cache import VentanaCache
 from vn_audiolibro.ui.editor import EditorJuego
 from vn_audiolibro.ui.puente import PuenteSesion
+from vn_audiolibro.ui.subtitulos import PantallaSubtitulos, abrir_subtitulos
 
 TITULO = "vn-audiolibro"
 MAX_LINEAS = 500
@@ -75,8 +76,11 @@ class VentanaPrincipal(QMainWindow):
         abrir_ajustes: AbrirAjustes | None = None,
         abrir_ventana_cache: AbrirVentanaCache | None = None,
         ruta_ajustes: Path | None = None,
+        subtitulos: Callable[[Perfil], PantallaSubtitulos | None] = abrir_subtitulos,
     ) -> None:
         super().__init__()
+        self._crear_subtitulos = subtitulos
+        self._subtitulos: PantallaSubtitulos | None = None
         self._ruta_ajustes = ruta_ajustes
         self.setWindowTitle(TITULO)
         self.resize(900, 560)
@@ -280,6 +284,8 @@ class VentanaPrincipal(QMainWindow):
         self._lineas.clear()
         self.historial.clear()
         self.estado.setText(_("Preparando «{nombre}»…").format(nombre=perfil.nombre))
+        # Antes de arrancar: la primera línea puede llegar en cuanto empieza la captura.
+        self._subtitulos = self._crear_subtitulos(perfil)
         self.puente.iniciar(perfil)
         self._actualizar_botones()
 
@@ -300,12 +306,17 @@ class VentanaPrincipal(QMainWindow):
 
     def _al_terminar(self) -> None:
         self._perfil_en_juego = None
+        if self._subtitulos is not None:
+            self._subtitulos.cerrar()
+            self._subtitulos = None
         if not self.puente.jugando and not self._hubo_error:
             self.estado.setText(_("Partida terminada. Elige un juego y pulsa Jugar."))
         self._actualizar_botones()
 
     def _mostrar_linea(self, linea: LineaJuego) -> None:
         self._lineas.append(linea)
+        if self._subtitulos is not None:
+            self._subtitulos.mostrar(linea.traduccion)
         self.historial.setHtml("".join(_html(linea) for linea in self._lineas))
         barra = self.historial.verticalScrollBar()
         barra.setValue(barra.maximum())
@@ -337,4 +348,7 @@ class VentanaPrincipal(QMainWindow):
         if self.puente.jugando:
             self.puente.detener()
         self.puente.esperar(timeout_s=15)
+        if self._subtitulos is not None:
+            self._subtitulos.cerrar()  # no tiene padre: si no, la app seguiría abierta
+            self._subtitulos = None
         evento.accept()

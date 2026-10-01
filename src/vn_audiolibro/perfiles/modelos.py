@@ -108,6 +108,41 @@ class AjustesVolumen:
         return Seleccion.de_nombres(juego, self.nivel_juego, dict(self.otras), self.excluir)
 
 
+class PosicionSubtitulos(StrEnum):
+    """Dónde van los subtítulos respecto a la zona de texto del juego."""
+
+    ENCIMA = "encima"
+    """Justo encima de la zona de texto, sin taparla."""
+    DEBAJO = "debajo"
+    """Justo debajo de la zona de texto (encima si no cabe dentro del juego)."""
+    TAPAR = "tapar"
+    """Sobre la zona de texto, con fondo opaco: se ve la traducción en lugar del original."""
+
+
+TAMANO_MIN, TAMANO_MAX = 10, 72
+
+
+@dataclass(frozen=True)
+class AjustesSubtitulos:
+    """Subtítulos con la traducción encima del juego (desactivados por defecto)."""
+
+    activo: bool = False
+    posicion: PosicionSubtitulos = PosicionSubtitulos.ENCIMA
+    tamano: int = 22
+    """Tamaño de la letra en puntos."""
+    opacidad: float = 0.75
+    """Opacidad del fondo (0, transparente; 1, opaco). Al tapar el texto, el fondo es opaco."""
+
+    def __post_init__(self) -> None:
+        if not TAMANO_MIN <= self.tamano <= TAMANO_MAX:
+            raise PerfilInvalidoError(
+                _("El tamaño de los subtítulos tiene que estar entre {minimo} y {maximo}").format(
+                    minimo=TAMANO_MIN, maximo=TAMANO_MAX
+                )
+            )
+        _nivel_valido(self.opacidad, _("opacidad"))
+
+
 @dataclass(frozen=True)
 class AjustesGuion:
     """Guion del juego como fuente del texto (ver `vn_audiolibro.guion`)."""
@@ -151,6 +186,7 @@ class Perfil:
     voz: AjustesVoz = field(default_factory=AjustesVoz)
     lectura: AjustesLectura = field(default_factory=AjustesLectura)
     volumen: AjustesVolumen = field(default_factory=AjustesVolumen)
+    subtitulos: AjustesSubtitulos = field(default_factory=AjustesSubtitulos)
     guion: AjustesGuion | None = None
     """Si está, el texto sale del guion del juego y el OCR solo sirve para saber por dónde va."""
     id: str = field(default_factory=nuevo_id)

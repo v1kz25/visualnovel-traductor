@@ -78,6 +78,7 @@ _prototipo(_user32.GetWindowTextLengthW, (_HWND,), _INT)
 _prototipo(_user32.GetWindowTextW, (_HWND, wintypes.LPWSTR, _INT), _INT)
 _prototipo(_user32.GetWindowThreadProcessId, (_HWND, ctypes.POINTER(wintypes.DWORD)), wintypes.DWORD)
 _prototipo(_user32.GetClientRect, (_HWND, ctypes.POINTER(wintypes.RECT)), _BOOL)
+_prototipo(_user32.GetForegroundWindow, (), _HWND)
 _prototipo(_user32.ClientToScreen, (_HWND, ctypes.POINTER(wintypes.POINT)), _BOOL)
 _prototipo(_user32.PrintWindow, (_HWND, _HDC, _UINT), _BOOL)
 _prototipo(_user32.GetDC, (_HWND,), _HDC)
@@ -161,6 +162,14 @@ class GestorVentanasWin32:
                 _("La ventana {id_ventana:#x} ya no existe").format(id_ventana=id_ventana)
             )
         return Rectangulo(x=origen.x, y=origen.y, ancho=ancho, alto=alto)
+
+    def activa(self) -> int | None:
+        """Ventana que está en primer plano, o None si no hay ninguna."""
+        return _activa()
+
+
+def _activa() -> int | None:
+    return _user32.GetForegroundWindow() or None
 
 
 def _titulo(id_ventana: int) -> str:

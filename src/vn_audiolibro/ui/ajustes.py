@@ -1,4 +1,4 @@
-"""Ajustes de un juego: voz y lectura, volumen del juego y de otras aplicaciones, y glosario."""
+"""Ajustes de un juego: voz y lectura, volumen del juego y de otras aplicaciones, glosario y subtítulos."""
 
 import logging
 import threading
@@ -31,13 +31,17 @@ from vn_audiolibro.cache.sqlite import CacheSQLite
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
 from vn_audiolibro.perfiles.modelos import (
     PAUSA_MAX_S,
+    TAMANO_MAX,
+    TAMANO_MIN,
     VELOCIDAD_MAX,
     VELOCIDAD_MIN,
     AjustesLectura,
+    AjustesSubtitulos,
     AjustesVolumen,
     AjustesVoz,
     Perfil,
     PerfilInvalidoError,
+    PosicionSubtitulos,
 )
 from vn_audiolibro.plataforma import cliente_audio, reproductor
 from vn_audiolibro.textos import N_, _, decimal
@@ -57,6 +61,16 @@ FRASES_PRUEBA = {
 BAJAR, SILENCIAR, NO_TOCAR = "bajar", "silenciar", "no tocar"
 ACCIONES = {BAJAR: N_("Bajar a"), SILENCIAR: N_("Silenciar"), NO_TOCAR: N_("No tocar nunca")}
 """Se traducen al mostrarlas, con `_()`."""
+
+POSICIONES = {
+    PosicionSubtitulos.ENCIMA: N_("Encima de la caja de texto"),
+    PosicionSubtitulos.DEBAJO: N_("Debajo de la caja de texto"),
+    PosicionSubtitulos.TAPAR: N_("Tapando la caja de texto (solo se ve la traducción)"),
+}
+AYUDA_SUBTITULOS = N_(
+    "La traducción aparece sobre el juego mientras es la ventana activa; los clics siguen llegando "
+    "al juego. Si no se ve con el juego en pantalla completa, ponlo en modo ventana o ventana sin bordes."
+)
 
 AbrirCache = Callable[[], CacheSQLite]
 ProbarVoz = Callable[[AjustesVoz, str], None]
@@ -124,6 +138,7 @@ class AjustesJuego(QDialog):
         pestanas.addTab(self._pestana_voz(), _("Voz y lectura"))
         pestanas.addTab(self._pestana_volumen(), _("Volumen"))
         pestanas.addTab(self._pestana_glosario(), _("Glosario"))
+        pestanas.addTab(self._pestana_subtitulos(), _("Subtítulos"))
         self.error = QLabel()
         self.error.setStyleSheet("color: #c0392b")
         self.error.setWordWrap(True)
@@ -173,6 +188,52 @@ class AjustesJuego(QDialog):
         formulario.addRow(_("Al avanzar deprisa"), self.modo)
         formulario.addRow(_("Pausa entre líneas"), self.pausa)
         return pestana
+
+    # Subtítulos
+
+    def _pestana_subtitulos(self) -> QWidget:
+        self.subtitulos = QCheckBox(_("Mostrar la traducción encima del juego"))
+        self.posicion = QComboBox()
+        for posicion, texto in POSICIONES.items():
+            self.posicion.addItem(_(texto), posicion.value)
+        self.tamano = QSpinBox()
+        self.tamano.setRange(TAMANO_MIN, TAMANO_MAX)
+        self.tamano.setSuffix(" pt")
+        self.opacidad = QSlider(Qt.Orientation.Horizontal)
+        self.opacidad.setRange(0, 100)
+        self.texto_opacidad = QLabel()
+        self.opacidad.valueChanged.connect(lambda v: self.texto_opacidad.setText(f"{v} %"))
+        self.subtitulos.toggled.connect(lambda _: self._actualizar_subtitulos())
+        self.posicion.currentIndexChanged.connect(lambda _: self._actualizar_subtitulos())
+        ayuda = QLabel(_(AYUDA_SUBTITULOS))
+        ayuda.setWordWrap(True)
+
+        fila_opacidad = QHBoxLayout()
+        fila_opacidad.addWidget(self.opacidad, 1)
+        fila_opacidad.addWidget(self.texto_opacidad)
+        pestana = QWidget()
+        formulario = QFormLayout(pestana)
+        formulario.addRow(self.subtitulos)
+        formulario.addRow(_("Posición"), self.posicion)
+        formulario.addRow(_("Tamaño de la letra"), self.tamano)
+        formulario.addRow(_("Opacidad del fondo"), fila_opacidad)
+        formulario.addRow(ayuda)
+        return pestana
+
+    def _actualizar_subtitulos(self) -> None:
+        activo = self.subtitulos.isChecked()
+        for control in (self.posicion, self.tamano):
+            control.setEnabled(activo)
+        tapar = self.posicion.currentData() == PosicionSubtitulos.TAPAR.value
+        self.opacidad.setEnabled(activo and not tapar)  # al tapar, el fondo es opaco
+
+    def _subtitulos(self) -> AjustesSubtitulos:
+        return AjustesSubtitulos(
+            activo=self.subtitulos.isChecked(),
+            posicion=PosicionSubtitulos(self.posicion.currentData()),
+            tamano=self.tamano.value(),
+            opacidad=self.opacidad.value() / 100,
+        )
 
     def probar(self) -> None:
         """Lee la frase de prueba en segundo plano con la voz y la velocidad elegidas."""
@@ -366,6 +427,12 @@ class AjustesJuego(QDialog):
             self.anadir_aplicacion(nombre, NO_TOCAR)
         for termino, traduccion in perfil.glosario.terminos:
             self.anadir_termino(termino, traduccion)
+        self.subtitulos.setChecked(perfil.subtitulos.activo)
+        self.posicion.setCurrentIndex(self.posicion.findData(perfil.subtitulos.posicion.value))
+        self.tamano.setValue(perfil.subtitulos.tamano)
+        self.opacidad.setValue(round(perfil.subtitulos.opacidad * 100))
+        self.texto_opacidad.setText(f"{self.opacidad.value()} %")
+        self._actualizar_subtitulos()
 
     def guardar(self) -> None:
         """Guarda los ajustes y limpia de la caché lo que ya no vale con ellos."""
@@ -377,6 +444,7 @@ class AjustesJuego(QDialog):
                 lectura=lectura,
                 volumen=self._volumen(),
                 glosario=self._glosario(),
+                subtitulos=self._subtitulos(),
             )
             self._almacen.guardar(nuevo)
         except (PerfilInvalidoError, ValueError) as error:

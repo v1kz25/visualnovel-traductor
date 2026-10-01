@@ -321,6 +321,9 @@ msgstr "“activo” must be true or false: {activo!r}"
 msgid "los nombres de las aplicaciones tienen que ser textos"
 msgstr "application names must be text"
 
+msgid "subtítulos no válidos: {datos!r}"
+msgstr "invalid subtitles: {datos!r}"
+
 msgid "No hay ningún juego con el identificador {id_perfil}"
 msgstr "There is no game with the identifier {id_perfil}"
 
@@ -347,6 +350,12 @@ msgstr "The speed must be between {minima} and {maxima}: {velocidad}"
 
 msgid "La pausa entre líneas tiene que estar entre 0 y {maximo} s"
 msgstr "The pause between lines must be between 0 and {maximo} s"
+
+msgid "El tamaño de los subtítulos tiene que estar entre {minimo} y {maximo}"
+msgstr "The subtitle size must be between {minimo} and {maximo}"
+
+msgid "opacidad"
+msgstr "opacity"
 
 msgid "Falta la carpeta del juego para leer su guion"
 msgstr "The game folder is missing to read its script"
@@ -560,6 +569,18 @@ msgstr "Mute"
 msgid "No tocar nunca"
 msgstr "Never touch"
 
+msgid "Encima de la caja de texto"
+msgstr "Above the text box"
+
+msgid "Debajo de la caja de texto"
+msgstr "Below the text box"
+
+msgid "Tapando la caja de texto (solo se ve la traducción)"
+msgstr "Covering the text box (only the translation is shown)"
+
+msgid "La traducción aparece sobre el juego mientras es la ventana activa; los clics siguen llegando al juego. Si no se ve con el juego en pantalla completa, ponlo en modo ventana o ventana sin bordes."
+msgstr "The translation appears over the game while it is the active window; clicks still reach the game. If it does not show with the game in full screen, switch the game to windowed or borderless window mode."
+
 msgid "Ajustes de «{nombre}»"
 msgstr "Settings for “{nombre}”"
 
@@ -571,6 +592,9 @@ msgstr "Volume"
 
 msgid "Glosario"
 msgstr "Glossary"
+
+msgid "Subtítulos"
+msgstr "Subtitles"
 
 msgid "Mujer"
 msgstr "Female"
@@ -598,6 +622,18 @@ msgstr "When advancing quickly"
 
 msgid "Pausa entre líneas"
 msgstr "Pause between lines"
+
+msgid "Mostrar la traducción encima del juego"
+msgstr "Show the translation over the game"
+
+msgid "Posición"
+msgstr "Position"
+
+msgid "Tamaño de la letra"
+msgstr "Font size"
+
+msgid "Opacidad del fondo"
+msgstr "Background opacity"
 
 msgid "No se pudo probar la voz: {error}"
 msgstr "Could not test the voice: {error}"

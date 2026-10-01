@@ -276,3 +276,47 @@ def test_ver_la_cache(qtbot: QtBot, almacen: AlmacenPerfiles, fabrica: Fabrica) 
     assert not ventana.boton_cache.isEnabled()
     ventana.ver_cache()  # mientras se juega, no se abre
     assert len(abiertas) == 1
+
+
+class SubtitulosFalsos:
+    def __init__(self) -> None:
+        self.textos: list[str] = []
+        self.cerrados = False
+
+    def mostrar(self, texto: str) -> None:
+        self.textos.append(texto)
+
+    def cerrar(self) -> None:
+        self.cerrados = True
+
+
+def test_subtitulos_durante_la_partida(qtbot: QtBot, almacen: AlmacenPerfiles, fabrica: Fabrica) -> None:
+    abiertos: list[tuple[str, SubtitulosFalsos]] = []
+
+    def abrir(perfil: Perfil) -> SubtitulosFalsos:
+        abiertos.append((perfil.nombre, SubtitulosFalsos()))
+        return abiertos[-1][1]
+
+    ventana = VentanaPrincipal(almacen, PuenteSesion(fabrica), subtitulos=abrir)  # type: ignore[arg-type]
+    qtbot.addWidget(ventana)
+    jugar(qtbot, ventana)
+
+    ((nombre, subtitulos),) = abiertos
+    assert nombre == "Alfa"
+    assert subtitulos.textos == ["uno"]
+    with qtbot.waitSignal(ventana.puente.terminada, timeout=ESPERA_MS):
+        ventana.detener()
+    assert subtitulos.cerrados
+
+
+def test_subtitulos_se_cierran_al_cerrar_la_app(
+    qtbot: QtBot, almacen: AlmacenPerfiles, fabrica: Fabrica
+) -> None:
+    subtitulos = SubtitulosFalsos()
+    ventana = VentanaPrincipal(almacen, PuenteSesion(fabrica), subtitulos=lambda _: subtitulos)  # type: ignore[arg-type,return-value]
+    qtbot.addWidget(ventana)
+    jugar(qtbot, ventana)
+
+    ventana.close()
+
+    assert subtitulos.cerrados

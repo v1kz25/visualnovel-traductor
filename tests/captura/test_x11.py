@@ -144,3 +144,20 @@ def test_cli_ventana_inexistente(gestor: GestorVentanasX11, monkeypatch: pytest.
     monkeypatch.setattr(cli, "gestor_ventanas", lambda: gestor)
 
     assert cli.main(["--ventana", "no existe ninguna ventana así"]) == 1
+
+
+def test_ventana_activa_segun_el_gestor_de_ventanas(
+    conexion: display.Display, ventana: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    gestor = GestorVentanasX11(conexion)
+    activa: list[int] | None = None
+
+    def propiedad(objetivo, nombre, tipo=X.AnyPropertyType):  # type: ignore[no-untyped-def]
+        return activa if nombre == "_NET_ACTIVE_WINDOW" else None
+
+    monkeypatch.setattr(gestor, "_propiedad", propiedad)
+    assert gestor.activa() is None  # sin gestor de ventanas (Xvfb), no se sabe
+    activa = [0]
+    assert gestor.activa() is None
+    activa = [ventana]
+    assert gestor.activa() == ventana

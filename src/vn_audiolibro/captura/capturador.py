@@ -30,6 +30,10 @@ class Ventanas(FuenteGeometria, Protocol):
         """
         ...
 
+    def activa(self) -> int | None:
+        """Ventana que tiene el foco, o None si no se sabe."""
+        ...
+
 
 class Capturador(Protocol):
     """Algo que devuelve la imagen actual de una zona de una ventana."""
