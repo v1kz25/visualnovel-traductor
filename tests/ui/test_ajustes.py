@@ -305,3 +305,21 @@ def test_listar_aplicaciones_sin_servidor(monkeypatch: pytest.MonkeyPatch) -> No
 
     monkeypatch.setattr(modulo, "cliente_audio", falla)
     assert listar_aplicaciones() == []
+
+
+def test_subtitulos(dialogo: AjustesJuego, almacen: AlmacenPerfiles) -> None:
+    from vn_audiolibro.perfiles.modelos import AjustesSubtitulos, PosicionSubtitulos
+
+    assert not dialogo.subtitulos.isChecked()  # desactivados por defecto
+    assert not dialogo.posicion.isEnabled()
+
+    dialogo.subtitulos.setChecked(True)
+    dialogo.tamano.setValue(30)
+    dialogo.opacidad.setValue(40)
+    assert dialogo.texto_opacidad.text() == "40 %"
+    dialogo.posicion.setCurrentIndex(dialogo.posicion.findData(PosicionSubtitulos.TAPAR.value))
+    assert not dialogo.opacidad.isEnabled()  # al tapar, el fondo es opaco
+    dialogo.guardar()
+
+    guardado = almacen.cargar(PERFIL.id).subtitulos
+    assert guardado == AjustesSubtitulos(True, PosicionSubtitulos.TAPAR, 30, 0.4)
