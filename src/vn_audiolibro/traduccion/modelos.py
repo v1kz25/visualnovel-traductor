@@ -2,7 +2,17 @@
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Protocol, runtime_checkable
+
+
+class Motor(StrEnum):
+    """Traductor que usa un juego."""
+
+    LOCAL = "local"
+    """Hy-MT2 en el equipo: gratis y sin conexión. El de por defecto."""
+    GEMINI = "gemini"
+    """Gemini de Google, en la nube: opcional, con la clave del usuario. Si falla, se traduce en local."""
 
 
 @dataclass(frozen=True)
