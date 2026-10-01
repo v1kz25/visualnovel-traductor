@@ -251,6 +251,7 @@ class EditorJuego(QDialog):
             ventana = self.ventanas.itemData(i)
             if isinstance(ventana, Ventana) and buscado in ventana.titulo.casefold():
                 self.ventanas.setCurrentIndex(i)
+                self._buscar_guion(ventana)
                 break
 
     @staticmethod

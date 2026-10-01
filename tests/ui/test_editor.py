@@ -338,3 +338,13 @@ def test_elegir_carpeta_parte_de_steam(monkeypatch: pytest.MonkeyPatch, qtbot: Q
     assert modulo.elegir_carpeta(None, "") == ""  # type: ignore[arg-type]
     assert modulo.elegir_carpeta(None, "/juegos") == ""  # type: ignore[arg-type]
     assert pedidas == [str(tmp_path), "/juegos"]
+
+
+def test_editar_un_juego_abierto_sin_guion_lo_encuentra(
+    qtbot: QtBot, almacen: AlmacenPerfiles, falsos: Falsos, tmp_path: Path
+) -> None:
+    carpeta = juego(tmp_path)
+    editor = abrir(qtbot, almacen, falsos, Perfil("Juego", "mi juego"), carpeta_juego=carpeta)
+
+    assert editor.carpeta_guion.text() == str(carpeta)
+    assert "Guion encontrado" in editor.estado_guion.text()
