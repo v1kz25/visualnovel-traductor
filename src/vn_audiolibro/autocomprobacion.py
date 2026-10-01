@@ -104,6 +104,22 @@ def _textos() -> str:
     return ", ".join(idiomas)
 
 
+def _llavero(plataforma: str = sys.platform) -> str:
+    """El llavero del sistema, donde se guarda la clave de Gemini: su backend y sus metadatos.
+
+    `keyring` encuentra los backends por los metadatos del paquete: si el empaquetado los pierde,
+    no encontraría ninguno y la clave no se podría guardar.
+    """
+    from importlib import import_module
+    from importlib.metadata import entry_points
+
+    modulo = "keyring.backends.Windows" if plataforma == "win32" else "keyring.backends.SecretService"
+    import_module(modulo)
+    if not entry_points(group="keyring.backends"):
+        raise RuntimeError("faltan los metadatos de keyring")
+    return modulo
+
+
 def comprobaciones(plataforma: str = sys.platform) -> list[Comprobacion]:
     """Lo que se comprueba en este sistema."""
     lista: list[Comprobacion] = [
@@ -116,6 +132,7 @@ def comprobaciones(plataforma: str = sys.platform) -> list[Comprobacion]:
         ("libsndfile", _soundfile),
         ("Qt e icono", _qt),
         ("idiomas de la interfaz", _textos),
+        ("llavero del sistema", lambda: _llavero(plataforma)),
     ]
     if plataforma == "win32":
         lista += [("PortAudio", _sounddevice), ("Core Audio", _pycaw)]

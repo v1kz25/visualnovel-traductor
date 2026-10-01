@@ -25,6 +25,9 @@ msgstr "Windows does not provide the contents of window {id_ventana:#x}"
 msgid "El servidor X no tiene la extensión Composite"
 msgstr "The X server does not have the Composite extension"
 
+msgid "No se puede usar el llavero del sistema para guardar la clave: {error}"
+msgstr "The system keyring cannot be used to store the key: {error}"
+
 msgid "Controles (escribe y pulsa Intro): p pausa/reanuda · r repite · s calla · m silencia la voz · q sale"
 msgstr "Controls (type and press Enter): p pause/resume · r repeat · s skip · m mute voice · q quit"
 
@@ -103,6 +106,9 @@ msgstr "SECONDS"
 msgid "segundos de silencio entre líneas"
 msgstr "seconds of silence between lines"
 
+msgid "traducir con Gemini en la nube (opcional; antes, guarda tu clave con la orden «gemini»)"
+msgstr "translate with Gemini in the cloud (optional; first save your key with the \"gemini\" command)"
+
 msgid "CARPETA"
 msgstr "FOLDER"
 
@@ -133,6 +139,12 @@ msgstr "do not limit the cache size"
 msgid "añade vn-audiolibro al menú de aplicaciones (en Windows, al menú Inicio)"
 msgstr "add vn-audiolibro to the applications menu (the Start menu on Windows)"
 
+msgid "guarda en el llavero del sistema tu clave de API de Gemini (la pide sin mostrarla)"
+msgstr "saves your Gemini API key in the system keyring (asks for it without showing it)"
+
+msgid "borra la clave guardada"
+msgstr "deletes the saved key"
+
 msgid "traduce por adelantado el guion de un juego (se puede cortar con Ctrl+C y seguir otro día)"
 msgstr "translates a game's script in advance (you can stop with Ctrl+C and continue another day)"
 
@@ -156,6 +168,18 @@ msgstr "No games yet. Set one up with: {orden}"
 
 msgid "{nombre}  (ventana «{ventana}», {idioma} → {destino}, id {id})"
 msgstr "{nombre}  (window “{ventana}”, {idioma} → {destino}, id {id})"
+
+msgid "Clave de Gemini borrada del llavero."
+msgstr "Gemini key deleted from the keyring."
+
+msgid "Clave de API de Gemini: "
+msgstr "Gemini API key: "
+
+msgid "No se ha guardado nada: la clave está vacía."
+msgstr "Nothing was saved: the key is empty."
+
+msgid "Clave guardada en el llavero del sistema. Elige Gemini como traductor en el editor del juego."
+msgstr "Key saved in the system keyring. Choose Gemini as the translator in the game editor."
 
 msgid "Acceso directo creado en {ruta}"
 msgstr "Shortcut created at {ruta}"
@@ -384,6 +408,9 @@ msgstr "Warming up the translator…"
 msgid "Leyendo «{ventana}»."
 msgstr "Reading “{ventana}”."
 
+msgid "Falta la clave de Gemini: se traducirá en local. Añádela en el editor del juego."
+msgstr "The Gemini key is missing: translating locally. Add it in the game editor."
+
 msgid "No se usará el guion, solo el OCR: {error}"
 msgstr "The script will not be used, only OCR: {error}"
 
@@ -454,6 +481,48 @@ msgstr "English"
 msgctxt "separador decimal"
 msgid ","
 msgstr "."
+
+msgid "No se pudo conectar con Gemini: {error}"
+msgstr "Could not connect to Gemini: {error}"
+
+msgid "Respuesta de Gemini no válida: {error}"
+msgstr "Invalid response from Gemini: {error}"
+
+msgid "Gemini: límite de peticiones agotado ({mensaje})"
+msgstr "Gemini: request limit reached ({mensaje})"
+
+msgid "Gemini no acepta la clave de API: revísala en el editor del juego"
+msgstr "Gemini does not accept the API key: check it in the game editor"
+
+msgid "Error de Gemini ({codigo}): {mensaje}"
+msgstr "Gemini error ({codigo}): {mensaje}"
+
+msgid "Gemini ha bloqueado la línea ({motivo})"
+msgstr "Gemini blocked the line ({motivo})"
+
+msgid "Gemini no ha devuelto ninguna traducción"
+msgstr "Gemini returned no translation"
+
+msgid "Gemini no ha traducido la línea ({motivo})"
+msgstr "Gemini did not translate the line ({motivo})"
+
+msgid "límite de peticiones por minuto o por día"
+msgstr "requests per minute or per day limit"
+
+msgid "Se traduce en local mientras Gemini no esté disponible: {motivo}"
+msgstr "Translating locally while Gemini is unavailable: {motivo}"
+
+msgid "Gemini vuelve a traducir"
+msgstr "Gemini is translating again"
+
+msgid "El texto del juego se envía a Google para traducirlo."
+msgstr "The game's text is sent to Google to be translated."
+
+msgid "En el plan gratuito, Google puede usar ese texto para mejorar sus productos."
+msgstr "On the free plan, Google may use that text to improve its products."
+
+msgid "Necesitas tu propia clave gratuita de Google AI Studio: {url}"
+msgstr "You need your own free Google AI Studio key: {url}"
 
 msgid "Respuesta inesperada de llama-server: {respuesta}"
 msgstr "Unexpected response from llama-server: {respuesta}"
@@ -656,6 +725,12 @@ msgstr "Horizontal"
 msgid "Vertical (columnas)"
 msgstr "Vertical (columns)"
 
+msgid "Local (gratis y sin conexión)"
+msgstr "Local (free and offline)"
+
+msgid "Gemini (en la nube, con tu clave de Google)"
+msgstr "Gemini (in the cloud, with your Google key)"
+
 msgid "Por color (caja de texto lisa)"
 msgstr "By color (plain text box)"
 
@@ -725,6 +800,12 @@ msgstr "Orientation"
 msgid "Buscar el texto"
 msgstr "Find the text"
 
+msgid "Traductor"
+msgstr "Translator"
+
+msgid "Clave de Gemini"
+msgstr "Gemini key"
+
 msgid "Guion del juego"
 msgstr "Game script"
 
@@ -773,6 +854,15 @@ msgid "Guion encontrado: {n} párrafo."
 msgid_plural "Guion encontrado: {n} párrafos."
 msgstr[0] "Script found: {n} paragraph."
 msgstr[1] "Script found: {n} paragraphs."
+
+msgid "Para traducir con Gemini, pega tu clave de API de Google AI Studio"
+msgstr "To translate with Gemini, paste your Google AI Studio API key"
+
+msgid "Guardada en el llavero (escribe otra para cambiarla)"
+msgstr "Saved in the keyring (type another one to change it)"
+
+msgid "Pega aquí tu clave de Google AI Studio"
+msgstr "Paste your Google AI Studio key here"
 
 msgid "Pendiente"
 msgstr "Pending"

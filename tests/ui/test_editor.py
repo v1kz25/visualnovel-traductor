@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
-from PySide6.QtWidgets import QDialog, QDialogButtonBox
+from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLineEdit
 from pytestqt.qtbot import QtBot
 
 from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, Imagen, Rectangulo, Ventana, ZonaRelativa
@@ -14,6 +14,7 @@ from vn_audiolibro.ocr.lector import AjustesLector, TextoLeido
 from vn_audiolibro.ocr.preprocesado import BusquedaTexto, Orientacion
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
 from vn_audiolibro.perfiles.modelos import AjustesGuion, AjustesVoz, Color, Perfil
+from vn_audiolibro.traduccion.modelos import Motor
 from vn_audiolibro.ui import editor as modulo
 from vn_audiolibro.ui.editor import EditorJuego, LectorBajoDemanda, capturar_ventana, listar_ventanas
 from vn_audiolibro.voz.piper import Hablante
@@ -171,6 +172,50 @@ def test_un_juego_en_ingles_solo_se_traduce_al_espanol_y_en_horizontal(
     editor.idioma.setCurrentIndex(editor.idioma.findData("ja"))
     assert editor.destino.isEnabled()
     assert editor.orientacion.isEnabled()
+
+
+def test_gemini_pide_la_clave_y_la_guarda_en_el_llavero(
+    qtbot: QtBot, almacen: AlmacenPerfiles, falsos: Falsos
+) -> None:
+    from vn_audiolibro import claves
+
+    editor = abrir(qtbot, almacen, falsos)
+    editor.nombre.setText("Juego")
+    editor.titulo.setText("juego")
+    assert editor.clave.isHidden()  # con el traductor local no hay clave que poner
+
+    editor.traductor.setCurrentIndex(editor.traductor.findData(Motor.GEMINI.value))
+    assert not editor.clave.isHidden()
+    assert editor.clave.echoMode() is QLineEdit.EchoMode.Password
+    assert "aistudio.google.com" in editor.aviso_gemini.text()
+    editor.guardar()
+    assert "clave de API" in editor.error.text()  # sin clave no se puede elegir Gemini
+    assert almacen.listar() == []
+
+    editor.clave.setText(" clave-123 ")
+    editor.guardar()
+
+    assert claves.leer() == "clave-123"
+    (guardado,) = almacen.listar()
+    assert guardado.traductor is Motor.GEMINI
+    assert editor.clave.text() == ""
+
+
+def test_editar_un_juego_con_gemini_y_clave_guardada(
+    qtbot: QtBot, almacen: AlmacenPerfiles, falsos: Falsos
+) -> None:
+    from vn_audiolibro import claves
+
+    claves.guardar("clave-123")
+    perfil = Perfil("Juego", "juego", traductor=Motor.GEMINI)
+    almacen.guardar(perfil)
+    editor = abrir(qtbot, almacen, falsos, perfil)
+
+    assert editor.traductor.currentData() == Motor.GEMINI.value
+    assert "Guardada" in editor.clave.placeholderText()
+    editor.guardar()  # no hace falta volver a escribirla
+    assert editor.guardado is not None
+    assert claves.leer() == "clave-123"
 
 
 def test_nombre_repetido_o_no_valido_no_cierra(

@@ -15,6 +15,7 @@ devuelve (sin dejar de traducir) y `q` sale.
 """
 
 import argparse
+import getpass
 import io
 import logging
 import sys
@@ -23,7 +24,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import replace
 from importlib.metadata import version
 
-from vn_audiolibro import plataforma, preparacion, textos
+from vn_audiolibro import claves, plataforma, preparacion, textos
 from vn_audiolibro.cache.sqlite import CacheSQLite
 from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, VentanaNoEncontradaError, ZonaRelativa
 from vn_audiolibro.configuracion import AjustesApp, cargar_ajustes, formato_tamano, guardar_ajustes
@@ -45,7 +46,8 @@ from vn_audiolibro.perfiles.modelos import (
 from vn_audiolibro.pipeline.orquestador import LineaJuego, Orquestador
 from vn_audiolibro.pipeline.sesion import Sesion, traductor_guion
 from vn_audiolibro.textos import N_, _, ngettext
-from vn_audiolibro.traduccion.modelos import TraduccionFallidaError
+from vn_audiolibro.traduccion.gemini import avisos_privacidad
+from vn_audiolibro.traduccion.modelos import Motor, TraduccionFallidaError
 from vn_audiolibro.voz.modelos import ModoLectura, VozFallidaError
 from vn_audiolibro.voz.piper import Hablante
 
@@ -122,6 +124,11 @@ def _parser() -> argparse.ArgumentParser:
         help=_("segundos de silencio entre líneas"),
     )
     crear.add_argument(
+        "--gemini",
+        action="store_true",
+        help=_("traducir con Gemini en la nube (opcional; antes, guarda tu clave con la orden «gemini»)"),
+    )
+    crear.add_argument(
         "--guion",
         metavar=_("CARPETA"),
         help=_("carpeta del juego: el texto se saca de su guion y el OCR solo sirve para seguirlo"),
@@ -142,6 +149,11 @@ def _parser() -> argparse.ArgumentParser:
     ordenes.add_parser(
         "instalar-acceso", help=_("añade vn-audiolibro al menú de aplicaciones (en Windows, al menú Inicio)")
     )
+
+    gemini = ordenes.add_parser(
+        "gemini", help=_("guarda en el llavero del sistema tu clave de API de Gemini (la pide sin mostrarla)")
+    )
+    gemini.add_argument("--borrar", action="store_true", help=_("borra la clave guardada"))
 
     traducir = ordenes.add_parser(
         "traducir-guion",
@@ -188,28 +200,32 @@ def main(argv: list[str] | None = None, entrada: Iterable[str] = sys.stdin) -> i
         from vn_audiolibro.autocomprobacion import autocomprobar
 
         return autocomprobar()
-    almacen = AlmacenPerfiles()
     try:
-        if args.orden == "crear":
-            return _crear(almacen, args)
-        if args.orden == "jugar":
-            return _jugar(almacen.buscar(args.juego), entrada, args.tiempos)
-        if args.orden == "traducir-guion":
-            return _traducir_guion(almacen.buscar(args.juego))
-        if args.orden == "preparar":
-            return _preparar()
-        if args.orden == "juegos":
-            return _perfiles(almacen)
-        if args.orden == "cache":
-            return _cache(almacen, args)
-        if args.orden == "instalar-acceso":
-            return _instalar_acceso()
+        resultado = _orden(AlmacenPerfiles(), args, entrada)
     except (KeyError, ValueError, PerfilInvalidoError, PerfilDuplicadoError) as error:
         print(error.args[0] if error.args else error, file=sys.stderr)
         return 1
+    if resultado is not None:
+        return resultado
     from vn_audiolibro.ui.app import ejecutar  # Qt solo se carga si se abre la interfaz
 
     return ejecutar()
+
+
+def _orden(almacen: AlmacenPerfiles, args: argparse.Namespace, entrada: Iterable[str]) -> int | None:
+    """Ejecuta la orden pedida; None si no se ha pedido ninguna (se abre la interfaz)."""
+    ordenes: dict[str, Callable[[], int]] = {
+        "crear": lambda: _crear(almacen, args),
+        "jugar": lambda: _jugar(almacen.buscar(args.juego), entrada, args.tiempos),
+        "traducir-guion": lambda: _traducir_guion(almacen.buscar(args.juego)),
+        "preparar": _preparar,
+        "juegos": lambda: _perfiles(almacen),
+        "cache": lambda: _cache(almacen, args),
+        "gemini": lambda: _gemini(args.borrar),
+        "instalar-acceso": _instalar_acceso,
+    }
+    orden = ordenes.get(args.orden)
+    return orden() if orden is not None else None
 
 
 def _perfiles(almacen: AlmacenPerfiles) -> int:
@@ -227,6 +243,27 @@ def _perfiles(almacen: AlmacenPerfiles) -> int:
                 id=perfil.id,
             )
         )
+    return 0
+
+
+def _gemini(borrar: bool, pedir_clave: Callable[[str], str] = getpass.getpass) -> int:
+    """Guarda o borra la clave de Gemini. Se pide sin mostrarla para que no quede en el historial."""
+    try:
+        if borrar:
+            claves.borrar()
+            print(_("Clave de Gemini borrada del llavero."))
+            return 0
+        for aviso in avisos_privacidad():
+            print(aviso)
+        clave = pedir_clave(_("Clave de API de Gemini: ")).strip()
+        if not clave:
+            print(_("No se ha guardado nada: la clave está vacía."), file=sys.stderr)
+            return 1
+        claves.guardar(clave)
+    except claves.LlaveroNoDisponibleError as error:
+        print(error, file=sys.stderr)
+        return 1
+    print(_("Clave guardada en el llavero del sistema. Elige Gemini como traductor en el editor del juego."))
     return 0
 
 
@@ -327,6 +364,7 @@ def _crear(almacen: AlmacenPerfiles, args: argparse.Namespace) -> int:
         zona=args.zona,
         color=Color.OSCURO if args.oscuro else Color.CLARO,
         orientacion=Orientacion.VERTICAL if args.vertical else Orientacion.HORIZONTAL,
+        traductor=Motor.GEMINI if args.gemini else Motor.LOCAL,
         busqueda=BusquedaTexto.DETECTOR if args.detector else BusquedaTexto.COLOR,
         voz=AjustesVoz(Hablante.HOMBRE if args.hombre else Hablante.MUJER, args.velocidad),
         lectura=AjustesLectura(

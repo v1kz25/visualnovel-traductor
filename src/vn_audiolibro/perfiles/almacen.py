@@ -24,7 +24,7 @@ from vn_audiolibro.perfiles.modelos import (
 )
 from vn_audiolibro.rutas import directorio_config
 from vn_audiolibro.textos import _
-from vn_audiolibro.traduccion.modelos import Glosario
+from vn_audiolibro.traduccion.modelos import Glosario, Motor
 from vn_audiolibro.voz.modelos import ModoLectura
 from vn_audiolibro.voz.piper import Hablante
 
@@ -57,6 +57,7 @@ def a_dict(perfil: Perfil) -> dict[str, Any]:
         "orientacion": perfil.orientacion.value,
         "busqueda": perfil.busqueda.value,
         "glosario": dict(perfil.glosario.terminos),
+        "traductor": perfil.traductor.value,
         "voz": {"hablante": perfil.voz.hablante.name.lower(), "velocidad": perfil.voz.velocidad},
         "lectura": {"modo": perfil.lectura.modo.value, "pausa_s": perfil.lectura.pausa_s},
         "volumen": {
@@ -90,6 +91,7 @@ def desde_dict(datos: Mapping[str, Any]) -> Perfil:
             orientacion=Orientacion(datos.get("orientacion", Orientacion.HORIZONTAL.value)),
             busqueda=BusquedaTexto(datos.get("busqueda", BusquedaTexto.COLOR.value)),
             glosario=_glosario(datos.get("glosario", {})),
+            traductor=Motor(datos.get("traductor", Motor.LOCAL.value)),
             voz=_voz(datos.get("voz", {})),
             lectura=_lectura(datos.get("lectura", {})),
             volumen=_volumen(datos.get("volumen", {})),

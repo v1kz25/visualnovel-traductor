@@ -3,9 +3,42 @@
 import re
 from collections.abc import Iterator
 
+import keyring
 import pytest
+from keyring.backend import KeyringBackend
+from keyring.errors import PasswordDeleteError
 
 from vn_audiolibro import plataforma, textos
+
+
+class LlaveroEnMemoria(KeyringBackend):
+    """Llavero de pega: ningún test lee ni escribe en el llavero real del equipo."""
+
+    priority = 1  # type: ignore[assignment]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.claves: dict[tuple[str, str], str] = {}
+
+    def get_password(self, service: str, username: str) -> str | None:
+        return self.claves.get((service, username))
+
+    def set_password(self, service: str, username: str, password: str) -> None:
+        self.claves[(service, username)] = password
+
+    def delete_password(self, service: str, username: str) -> None:
+        if self.claves.pop((service, username), None) is None:
+            raise PasswordDeleteError(username)
+
+
+@pytest.fixture(autouse=True)
+def llavero() -> Iterator[LlaveroEnMemoria]:
+    """Llavero en memoria, vacío en cada test."""
+    anterior = keyring.get_keyring()
+    propio = LlaveroEnMemoria()
+    keyring.set_keyring(propio)
+    yield propio
+    keyring.set_keyring(anterior)
 
 
 @pytest.fixture(autouse=True)
