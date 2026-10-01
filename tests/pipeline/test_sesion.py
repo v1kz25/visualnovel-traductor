@@ -7,6 +7,7 @@ import pytest
 
 from vn_audiolibro.captura.modelos import Rectangulo, Ventana, VentanaNoEncontradaError
 from vn_audiolibro.guion.modelos import GuionNoEncontradoError, OrigenGuion
+from vn_audiolibro.ocr.preprocesado import BusquedaTexto
 from vn_audiolibro.perfiles.modelos import AjustesGuion, AjustesVolumen, AjustesVoz, Perfil
 from vn_audiolibro.pipeline import sesion as modulo
 from vn_audiolibro.pipeline.orquestador import GuionJuego
@@ -58,7 +59,7 @@ class GestorFalso:
 def registro(monkeypatch: pytest.MonkeyPatch) -> Registro:
     registro = Registro()
     monkeypatch.setattr(modulo, "gestor_ventanas", GestorFalso)
-    monkeypatch.setattr(modulo, "asegurar_descarga", lambda descarga: Path("ocr.onnx"))
+    monkeypatch.setattr(modulo, "asegurar_descarga", lambda descarga: Path(descarga.fichero))
     monkeypatch.setattr(modulo, "asegurar_voz", lambda voz: Path(voz.modelo.fichero))
     monkeypatch.setattr(modulo, "asegurar_llama_server", lambda: Path("llama-server"))
     monkeypatch.setattr(modulo, "asegurar_modelo_traduccion", lambda: Path("hy-mt2.gguf"))
@@ -150,6 +151,24 @@ def test_si_falla_al_arrancar_desmonta_lo_que_habia(
         "detener servidor",
     ]
     assert abierta.orquestador is None
+
+
+def test_por_color_solo_carga_el_reconocedor(registro: Registro) -> None:
+    with sesion():
+        pass
+    assert registro.creados["reconocedor"] == (Path("ch_PP-OCRv5_rec_mobile.onnx"), None)
+    _, ajustes, detector = registro.creados["lector"]
+    assert (ajustes.busqueda, detector) == (BusquedaTexto.COLOR, None)
+
+
+def test_con_detector_lo_descarga_y_se_lo_pasa_al_lector(registro: Registro) -> None:
+    with sesion(Perfil("Juego", "juego", idioma="ja", busqueda=BusquedaTexto.DETECTOR)):
+        pass
+    modelos = (Path("ch_PP-OCRv5_rec_mobile.onnx"), Path("ch_PP-OCRv5_det_mobile.onnx"))
+    assert registro.creados["reconocedor"] == modelos
+    reconocedor, ajustes, detector = registro.creados["lector"]
+    assert ajustes.busqueda is BusquedaTexto.DETECTOR
+    assert detector is reconocedor
 
 
 def test_volumen_desactivado_no_crea_atenuador(registro: Registro) -> None:

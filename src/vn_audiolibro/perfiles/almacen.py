@@ -9,7 +9,7 @@ from typing import Any
 
 from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, ZonaRelativa
 from vn_audiolibro.guion.modelos import OrigenGuion
-from vn_audiolibro.ocr.preprocesado import Orientacion
+from vn_audiolibro.ocr.preprocesado import BusquedaTexto, Orientacion
 from vn_audiolibro.perfiles.modelos import (
     DESTINOS,
     IDIOMAS,
@@ -55,6 +55,7 @@ def a_dict(perfil: Perfil) -> dict[str, Any]:
         "zona": asdict(perfil.zona),
         "color": perfil.color.value,
         "orientacion": perfil.orientacion.value,
+        "busqueda": perfil.busqueda.value,
         "glosario": dict(perfil.glosario.terminos),
         "voz": {"hablante": perfil.voz.hablante.name.lower(), "velocidad": perfil.voz.velocidad},
         "lectura": {"modo": perfil.lectura.modo.value, "pausa_s": perfil.lectura.pausa_s},
@@ -87,6 +88,7 @@ def desde_dict(datos: Mapping[str, Any]) -> Perfil:
             zona=_zona(datos["zona"]) if "zona" in datos else TODA_LA_VENTANA,
             color=Color(datos.get("color", Color.CLARO)),
             orientacion=Orientacion(datos.get("orientacion", Orientacion.HORIZONTAL.value)),
+            busqueda=BusquedaTexto(datos.get("busqueda", BusquedaTexto.COLOR.value)),
             glosario=_glosario(datos.get("glosario", {})),
             voz=_voz(datos.get("voz", {})),
             lectura=_lectura(datos.get("lectura", {})),

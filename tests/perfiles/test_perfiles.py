@@ -9,7 +9,7 @@ import pytest
 from vn_audiolibro.captura.mascara import TEXTO_OSCURO
 from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, ZonaRelativa
 from vn_audiolibro.guion.modelos import OrigenGuion
-from vn_audiolibro.ocr.preprocesado import Orientacion
+from vn_audiolibro.ocr.preprocesado import BusquedaTexto, Orientacion
 from vn_audiolibro.perfiles.almacen import (
     VERSION_FORMATO,
     AlmacenPerfiles,
@@ -40,6 +40,7 @@ COMPLETO = Perfil(
     zona=ZonaRelativa(0.1, 0.7, 0.8, 0.25),
     color=Color.OSCURO,
     orientacion=Orientacion.VERTICAL,
+    busqueda=BusquedaTexto.DETECTOR,
     glosario=Glosario.desde_dict({"櫻": "Sakura", "先輩": "senpai"}),
     voz=AjustesVoz(Hablante.HOMBRE, 1.25),
     lectura=AjustesLectura(ModoLectura.ULTIMA, 0.5),
@@ -132,6 +133,7 @@ def test_ida_y_vuelta_por_json() -> None:
     assert datos["voz"] == {"hablante": "hombre", "velocidad": 1.25}
     assert datos["lectura"] == {"modo": "ultima", "pausa_s": 0.5}
     assert datos["destino"] == "en"
+    assert datos["busqueda"] == "detector"
     assert datos["guion"] == {"carpeta": "/juegos/mi juego", "origen": "original"}
     sin_guion = a_dict(Perfil("J", "j"))
     assert sin_guion["guion"] is None
@@ -142,6 +144,7 @@ def test_los_campos_que_faltan_toman_su_valor_por_defecto() -> None:
     perfil = desde_dict({"version": 1, "nombre": "Juego", "ventana": "juego"})
     assert perfil.destino == "es"  # los juegos de antes se traducían al español
     assert perfil.color == Color.CLARO
+    assert perfil.busqueda is BusquedaTexto.COLOR  # los juegos de antes buscaban por color
     assert perfil.glosario == Glosario()
     assert perfil.volumen == AjustesVolumen()
     assert perfil.guion is None

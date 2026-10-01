@@ -29,7 +29,7 @@ from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, VentanaNoEncontradaEr
 from vn_audiolibro.configuracion import AjustesApp, cargar_ajustes, formato_tamano, guardar_ajustes
 from vn_audiolibro.descargas import DescargaFallidaError
 from vn_audiolibro.guion.modelos import GuionNoEncontradoError, OrigenGuion
-from vn_audiolibro.ocr.preprocesado import Orientacion
+from vn_audiolibro.ocr.preprocesado import BusquedaTexto, Orientacion
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles, PerfilDuplicadoError
 from vn_audiolibro.perfiles.modelos import (
     DESTINOS,
@@ -88,6 +88,11 @@ def _parser() -> argparse.ArgumentParser:
     )
     crear.add_argument("--oscuro", action="store_true", help=_("el texto es oscuro sobre fondo claro"))
     crear.add_argument("--vertical", action="store_true", help=_("el texto va en columnas verticales"))
+    crear.add_argument(
+        "--detector",
+        action="store_true",
+        help=_("buscar el texto con el detector: para el texto escrito sobre la imagen, sin caja de texto"),
+    )
     crear.add_argument("--hombre", action="store_true", help=_("voz de hombre (por defecto, de mujer)"))
     crear.add_argument(
         "--velocidad",
@@ -322,6 +327,7 @@ def _crear(almacen: AlmacenPerfiles, args: argparse.Namespace) -> int:
         zona=args.zona,
         color=Color.OSCURO if args.oscuro else Color.CLARO,
         orientacion=Orientacion.VERTICAL if args.vertical else Orientacion.HORIZONTAL,
+        busqueda=BusquedaTexto.DETECTOR if args.detector else BusquedaTexto.COLOR,
         voz=AjustesVoz(Hablante.HOMBRE if args.hombre else Hablante.MUJER, args.velocidad),
         lectura=AjustesLectura(
             ModoLectura.ULTIMA if args.saltar_a_la_ultima else ModoLectura.COLA, args.pausa

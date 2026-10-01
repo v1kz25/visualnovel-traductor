@@ -96,6 +96,24 @@ def vertical(columnas: list[str], cara: ImageFont.FreeTypeFont, estilo: Estilo) 
     return np.asarray(imagen).copy()
 
 
+def sobre_imagen(lineas: list[str], cara: ImageFont.FreeTypeFont, tamano: int = 30) -> Imagen:
+    """Texto blanco con borde negro escrito sobre una imagen con zonas claras grandes (nubes).
+
+    Es como escriben el texto los juegos sin caja de texto: la máscara por color atrapa también
+    las nubes y descarta las filas de texto por pequeñas.
+    """
+    salto = round(tamano * 2.3)
+    ancho = 40 + tamano * max(len(linea) for linea in lineas)
+    imagen = Image.new("RGB", (ancho, 40 + salto * len(lineas)), (60, 90, 150))
+    dibujo = ImageDraw.Draw(imagen)
+    dibujo.ellipse((-80, 40, ancho // 2 - 60, imagen.height + 150), fill=(245, 245, 250))
+    dibujo.ellipse((ancho // 2 + 60, -60, ancho + 60, salto * 2), fill=(235, 235, 240))
+    for n, linea in enumerate(lineas):
+        posicion = (20, 20 + n * salto)
+        dibujo.text(posicion, linea, font=cara, fill=(255, 255, 255), stroke_width=3, stroke_fill=(0, 0, 0))
+    return np.asarray(imagen).copy()
+
+
 def distancia(a: str, b: str) -> int:
     """Distancia de Levenshtein entre dos textos."""
     previa = list(range(len(b) + 1))

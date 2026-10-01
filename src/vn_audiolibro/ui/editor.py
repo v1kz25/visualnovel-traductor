@@ -26,8 +26,8 @@ from vn_audiolibro.descargas import asegurar_descarga
 from vn_audiolibro.guion.modelos import GuionNoEncontradoError, OrigenGuion
 from vn_audiolibro.guion.outputline import carpeta_scripts, leer_guion
 from vn_audiolibro.ocr.lector import AjustesLector, LectorOCR
-from vn_audiolibro.ocr.modelos import REC_PPOCRV5_MOBILE
-from vn_audiolibro.ocr.preprocesado import Orientacion
+from vn_audiolibro.ocr.modelos import DET_PPOCRV5_MOBILE, REC_PPOCRV5_MOBILE
+from vn_audiolibro.ocr.preprocesado import BusquedaTexto, Orientacion
 from vn_audiolibro.ocr.reconocedor import ReconocedorRapidOCR
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles, PerfilDuplicadoError
 from vn_audiolibro.perfiles.modelos import DESTINOS, IDIOMAS, AjustesGuion, Color, Perfil, PerfilInvalidoError
@@ -50,6 +50,10 @@ NOMBRES_ORIENTACIONES = {
     Orientacion.HORIZONTAL: N_("Horizontal"),
     Orientacion.VERTICAL: N_("Vertical (columnas)"),
 }
+NOMBRES_BUSQUEDAS = {
+    BusquedaTexto.COLOR: N_("Por color (caja de texto lisa)"),
+    BusquedaTexto.DETECTOR: N_("Con el detector (texto sobre la imagen)"),
+}
 
 NOMBRES_ORIGENES = {
     OrigenGuion.ORIGINAL: N_("El texto del juego"),
@@ -60,6 +64,12 @@ AYUDA_GUION = N_(
     "exacto del guion, se traduce por adelantado y el OCR solo sirve para saber por dónde vas."
 )
 STEAM = Path.home() / ".local" / "share" / "Steam" / "steamapps" / "common"
+
+AYUDA_BUSQUEDA = N_(
+    "Por color va bien con una caja de texto lisa. Si el juego escribe el texto directamente sobre "
+    "la imagen y el OCR lee mal o nada, usa el detector: es más lento y la primera vez descarga "
+    "un modelo de 5 MB."
+)
 
 AYUDA_ZONA = N_("Captura la ventana y dibuja con el ratón un recuadro sobre la caja de texto.")
 
@@ -92,7 +102,10 @@ def capturar_ventana(ventana: Ventana) -> Imagen:
 
 
 class LectorBajoDemanda:
-    """OCR que carga el modelo la primera vez que se usa (tarda un poco) y lo reutiliza."""
+    """OCR que carga el modelo la primera vez que se usa (tarda un poco) y lo reutiliza.
+
+    El detector solo se descarga y se carga cuando se prueba un juego que lo usa.
+    """
 
     def __init__(self) -> None:
         self._reconocedor: ReconocedorRapidOCR | None = None
@@ -100,9 +113,12 @@ class LectorBajoDemanda:
 
     def __call__(self, imagen: Imagen, ajustes: AjustesLector) -> str:
         with self._cerrojo:
-            if self._reconocedor is None:
-                self._reconocedor = ReconocedorRapidOCR(asegurar_descarga(REC_PPOCRV5_MOBILE))
-            return LectorOCR(self._reconocedor, ajustes).leer(imagen).texto
+            con_detector = ajustes.busqueda is BusquedaTexto.DETECTOR
+            if self._reconocedor is None or (con_detector and not self._reconocedor.con_detector):
+                detector = asegurar_descarga(DET_PPOCRV5_MOBILE) if con_detector else None
+                self._reconocedor = ReconocedorRapidOCR(asegurar_descarga(REC_PPOCRV5_MOBILE), detector)
+            reconocedor = self._reconocedor
+            return LectorOCR(reconocedor, ajustes, reconocedor if con_detector else None).leer(imagen).texto
 
 
 class EditorJuego(QDialog):
@@ -166,6 +182,10 @@ class EditorJuego(QDialog):
         self.orientacion = QComboBox()
         for orientacion, texto in NOMBRES_ORIENTACIONES.items():
             self.orientacion.addItem(_(texto), orientacion.value)
+        self.busqueda = QComboBox()
+        for busqueda, texto in NOMBRES_BUSQUEDAS.items():
+            self.busqueda.addItem(_(texto), busqueda.value)
+        self.busqueda.setToolTip(_(AYUDA_BUSQUEDA))
         self.carpeta_guion = QLineEdit()
         self.carpeta_guion.setPlaceholderText(_("Ninguno: solo OCR"))
         self.boton_guion = QPushButton(_("Elegir…"))
@@ -189,6 +209,7 @@ class EditorJuego(QDialog):
         formulario.addRow(_("Traducir y leer en"), self.destino)
         formulario.addRow(_("Texto"), self.color)
         formulario.addRow(_("Orientación"), self.orientacion)
+        formulario.addRow(_("Buscar el texto"), self.busqueda)
         formulario.addRow(_("Guion del juego"), fila_guion)
         formulario.addRow(_("Traducir desde"), self.origen_guion)
         formulario.addRow("", self.estado_guion)
@@ -241,6 +262,7 @@ class EditorJuego(QDialog):
         self._elegir(self.destino, perfil.destino)
         self._elegir(self.color, perfil.color.value)
         self._elegir(self.orientacion, perfil.orientacion.value)
+        self._elegir(self.busqueda, perfil.busqueda.value)
         self.selector.poner_zona(perfil.zona)
         if perfil.guion is not None:
             self.carpeta_guion.setText(perfil.guion.carpeta)
@@ -321,7 +343,9 @@ class EditorJuego(QDialog):
         recorte = self._recorte()
         if recorte is None:
             return
-        ajustes = AjustesLector(self.idioma.currentData(), self._color().color_texto, self._orientacion())
+        ajustes = AjustesLector(
+            self.idioma.currentData(), self._color().color_texto, self._orientacion(), self._busqueda()
+        )
         self.boton_probar.setEnabled(False)
         self.resultado.setText(_("Leyendo…"))
 
@@ -352,6 +376,9 @@ class EditorJuego(QDialog):
 
     def _orientacion(self) -> Orientacion:
         return Orientacion(self.orientacion.currentData())
+
+    def _busqueda(self) -> BusquedaTexto:
+        return BusquedaTexto(self.busqueda.currentData())
 
     # Guion
 
@@ -405,6 +432,7 @@ class EditorJuego(QDialog):
                 zona=self.selector.zona or TODA_LA_VENTANA,
                 color=self._color(),
                 orientacion=self._orientacion(),
+                busqueda=self._busqueda(),
                 guion=self._guion(),
             )
             self._almacen.guardar(perfil)
