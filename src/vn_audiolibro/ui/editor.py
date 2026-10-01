@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from vn_audiolibro import claves
 from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, Imagen, Rectangulo, Ventana
 from vn_audiolibro.descargas import asegurar_descarga
 from vn_audiolibro.guion.modelos import GuionNoEncontradoError, OrigenGuion
@@ -42,6 +43,8 @@ from vn_audiolibro.perfiles.modelos import (
 from vn_audiolibro.plataforma import capturador, carpeta_de_proceso, gestor_ventanas
 from vn_audiolibro.procesos import pids_propios
 from vn_audiolibro.textos import N_, _, ngettext
+from vn_audiolibro.traduccion.gemini import URL_CLAVES, avisos_privacidad
+from vn_audiolibro.traduccion.modelos import Motor
 from vn_audiolibro.ui.zona import SelectorZona
 
 _registro = logging.getLogger(__name__)
@@ -59,6 +62,11 @@ NOMBRES_ORIENTACIONES = {
     Orientacion.HORIZONTAL: N_("Horizontal"),
     Orientacion.VERTICAL: N_("Vertical (columnas)"),
 }
+NOMBRES_MOTORES = {
+    Motor.LOCAL: N_("Local (gratis y sin conexión)"),
+    Motor.GEMINI: N_("Gemini (en la nube, con tu clave de Google)"),
+}
+
 NOMBRES_BUSQUEDAS = {
     BusquedaTexto.COLOR: N_("Por color (caja de texto lisa)"),
     BusquedaTexto.DETECTOR: N_("Con el detector (texto sobre la imagen)"),
@@ -85,6 +93,8 @@ AYUDA_ZONA = N_("Captura la ventana y dibuja con el ratón un recuadro sobre la 
 ListarVentanas = Callable[[], list[Ventana]]
 CapturarVentana = Callable[[Ventana], Imagen]
 LeerZona = Callable[[Imagen, AjustesLector], str]
+LeerClave = Callable[[], str | None]
+GuardarClave = Callable[[str], None]
 CarpetaJuego = Callable[[int], Path | None]
 """Carpeta del juego a partir del proceso de su ventana."""
 ElegirCarpeta = Callable[[QWidget, str], str]
@@ -149,6 +159,8 @@ class EditorJuego(QDialog):
         parent: QWidget | None = None,
         pedir_carpeta: ElegirCarpeta = elegir_carpeta,
         carpeta_juego: CarpetaJuego = carpeta_de_proceso,
+        leer_clave: LeerClave = claves.leer,
+        guardar_clave: GuardarClave = claves.guardar,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(_("Editar juego") if perfil else _("Añadir juego"))
@@ -160,6 +172,8 @@ class EditorJuego(QDialog):
         self._leer = leer or LectorBajoDemanda()
         self._pedir_carpeta = pedir_carpeta
         self._carpeta_juego = carpeta_juego
+        self._leer_clave = leer_clave
+        self._guardar_clave = guardar_clave
         self._captura: Imagen | None = None
         self.guardado: Perfil | None = None
         self._crear_widgets()
@@ -167,6 +181,7 @@ class EditorJuego(QDialog):
         self.actualizar_ventanas()
         if perfil is not None:
             self._rellenar(perfil)
+        self._al_cambiar_traductor()
         self._actualizar_botones()
 
     # Construcción
@@ -195,6 +210,14 @@ class EditorJuego(QDialog):
         for busqueda, texto in NOMBRES_BUSQUEDAS.items():
             self.busqueda.addItem(_(texto), busqueda.value)
         self.busqueda.setToolTip(_(AYUDA_BUSQUEDA))
+        self.traductor = QComboBox()
+        for motor, texto in NOMBRES_MOTORES.items():
+            self.traductor.addItem(_(texto), motor.value)
+        self.clave = QLineEdit()
+        self.clave.setEchoMode(QLineEdit.EchoMode.Password)
+        self.aviso_gemini = QLabel(self._texto_aviso_gemini())
+        self.aviso_gemini.setWordWrap(True)
+        self.aviso_gemini.setOpenExternalLinks(True)
         self.carpeta_guion = QLineEdit()
         self.carpeta_guion.setPlaceholderText(_("Ninguno: solo OCR"))
         self.boton_guion = QPushButton(_("Elegir…"))
@@ -219,6 +242,10 @@ class EditorJuego(QDialog):
         formulario.addRow(_("Texto"), self.color)
         formulario.addRow(_("Orientación"), self.orientacion)
         formulario.addRow(_("Buscar el texto"), self.busqueda)
+        formulario.addRow(_("Traductor"), self.traductor)
+        formulario.addRow(_("Clave de Gemini"), self.clave)
+        formulario.addRow("", self.aviso_gemini)
+        self._formulario = formulario
         formulario.addRow(_("Guion del juego"), fila_guion)
         formulario.addRow(_("Traducir desde"), self.origen_guion)
         formulario.addRow("", self.estado_guion)
@@ -252,6 +279,7 @@ class EditorJuego(QDialog):
     def _conectar(self) -> None:
         self.boton_actualizar.clicked.connect(self.actualizar_ventanas)
         self.idioma.currentIndexChanged.connect(lambda _: self._al_cambiar_idioma())
+        self.traductor.currentIndexChanged.connect(lambda _: self._al_cambiar_traductor())
         self.ventanas.activated.connect(lambda _: self._al_elegir_ventana())
         self.titulo.textChanged.connect(lambda _: self._actualizar_botones())
         self.nombre.textChanged.connect(lambda _: self._actualizar_botones())
@@ -273,6 +301,7 @@ class EditorJuego(QDialog):
         self._elegir(self.color, perfil.color.value)
         self._elegir(self.orientacion, perfil.orientacion.value)
         self._elegir(self.busqueda, perfil.busqueda.value)
+        self._elegir(self.traductor, perfil.traductor.value)
         self.selector.poner_zona(perfil.zona)
         if perfil.guion is not None:
             self.carpeta_guion.setText(perfil.guion.carpeta)
@@ -443,14 +472,48 @@ class EditorJuego(QDialog):
                 color=self._color(),
                 orientacion=self._orientacion(),
                 busqueda=self._busqueda(),
+                traductor=self._motor(),
                 guion=self._guion(),
             )
+            self._comprobar_clave()
             self._almacen.guardar(perfil)
-        except (PerfilInvalidoError, PerfilDuplicadoError) as error:
+        except (PerfilInvalidoError, PerfilDuplicadoError, claves.LlaveroNoDisponibleError) as error:
             self.error.setText(str(error))
             return
         self.guardado = perfil
         self.accept()
+
+    def _motor(self) -> Motor:
+        return Motor(self.traductor.currentData())
+
+    def _comprobar_clave(self) -> None:
+        """Con Gemini, guarda la clave escrita en el llavero; sin ninguna guardada, no deja seguir."""
+        if self._motor() is not Motor.GEMINI:
+            return
+        if clave := self.clave.text().strip():
+            self._guardar_clave(clave)
+            self.clave.clear()
+        elif self._leer_clave() is None:
+            raise PerfilInvalidoError(_("Para traducir con Gemini, pega tu clave de API de Google AI Studio"))
+        self._al_cambiar_traductor()
+
+    @staticmethod
+    def _texto_aviso_gemini() -> str:
+        enlace = f'<a href="{URL_CLAVES}">{URL_CLAVES}</a>'
+        return "<br>".join(aviso.replace(URL_CLAVES, enlace) for aviso in avisos_privacidad())
+
+    def _al_cambiar_traductor(self) -> None:
+        """La clave y el aviso de privacidad solo se ven con Gemini."""
+        gemini = self._motor() is Motor.GEMINI
+        self._formulario.setRowVisible(self.clave, gemini)
+        self._formulario.setRowVisible(self.aviso_gemini, gemini)
+        if gemini:
+            guardada = self._leer_clave() is not None
+            self.clave.setPlaceholderText(
+                _("Guardada en el llavero (escribe otra para cambiarla)")
+                if guardada
+                else _("Pega aquí tu clave de Google AI Studio")
+            )
 
     def _al_cambiar_idioma(self) -> None:
         """Un juego en inglés solo se traduce al español y en horizontal: se fijan y se bloquean."""

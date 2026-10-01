@@ -27,7 +27,7 @@ from vn_audiolibro.perfiles.modelos import (
     Perfil,
     PerfilInvalidoError,
 )
-from vn_audiolibro.traduccion.modelos import Glosario
+from vn_audiolibro.traduccion.modelos import Glosario, Motor
 from vn_audiolibro.voz.modelos import ModoLectura
 from vn_audiolibro.voz.piper import Hablante
 from vn_audiolibro.voz.volumen import Flujo, Juego
@@ -42,6 +42,7 @@ COMPLETO = Perfil(
     orientacion=Orientacion.VERTICAL,
     busqueda=BusquedaTexto.DETECTOR,
     glosario=Glosario.desde_dict({"櫻": "Sakura", "先輩": "senpai"}),
+    traductor=Motor.GEMINI,
     voz=AjustesVoz(Hablante.HOMBRE, 1.25),
     lectura=AjustesLectura(ModoLectura.ULTIMA, 0.5),
     volumen=AjustesVolumen(activo=False, nivel_juego=0.5, otras=(("Firefox", 0.0),), excluir=("Discord",)),
@@ -142,6 +143,8 @@ def test_ida_y_vuelta_por_json() -> None:
     assert datos["lectura"] == {"modo": "ultima", "pausa_s": 0.5}
     assert datos["destino"] == "en"
     assert datos["busqueda"] == "detector"
+    assert datos["traductor"] == "gemini"
+    assert "clave" not in json.dumps(datos).lower()  # la clave nunca va en el fichero del juego
     assert datos["guion"] == {"carpeta": "/juegos/mi juego", "origen": "original"}
     sin_guion = a_dict(Perfil("J", "j"))
     assert sin_guion["guion"] is None
@@ -153,6 +156,7 @@ def test_los_campos_que_faltan_toman_su_valor_por_defecto() -> None:
     assert perfil.destino == "es"  # los juegos de antes se traducían al español
     assert perfil.color == Color.CLARO
     assert perfil.busqueda is BusquedaTexto.COLOR  # los juegos de antes buscaban por color
+    assert perfil.traductor is Motor.LOCAL
     assert perfil.glosario == Glosario()
     assert perfil.volumen == AjustesVolumen()
     assert perfil.guion is None

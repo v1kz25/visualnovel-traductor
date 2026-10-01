@@ -7,6 +7,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Self
 
+from vn_audiolibro import claves
 from vn_audiolibro.cache.sqlite import CacheSQLite
 from vn_audiolibro.captura.bucle import BucleCaptura
 from vn_audiolibro.configuracion import cargar_ajustes
@@ -23,8 +24,10 @@ from vn_audiolibro.perfiles.modelos import Perfil
 from vn_audiolibro.pipeline.orquestador import AjustesOrquestador, GuionJuego, LineaJuego, Orquestador
 from vn_audiolibro.plataforma import capturador, cliente_audio, gestor_ventanas, juego_de_pid, reproductor
 from vn_audiolibro.textos import _
+from vn_audiolibro.traduccion.gemini import ClienteGemini, TraductorConRespaldo, TraductorGemini
 from vn_audiolibro.traduccion.llama import ServidorLlama, asegurar_llama_server, asegurar_modelo_traduccion
 from vn_audiolibro.traduccion.local import TraductorLocal
+from vn_audiolibro.traduccion.modelos import Motor, Traductor
 from vn_audiolibro.voz.locutor import Locutor
 from vn_audiolibro.voz.modelos import Atenuador
 from vn_audiolibro.voz.piper import SintetizadorPiper, asegurar_voz, elegir_voz
@@ -141,9 +144,10 @@ class Sesion:
         pila.callback(locutor.cerrar)
 
         self._al_estado(_("Calentando el traductor…"))
-        traductor = TraductorLocal(cliente)
+        local = TraductorLocal(cliente)
         desde_ingles = perfil.guion is not None and perfil.guion.origen is OrigenGuion.INGLES
-        traductor.calentar(IDIOMA_INGLES if desde_ingles else perfil.idioma, perfil.destino)
+        local.calentar(IDIOMA_INGLES if desde_ingles else perfil.idioma, perfil.destino)
+        traductor = self._traductor(local)
         guion = self._guion(traductor, cache)
 
         reconocedor = ReconocedorRapidOCR(modelo_ocr, modelo_detector)
@@ -175,7 +179,20 @@ class Sesion:
         self.orquestador = orquestador
         return orquestador
 
-    def _guion(self, traductor: TraductorLocal, cache: CacheSQLite) -> GuionJuego | None:
+    def _traductor(self, local: TraductorLocal) -> Traductor:
+        """El traductor del juego: el local o Gemini, que recurre al local si falla."""
+        if self.perfil.traductor is not Motor.GEMINI:
+            return local
+        clave = claves.leer()
+        if clave is None:
+            self._al_error(
+                _("Falta la clave de Gemini: se traducirá en local. Añádela en el editor del juego.")
+            )
+            return local
+        gemini = TraductorGemini(ClienteGemini(clave))
+        return TraductorConRespaldo(gemini, local, self._al_error)
+
+    def _guion(self, traductor: Traductor, cache: CacheSQLite) -> GuionJuego | None:
         """El guion del juego, si se ha configurado y se puede leer; si no, se juega con el OCR."""
         perfil = self.perfil
         if perfil.guion is None:

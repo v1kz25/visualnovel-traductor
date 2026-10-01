@@ -23,6 +23,7 @@ from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
 from vn_audiolibro.perfiles.modelos import AjustesGuion, AjustesLectura, Color, Perfil
 from vn_audiolibro.pipeline.orquestador import LineaJuego, Tiempos
 from vn_audiolibro.preparacion import Aviso, Componente
+from vn_audiolibro.traduccion.modelos import Motor
 from vn_audiolibro.voz.modelos import ModoLectura
 from vn_audiolibro.voz.piper import Hablante
 
@@ -120,6 +121,7 @@ def test_crear_y_listar(configuracion: AlmacenPerfiles, capsys: pytest.CaptureFi
         "--oscuro",
         "--vertical",
         "--detector",
+        "--gemini",
         "--hombre",
         "--velocidad",
         "1.2",
@@ -134,6 +136,7 @@ def test_crear_y_listar(configuracion: AlmacenPerfiles, capsys: pytest.CaptureFi
     assert (perfil.nombre, perfil.ventana, perfil.idioma, perfil.destino) == ("Mi juego", "juego", "ja", "en")
     assert perfil.color == Color.OSCURO
     assert perfil.busqueda is BusquedaTexto.DETECTOR
+    assert perfil.traductor is Motor.GEMINI
     assert perfil.zona.y == 0.7
     assert (perfil.voz.hablante, perfil.voz.velocidad) == (Hablante.HOMBRE, 1.2)
     assert (perfil.volumen.activo, perfil.volumen.nivel_juego) == (False, 0.5)
@@ -144,6 +147,7 @@ def test_crear_y_listar(configuracion: AlmacenPerfiles, capsys: pytest.CaptureFi
     assert otro.lectura == AjustesLectura(ModoLectura.ULTIMA, 0.5)
     assert otro.destino == "es"
     assert otro.busqueda is BusquedaTexto.COLOR
+    assert otro.traductor is Motor.LOCAL
 
     assert cli.main(["juegos"]) == 0
     assert "Mi juego  (ventana «juego», ja → en" in capsys.readouterr().out
@@ -451,3 +455,41 @@ def test_idioma_elegido_en_la_app_manda_sobre_el_del_sistema(capsys: pytest.Capt
     guardar_ajustes(AjustesApp(idioma="en"))
     assert cli.main(["juegos"]) == 0
     assert "No games yet" in capsys.readouterr().out
+
+
+# Clave de Gemini
+
+
+def test_gemini_guarda_la_clave_sin_mostrarla(capsys: pytest.CaptureFixture[str]) -> None:
+    from vn_audiolibro import claves
+
+    assert cli._gemini(borrar=False, pedir_clave=lambda _: "  clave-123 ") == 0
+
+    assert claves.leer() == "clave-123"
+    salida = capsys.readouterr().out
+    assert "clave-123" not in salida
+    assert "se envía a Google" in salida
+    assert "aistudio.google.com" in salida
+
+    assert cli.main(["gemini", "--borrar"]) == 0
+    assert claves.leer() is None
+
+
+def test_gemini_con_la_clave_vacia_no_guarda_nada(capsys: pytest.CaptureFixture[str]) -> None:
+    from vn_audiolibro import claves
+
+    assert cli._gemini(borrar=False, pedir_clave=lambda _: " ") == 1
+    assert claves.leer() is None
+    assert "vacía" in capsys.readouterr().err
+
+
+def test_gemini_sin_llavero(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    from vn_audiolibro import claves
+
+    def sin_llavero(clave: str) -> None:
+        raise claves.LlaveroNoDisponibleError("No se puede usar el llavero")
+
+    monkeypatch.setattr(claves, "guardar", sin_llavero)
+
+    assert cli._gemini(borrar=False, pedir_clave=lambda _: "clave") == 1
+    assert "llavero" in capsys.readouterr().err

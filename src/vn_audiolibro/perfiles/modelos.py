@@ -9,7 +9,7 @@ from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, ZonaRelativa
 from vn_audiolibro.guion.modelos import OrigenGuion
 from vn_audiolibro.ocr.preprocesado import BusquedaTexto, Orientacion
 from vn_audiolibro.textos import _
-from vn_audiolibro.traduccion.modelos import Glosario
+from vn_audiolibro.traduccion.modelos import Glosario, Motor
 from vn_audiolibro.voz.modelos import PAUSA_ENTRE_LINEAS_S, ModoLectura
 from vn_audiolibro.voz.piper import HABLANTE_POR_DEFECTO, Hablante
 from vn_audiolibro.voz.volumen import NIVEL_POR_DEFECTO, Juego, Seleccion
@@ -146,6 +146,8 @@ class Perfil:
     busqueda: BusquedaTexto = BusquedaTexto.COLOR
     """Cómo se busca el texto en la zona: por color (caja de texto lisa) o con el detector."""
     glosario: Glosario = field(default_factory=Glosario)
+    traductor: Motor = Motor.LOCAL
+    """Traductor del juego: el local (por defecto) o Gemini, con la clave del usuario."""
     voz: AjustesVoz = field(default_factory=AjustesVoz)
     lectura: AjustesLectura = field(default_factory=AjustesLectura)
     volumen: AjustesVolumen = field(default_factory=AjustesVolumen)

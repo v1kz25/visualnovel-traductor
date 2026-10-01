@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 
+from vn_audiolibro import claves
 from vn_audiolibro.captura.modelos import Rectangulo, Ventana, VentanaNoEncontradaError
 from vn_audiolibro.guion.modelos import GuionNoEncontradoError, OrigenGuion
 from vn_audiolibro.ocr.preprocesado import BusquedaTexto
@@ -12,6 +13,8 @@ from vn_audiolibro.perfiles.modelos import AjustesGuion, AjustesVolumen, Ajustes
 from vn_audiolibro.pipeline import sesion as modulo
 from vn_audiolibro.pipeline.orquestador import GuionJuego
 from vn_audiolibro.pipeline.sesion import Sesion, ajustes_guion, traductor_guion
+from vn_audiolibro.traduccion.gemini import TraductorConRespaldo
+from vn_audiolibro.traduccion.modelos import Motor
 from vn_audiolibro.voz.modelos import VozFallidaError
 from vn_audiolibro.voz.piper import Hablante
 from vn_audiolibro.voz.volumen import Juego
@@ -169,6 +172,25 @@ def test_con_detector_lo_descarga_y_se_lo_pasa_al_lector(registro: Registro) -> 
     reconocedor, ajustes, detector = registro.creados["lector"]
     assert ajustes.busqueda is BusquedaTexto.DETECTOR
     assert detector is reconocedor
+
+
+def test_con_gemini_y_clave_traduce_con_respaldo_local(registro: Registro) -> None:
+    claves.guardar("clave-123")
+    with sesion(Perfil("Juego", "juego", idioma="ja", traductor=Motor.GEMINI)):
+        pass
+
+    traductor = registro.creados["orquestador"][2]
+    assert isinstance(traductor, TraductorConRespaldo)
+    assert "calentar traductor" in registro.eventos  # el local se calienta igual: es el respaldo
+
+
+def test_con_gemini_sin_clave_avisa_y_traduce_en_local(registro: Registro) -> None:
+    errores: list[str] = []
+    with sesion(Perfil("Juego", "juego", idioma="ja", traductor=Motor.GEMINI), errores):
+        pass
+
+    assert not isinstance(registro.creados["orquestador"][2], TraductorConRespaldo)
+    assert errores == ["Falta la clave de Gemini: se traducirá en local. Añádela en el editor del juego."]
 
 
 def test_volumen_desactivado_no_crea_atenuador(registro: Registro) -> None:
