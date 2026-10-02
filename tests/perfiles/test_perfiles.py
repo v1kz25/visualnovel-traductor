@@ -40,6 +40,8 @@ COMPLETO = Perfil(
     idioma="ja",
     destino="en",
     zona=ZonaRelativa(0.1, 0.7, 0.8, 0.25),
+    zona_nombre=ZonaRelativa(0.1, 0.62, 0.2, 0.06),
+    separar_personaje=False,
     color=Color.OSCURO,
     orientacion=Orientacion.VERTICAL,
     busqueda=BusquedaTexto.DETECTOR,
@@ -180,6 +182,8 @@ def test_los_campos_que_faltan_toman_su_valor_por_defecto() -> None:
     assert perfil.glosario == Glosario()
     assert perfil.volumen == AjustesVolumen()
     assert perfil.guion is None
+    assert perfil.zona_nombre is None
+    assert perfil.separar_personaje  # los juegos de antes también quitan el nombre de quien habla
     con_guion = desde_dict({"version": 1, "nombre": "J", "ventana": "j", "guion": {"carpeta": "/j"}})
     assert con_guion.guion == AjustesGuion("/j", OrigenGuion.ORIGINAL)
 
@@ -206,6 +210,8 @@ def test_version_mas_nueva() -> None:
         {"zona": {"x": "0", "y": 0, "ancho": 1, "alto": 1}},
         {"zona": {"x": True, "y": 0, "ancho": 1, "alto": 1}},
         {"zona": {"x": 0}},
+        {"zona_nombre": {"x": 0}},
+        {"separar_personaje": "no"},
         {"color": "verde"},
         {"orientacion": "diagonal"},
         {"glosario": {"櫻": 3}},

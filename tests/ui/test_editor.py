@@ -133,6 +133,44 @@ def test_sin_zona_se_usa_toda_la_ventana_y_el_boton_la_pone(
     assert editor.selector.zona == TODA_LA_VENTANA
 
 
+def test_zona_del_nombre_y_quien_habla(qtbot: QtBot, almacen: AlmacenPerfiles, falsos: Falsos) -> None:
+    editor = abrir(qtbot, almacen, falsos)
+    editor.nombre.setText("Juego")
+    editor.titulo.setText("juego")
+    assert editor.separar_personaje.isChecked()  # por defecto, el nombre no se lee
+    assert not editor.boton_nombre.isEnabled()  # sin captura no hay dónde dibujar
+
+    editor.ventanas.setCurrentIndex(0)
+    editor.boton_capturar.click()
+    editor.selector.poner_zona(ZonaRelativa(0.1, 0.5, 0.5, 0.5))
+    editor.boton_nombre.click()
+    assert editor.selector.dibujando_nombre
+    editor.selector.poner_zona_nombre(ZonaRelativa(0.1, 0.4, 0.2, 0.1))
+    assert not editor.boton_nombre.isChecked()
+    assert editor.boton_quitar_nombre.isEnabled()
+    assert not editor.separar_personaje.isEnabled()  # con zona del nombre, ya va aparte
+
+    with qtbot.waitSignal(editor.texto_leido, timeout=ESPERA_MS):
+        editor.boton_probar.click()
+    assert editor.resultado.text() == "Texto leído: 你好 · Nombre: 你好"
+    assert [forma for forma, _ajustes in falsos.leidos] == [(50, 100, 3), (10, 40, 3)]
+
+    editor.guardar()
+    guardado = almacen.buscar("Juego")
+    assert guardado.zona_nombre == ZonaRelativa(0.1, 0.4, 0.2, 0.1)
+    assert guardado.separar_personaje
+
+    editor = abrir(qtbot, almacen, falsos, guardado)
+    assert editor.selector.zona_nombre == guardado.zona_nombre
+    editor.boton_quitar_nombre.click()
+    assert editor.separar_personaje.isEnabled()
+    editor.separar_personaje.setChecked(False)
+    editor.guardar()
+    guardado = almacen.buscar("Juego")
+    assert guardado.zona_nombre is None
+    assert not guardado.separar_personaje
+
+
 def test_editar_conserva_el_resto_de_ajustes(qtbot: QtBot, almacen: AlmacenPerfiles, falsos: Falsos) -> None:
     zona = ZonaRelativa(0.1, 0.1, 0.8, 0.3)
     perfil = Perfil(

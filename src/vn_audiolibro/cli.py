@@ -84,6 +84,17 @@ def _parser() -> argparse.ArgumentParser:
     crear.add_argument(
         "--zona", type=_zona, default=TODA_LA_VENTANA, metavar=_("ZONA"), help=_("x,y,ancho,alto entre 0 y 1")
     )
+    crear.add_argument(
+        "--zona-nombre",
+        type=_zona,
+        metavar=_("ZONA"),
+        help=_("zona donde el juego escribe quién habla (x,y,ancho,alto): ese nombre no se lee"),
+    )
+    crear.add_argument(
+        "--con-nombre",
+        action="store_true",
+        help=_("leer también el nombre de quien habla al principio de la línea («Nombre：texto»)"),
+    )
     crear.add_argument("--idioma", choices=IDIOMAS, default=IDIOMAS[0], help=_("idioma del juego"))
     crear.add_argument(
         "--destino", choices=DESTINOS, default=DESTINOS[0], help=_("idioma de la traducción y de la voz")
@@ -362,6 +373,8 @@ def _crear(almacen: AlmacenPerfiles, args: argparse.Namespace) -> int:
         idioma=args.idioma,
         destino=args.destino,
         zona=args.zona,
+        zona_nombre=args.zona_nombre,
+        separar_personaje=not args.con_nombre,
         color=Color.OSCURO if args.oscuro else Color.CLARO,
         orientacion=Orientacion.VERTICAL if args.vertical else Orientacion.HORIZONTAL,
         traductor=Motor.GEMINI if args.gemini else Motor.LOCAL,
@@ -416,7 +429,7 @@ def _traducir_guion(perfil: Perfil) -> int:
 
 def _mostrar(linea: LineaJuego, tiempos: bool = False) -> None:
     marcas = "" if linea.leida or linea.silenciada else _(" (no leída: llegó otra línea)")
-    print(f"\n{linea.original}\n→ {linea.traduccion}{marcas}", flush=True)
+    print(f"\n{linea.original}\n→ {linea.traduccion_con_personaje}{marcas}", flush=True)
     if tiempos and linea.tiempos is not None:
         t = linea.tiempos
         voz = _("no se leyó") if t.hasta_voz_s is None else f"{t.hasta_voz_s:.2f} s"

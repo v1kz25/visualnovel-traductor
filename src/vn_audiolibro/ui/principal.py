@@ -60,7 +60,7 @@ def _html(linea: LineaJuego) -> str:
     color = "" if normal else " color: gray;"  # las no leídas, apagadas
     return (
         f'<p style="margin: 8px 0 0 0; color: gray">{escape(linea.original)}</p>'
-        f'<p style="margin: 0; font-size: large;{color}">{escape(linea.traduccion)}{sufijo}</p>'
+        f'<p style="margin: 0; font-size: large;{color}">{escape(linea.traduccion_con_personaje)}{sufijo}</p>'
     )
 
 
@@ -305,6 +305,9 @@ class VentanaPrincipal(QMainWindow):
         self._actualizar_botones()
 
     def _al_terminar(self) -> None:
+        if self._perfil_en_juego is not None:
+            # La partida puede haber añadido nombres de personajes al glosario del juego.
+            self.recargar_perfiles(elegir=self._perfil_en_juego.id)
         self._perfil_en_juego = None
         if self._subtitulos is not None:
             self._subtitulos.cerrar()
@@ -316,7 +319,7 @@ class VentanaPrincipal(QMainWindow):
     def _mostrar_linea(self, linea: LineaJuego) -> None:
         self._lineas.append(linea)
         if self._subtitulos is not None:
-            self._subtitulos.mostrar(linea.traduccion)
+            self._subtitulos.mostrar(linea.traduccion_con_personaje)
         self.historial.setHtml("".join(_html(linea) for linea in self._lineas))
         barra = self.historial.verticalScrollBar()
         barra.setValue(barra.maximum())

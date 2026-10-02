@@ -1,20 +1,22 @@
 """Tests del montaje de la sesión, con todas las piezas sustituidas por falsas que apuntan qué pasa."""
 
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from vn_audiolibro import claves
-from vn_audiolibro.captura.modelos import Rectangulo, Ventana, VentanaNoEncontradaError
+from vn_audiolibro.captura.modelos import Rectangulo, Ventana, VentanaNoEncontradaError, ZonaRelativa
 from vn_audiolibro.guion.modelos import GuionNoEncontradoError, OrigenGuion
 from vn_audiolibro.ocr.preprocesado import BusquedaTexto
+from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
 from vn_audiolibro.perfiles.modelos import AjustesGuion, AjustesVolumen, AjustesVoz, Perfil
 from vn_audiolibro.pipeline import sesion as modulo
 from vn_audiolibro.pipeline.orquestador import GuionJuego
 from vn_audiolibro.pipeline.sesion import Sesion, ajustes_guion, traductor_guion
 from vn_audiolibro.traduccion.gemini import TraductorConRespaldo
-from vn_audiolibro.traduccion.modelos import Motor
+from vn_audiolibro.traduccion.modelos import Glosario, Motor
 from vn_audiolibro.voz.modelos import VozFallidaError
 from vn_audiolibro.voz.piper import Hablante
 from vn_audiolibro.voz.volumen import Juego
@@ -28,6 +30,7 @@ class Registro:
     def __init__(self) -> None:
         self.eventos: list[str] = []
         self.creados: dict[str, tuple[Any, ...]] = {}
+        self.opciones: dict[str, dict[str, Any]] = {}
 
     def pieza(self, nombre: str, parar: str | None = None, fallar_al: str | None = None) -> type:
         registro = self
@@ -35,6 +38,7 @@ class Registro:
         class Pieza:
             def __init__(self, *args: Any, **kwargs: Any) -> None:
                 registro.creados[nombre] = args
+                registro.opciones[nombre] = kwargs
                 registro.eventos.append(f"crear {nombre}")
                 if fallar_al == "crear":
                     raise VozFallidaError(f"{nombre} no disponible")
@@ -256,3 +260,36 @@ def test_traductor_guion_sin_guion(registro: Registro) -> None:
     ):
         pass
     assert registro.eventos == []
+
+
+def test_pasa_la_zona_del_nombre_y_si_se_separa_el_personaje(registro: Registro) -> None:
+    zona_nombre = ZonaRelativa(0.1, 0.7, 0.2, 0.05)
+    perfil = Perfil("Juego", "juego", zona_nombre=zona_nombre, separar_personaje=False)
+    with sesion(perfil) as abierta:
+        assert registro.opciones["bucle"]["zona_nombre"] == zona_nombre
+        assert not registro.creados["orquestador"][0].separar_personaje
+        assert registro.opciones["orquestador"]["al_personaje"] == abierta.guardar_personaje
+
+
+def test_guarda_los_nombres_aprendidos_en_el_glosario_del_juego(tmp_path: Path) -> None:
+    almacen = AlmacenPerfiles(tmp_path)
+    perfil = Perfil("Juego", "juego", glosario=Glosario.desde_dict({"櫻": "Sakura"}))
+    almacen.guardar(perfil)
+    # Mientras se juega, el usuario cambia algo del juego: no se pierde.
+    almacen.guardar(replace(perfil, glosario=Glosario.desde_dict({"櫻": "Sakura", "林": "Lin"})))
+    abierta = Sesion(perfil, lambda _: None, lambda _: None, almacen=almacen)
+
+    abierta.guardar_personaje("小雨", "Xiaoyu")
+    abierta.guardar_personaje("林", "Bosque")  # ya tenía traducción: se respeta
+
+    terminos = dict(almacen.cargar(perfil.id).glosario.terminos)
+    assert terminos == {"櫻": "Sakura", "林": "Lin", "小雨": "Xiaoyu"}
+
+
+def test_si_no_puede_guardar_el_nombre_se_sigue_jugando(tmp_path: Path) -> None:
+    perfil = Perfil("Juego", "juego")  # nunca se guardó
+    abierta = Sesion(perfil, lambda _: None, lambda _: None, almacen=AlmacenPerfiles(tmp_path))
+
+    abierta.guardar_personaje("小雨", "Xiaoyu")
+
+    assert not list(tmp_path.iterdir())

@@ -3,6 +3,7 @@
 import contextlib
 import logging
 from collections.abc import Callable, Iterator
+from dataclasses import replace
 from pathlib import Path
 from types import TracebackType
 from typing import Self
@@ -20,6 +21,7 @@ from vn_audiolibro.ocr.lector import AjustesLector, LectorOCR
 from vn_audiolibro.ocr.modelos import DET_PPOCRV5_MOBILE, REC_PPOCRV5_MOBILE
 from vn_audiolibro.ocr.preprocesado import BusquedaTexto
 from vn_audiolibro.ocr.reconocedor import ReconocedorRapidOCR
+from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
 from vn_audiolibro.perfiles.modelos import Perfil
 from vn_audiolibro.pipeline.orquestador import AjustesOrquestador, GuionJuego, LineaJuego, Orquestador
 from vn_audiolibro.plataforma import capturador, cliente_audio, gestor_ventanas, juego_de_pid, reproductor
@@ -27,7 +29,7 @@ from vn_audiolibro.textos import _
 from vn_audiolibro.traduccion.gemini import ClienteGemini, TraductorConRespaldo, TraductorGemini
 from vn_audiolibro.traduccion.llama import ServidorLlama, asegurar_llama_server, asegurar_modelo_traduccion
 from vn_audiolibro.traduccion.local import TraductorLocal
-from vn_audiolibro.traduccion.modelos import Motor, Traductor
+from vn_audiolibro.traduccion.modelos import Glosario, Motor, Traductor
 from vn_audiolibro.voz.locutor import Locutor
 from vn_audiolibro.voz.modelos import Atenuador
 from vn_audiolibro.voz.piper import SintetizadorPiper, asegurar_voz, elegir_voz
@@ -81,8 +83,11 @@ class Sesion:
         al_linea: Callable[[LineaJuego], None],
         al_error: Callable[[str], None],
         al_estado: Callable[[str], None] = lambda _: None,
+        almacen: AlmacenPerfiles | None = None,
     ) -> None:
+        """`almacen` es donde se guardan los nombres de personaje aprendidos al jugar."""
         self.perfil = perfil
+        self._almacen = almacen or AlmacenPerfiles()
         self._al_linea = al_linea
         self._al_error = al_error
         self._al_estado = al_estado
@@ -158,7 +163,12 @@ class Sesion:
         )
         orquestador = Orquestador(
             AjustesOrquestador(
-                perfil.id, perfil.idioma, perfil.glosario, perfil.lectura.modo, destino=perfil.destino
+                perfil.id,
+                perfil.idioma,
+                perfil.glosario,
+                perfil.lectura.modo,
+                destino=perfil.destino,
+                separar_personaje=perfil.separar_personaje,
             ),
             lector,
             traductor,
@@ -167,17 +177,38 @@ class Sesion:
             self._al_linea,
             self._al_error,
             guion,
+            al_personaje=self.guardar_personaje,
         )
         pila.callback(orquestador.cerrar)
 
         bucle = BucleCaptura(
-            ventana.id, perfil.zona, orquestador.recibir_zona, ventanas, capturador(ventanas)
+            ventana.id,
+            perfil.zona,
+            orquestador.recibir_zona,
+            ventanas,
+            capturador(ventanas),
+            zona_nombre=perfil.zona_nombre,
         )
         bucle.iniciar()
         pila.callback(bucle.detener)
         self._al_estado(_("Leyendo «{ventana}».").format(ventana=ventana.titulo))
         self.orquestador = orquestador
         return orquestador
+
+    def guardar_personaje(self, original: str, traduccion: str) -> None:
+        """Añade el nombre traducido al glosario del juego, salvo que el usuario ya le haya dado otro.
+
+        Se relee el juego guardado para no pisar lo que haya cambiado desde que empezó la partida.
+        """
+        try:
+            actual = self._almacen.cargar(self.perfil.id)
+            if any(termino == original for termino, _traduccion in actual.glosario.terminos):
+                return
+            glosario = actual.glosario.unir(Glosario(((original, traduccion),)))
+            self._almacen.guardar(replace(actual, glosario=glosario))
+        except (KeyError, OSError, ValueError):
+            # Sin guardarlo se puede seguir jugando: se volverá a traducir en la próxima partida.
+            _registro.warning("No se pudo guardar el nombre «%s» en el glosario", original, exc_info=True)
 
     def _traductor(self, local: TraductorLocal) -> Traductor:
         """El traductor del juego: el local o Gemini, que recurre al local si falla."""

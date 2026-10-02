@@ -70,6 +70,10 @@ en `%LOCALAPPDATA%\vn-audiolibro` y los ajustes en `%APPDATA%\vn-audiolibro`.
 1. **Añadir juego**: elige la ventana del juego, captúrala y dibuja un recuadro sobre la caja de texto.
    Ahí se elige también el idioma de la traducción y de la voz: español (por defecto) o inglés.
    La voz inglesa (unos 64 MB, de dominio público) se descarga la primera vez que se usa.
+   El nombre de quien habla no se lee en voz alta: se muestra delante de la traducción. La app lo
+   reconoce al principio de la línea (`Nombre：texto`, `【Nombre】texto` o `Nombre「texto」`) o, si el
+   juego lo pone en una caja aparte, en la **Zona del nombre** que dibujes. Cada nombre se traduce
+   una vez y se guarda en el glosario del juego, donde puedes corregirlo.
 2. **Jugar**: la app lee cada línea nueva, la traduce y la dice en voz alta mientras juegas.
 3. **Ajustes**: voz (mujer u hombre) y velocidad, cómo leer cuando avanzas deprisa, volumen del juego
    y de otras aplicaciones, y glosario de nombres propios.

@@ -1,5 +1,6 @@
 """Tests de la ventana principal con perfiles en una carpeta temporal y una sesión falsa."""
 
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -11,6 +12,7 @@ from pytestqt.qtbot import QtBot
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
 from vn_audiolibro.perfiles.modelos import Perfil
 from vn_audiolibro.pipeline.orquestador import LineaJuego
+from vn_audiolibro.traduccion.modelos import Glosario
 from vn_audiolibro.ui.principal import MAX_LINEAS, VentanaPrincipal
 from vn_audiolibro.ui.puente import PuenteSesion
 
@@ -100,6 +102,8 @@ def test_marcas_de_las_lineas_e_historial_limitado(qtbot: QtBot, ventana: Ventan
     jugar(qtbot, ventana)
     ventana.puente.linea.emit(LineaJuego("二", "<dos>", desde_cache=True, leida=False))
     assert textos(ventana)[-2:] == ["二", "<dos> (no leída)"]  # el texto no se interpreta como HTML
+    ventana.puente.linea.emit(LineaJuego("三", "tres", desde_cache=False, leida=True, personaje="Rena"))
+    assert textos(ventana)[-2:] == ["三", "Rena: tres"]  # quién habla, delante de la traducción
 
     for i in range(MAX_LINEAS + 5):
         ventana.puente.linea.emit(LineaJuego(f"原{i}", f"t{i}", desde_cache=False, leida=True))
@@ -138,6 +142,21 @@ def test_detener(qtbot: QtBot, ventana: VentanaPrincipal, fabrica: Fabrica) -> N
     assert fabrica.sesiones[0].detenida.is_set()
     assert "Partida terminada" in ventana.estado.text()
     assert ventana.boton_jugar.isEnabled()
+
+
+def test_al_terminar_relee_el_juego_con_los_nombres_aprendidos(
+    qtbot: QtBot, ventana: VentanaPrincipal, almacen: AlmacenPerfiles
+) -> None:
+    jugar(qtbot, ventana)
+    alfa = almacen.buscar("Alfa")
+    almacen.guardar(replace(alfa, glosario=Glosario.desde_dict({"小雨": "Xiaoyu"})))  # lo hace la sesión
+    with qtbot.waitSignal(ventana.puente.terminada, timeout=ESPERA_MS):
+        ventana.boton_detener.click()
+
+    elegido = ventana.perfil_elegido()
+    assert elegido is not None
+    assert elegido.id == alfa.id
+    assert dict(elegido.glosario.terminos) == {"小雨": "Xiaoyu"}
 
 
 def test_error_al_jugar(qtbot: QtBot, almacen: AlmacenPerfiles) -> None:

@@ -40,10 +40,20 @@ class LectorFalso:
         self.textos: dict[int, str] = {}
         self.leidas: list[str] = []
 
-    def zona(self, texto: str) -> ZonaEstable:
+    def zona(self, texto: str, nombre: str | None = None) -> ZonaEstable:
+        """Zona con ese texto y, si se indica, con la zona del nombre del personaje."""
+        return ZonaEstable(
+            imagen=self._imagen(texto),
+            y_inicio=0,
+            completa=True,
+            instante=0.0,
+            nombre=None if nombre is None else self._imagen(nombre),
+        )
+
+    def _imagen(self, texto: str) -> Imagen:
         imagen = np.zeros((4, 4, 3), dtype=np.uint8)
         self.textos[id(imagen)] = texto
-        return ZonaEstable(imagen=imagen, y_inicio=0, completa=True, instante=0.0)
+        return imagen
 
     def leer(self, imagen: Imagen) -> TextoLeido:
         texto = self.textos[id(imagen)]
@@ -98,6 +108,7 @@ class Montaje:
         destino: str = "es",
         guion: Guion | None = None,
         por_partes: bool = False,
+        separar_personaje: bool = True,
     ) -> None:
         self.lector = LectorFalso()
         self.traductor: TraductorFalso | TraductorPorPartesFalso = (
@@ -107,6 +118,7 @@ class Montaje:
         self.cache = cache
         self.lineas: list[LineaJuego] = []
         self.errores: list[str] = []
+        self.personajes: list[tuple[str, str]] = []
         glosario = Glosario.desde_dict({"櫻": "Sakura"})
         idioma = "zh-Hant" if guion is None else "ja"
         self.guion = None
@@ -116,7 +128,9 @@ class Montaje:
                 SeguidorGuion(guion, BuscadorGuion(guion, idioma)), preparador, anticipo=2
             )
         self.orquestador = Orquestador(
-            AjustesOrquestador(PERFIL, idioma, glosario, modo, destino=destino),
+            AjustesOrquestador(
+                PERFIL, idioma, glosario, modo, destino=destino, separar_personaje=separar_personaje
+            ),
             self.lector,
             self.traductor,
             cache,
@@ -124,13 +138,18 @@ class Montaje:
             self.lineas.append,
             self.errores.append,
             self.guion,
+            al_personaje=lambda original, traduccion: self.personajes.append((original, traduccion)),
         )
 
     def llega(self, *textos: str) -> None:
         """Llegan zonas con esos textos y se espera a que se procesen."""
         for texto in textos:
-            self.orquestador.recibir_zona(self.lector.zona(texto))
-            assert self.orquestador.esperar(ESPERA_S)
+            self.llega_con_nombre(texto, None)
+
+    def llega_con_nombre(self, texto: str, nombre: str | None) -> None:
+        """Llega una zona con ese texto y esa zona del nombre, y se espera a que se procese."""
+        self.orquestador.recibir_zona(self.lector.zona(texto, nombre))
+        assert self.orquestador.esperar(ESPERA_S)
 
 
 @pytest.fixture
@@ -178,6 +197,69 @@ def test_pasa_el_contexto_y_el_glosario(montaje: Montaje) -> None:
     assert ultima.contexto[-1].traduccion == "es:四"
     assert ultima.glosario.presentes("櫻") == [("櫻", "Sakura")]
     assert ultima.idioma == "zh-Hant"
+
+
+def test_no_lee_el_nombre_del_personaje_y_lo_traduce_una_sola_vez(montaje: Montaje) -> None:
+    montaje.llega("小雨：我們走吧。", "小雨：好。", "她走了。")
+
+    assert [p.texto for p in montaje.traductor.peticiones] == ["我們走吧。", "小雨", "好。", "她走了。"]
+    assert montaje.voz.dichas == ["es:我們走吧。", "es:好。", "es:她走了。"]
+    assert [linea.personaje for linea in montaje.lineas] == ["es:小雨", "es:小雨", None]
+    assert montaje.lineas[0].original == "我們走吧。"
+    assert montaje.lineas[0].traduccion_con_personaje == "es:小雨: es:我們走吧。"
+    assert montaje.lineas[2].traduccion_con_personaje == "es:她走了。"
+    assert montaje.personajes == [("小雨", "es:小雨")]
+    # El nombre entra en el glosario de las líneas siguientes, para que salga siempre igual.
+    assert montaje.traductor.peticiones[-1].glosario.presentes("小雨") == [("小雨", "es:小雨")]
+
+
+def test_el_nombre_del_glosario_no_se_traduce(montaje: Montaje) -> None:
+    montaje.llega("【櫻】走吧。")
+
+    assert [p.texto for p in montaje.traductor.peticiones] == ["走吧。"]
+    assert montaje.lineas[0].personaje == "Sakura"
+    assert montaje.personajes == []
+
+
+def test_un_nombre_sin_letras_se_queda_como_esta(montaje: Montaje) -> None:
+    montaje.llega("？？？「誰？」")
+
+    assert [p.texto for p in montaje.traductor.peticiones] == ["「誰？」"]
+    assert montaje.lineas[0].personaje == "？？？"
+
+
+def test_si_el_nombre_no_se_puede_traducir_se_muestra_el_original(montaje: Montaje) -> None:
+    montaje.llega("fallo：一", "fallo：二")
+
+    assert [p.texto for p in montaje.traductor.peticiones] == ["一", "fallo", "二"]  # sin reintentos
+    assert [linea.personaje for linea in montaje.lineas] == ["fallo", "fallo"]
+    assert montaje.personajes == []
+
+
+def test_con_la_zona_del_nombre_lee_el_nombre_de_ella(montaje: Montaje) -> None:
+    montaje.llega_con_nombre("我們走吧。", "小雨")
+    montaje.llega_con_nombre("我們走吧。", "櫻")  # el mismo texto dicho por otro personaje
+    montaje.llega_con_nombre("林：好。", "")  # zona del nombre vacía: narración, sin buscar el formato
+
+    assert montaje.voz.dichas == ["es:我們走吧。", "es:我們走吧。", "es:林：好。"]
+    assert [linea.personaje for linea in montaje.lineas] == ["es:小雨", "Sakura", None]
+
+
+def test_si_no_se_separa_el_personaje_se_lee_la_linea_entera(cache: CacheSQLite) -> None:
+    montaje = Montaje(cache, separar_personaje=False)
+    try:
+        montaje.llega("小雨：我們走吧。")
+    finally:
+        montaje.orquestador.cerrar()
+
+    assert montaje.voz.dichas == ["es:小雨：我們走吧。"]
+    assert montaje.lineas[0].personaje is None
+
+
+def test_el_texto_anadido_por_otro_personaje_se_lee_entero(montaje: Montaje) -> None:
+    montaje.llega("小雨：好。", "林：好。我們走吧。")
+
+    assert montaje.voz.dichas == ["es:好。", "es:好。我們走吧。"]
 
 
 def test_traduce_al_destino_y_lo_guarda_aparte_en_la_cache(cache: CacheSQLite) -> None:

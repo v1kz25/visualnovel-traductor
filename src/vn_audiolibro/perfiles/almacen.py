@@ -55,6 +55,8 @@ def a_dict(perfil: Perfil) -> dict[str, Any]:
         "idioma": perfil.idioma,
         "destino": perfil.destino,
         "zona": asdict(perfil.zona),
+        "zona_nombre": None if perfil.zona_nombre is None else asdict(perfil.zona_nombre),
+        "separar_personaje": perfil.separar_personaje,
         "color": perfil.color.value,
         "orientacion": perfil.orientacion.value,
         "busqueda": perfil.busqueda.value,
@@ -95,6 +97,8 @@ def desde_dict(datos: Mapping[str, Any]) -> Perfil:
             # Los juegos guardados antes de poder elegirlo se traducían al español.
             destino=datos.get("destino", DESTINOS[0]),
             zona=_zona(datos["zona"]) if "zona" in datos else TODA_LA_VENTANA,
+            zona_nombre=None if datos.get("zona_nombre") is None else _zona(datos["zona_nombre"]),
+            separar_personaje=_booleano(datos, "separar_personaje", True),
             color=Color(datos.get("color", Color.CLARO)),
             orientacion=Orientacion(datos.get("orientacion", Orientacion.HORIZONTAL.value)),
             busqueda=BusquedaTexto(datos.get("busqueda", BusquedaTexto.COLOR.value)),
@@ -119,6 +123,15 @@ def _texto(datos: Mapping[str, Any], clave: str) -> str:
     valor = datos.get(clave)
     if not isinstance(valor, str):
         raise PerfilInvalidoError(_("Falta «{clave}» o no es un texto").format(clave=clave))
+    return valor
+
+
+def _booleano(datos: Mapping[str, Any], clave: str, por_defecto: bool) -> bool:
+    valor = datos.get(clave, por_defecto)
+    if not isinstance(valor, bool):
+        raise TypeError(
+            _("«{clave}» tiene que ser verdadero o falso: {valor!r}").format(clave=clave, valor=valor)
+        )
     return valor
 
 
