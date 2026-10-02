@@ -110,3 +110,5 @@ class ZonaEstable:
     """True si el texto anterior desapareció (pantalla nueva); False si se añadieron filas (NVL)."""
     instante: float
     """Momento de la captura, en segundos monotónicos."""
+    nombre: Imagen | None = None
+    """Recorte de la zona del nombre del personaje en ese mismo momento, si el juego la tiene."""

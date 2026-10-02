@@ -1,4 +1,7 @@
-"""Selector de la zona de texto: una captura de la ventana del juego sobre la que se dibuja un recuadro."""
+"""Selector de la zona de texto: una captura de la ventana del juego sobre la que se dibuja un recuadro.
+
+También se puede dibujar un segundo recuadro, en otro color, con la zona del nombre del personaje.
+"""
 
 import numpy as np
 from PySide6.QtCore import QPointF, QRectF, QSize, Qt, Signal
@@ -20,10 +23,16 @@ def a_qimage(imagen: Imagen) -> QImage:
 
 
 class SelectorZona(QWidget):
-    """Muestra la captura escalada y deja dibujar la zona con el ratón (pulsar, arrastrar, soltar)."""
+    """Muestra la captura escalada y deja dibujar la zona con el ratón (pulsar, arrastrar, soltar).
+
+    Con `dibujar_nombre(True)`, el siguiente recuadro es la zona del nombre; después se vuelve a
+    dibujar la zona de texto.
+    """
 
     zona_cambiada = Signal(object)
     """La nueva `ZonaRelativa`, o None si se borró."""
+    zona_nombre_cambiada = Signal(object)
+    """La nueva zona del nombre, o None si se quitó."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -32,6 +41,8 @@ class SelectorZona(QWidget):
         self.setCursor(Qt.CursorShape.CrossCursor)
         self._imagen: QPixmap | None = None
         self._zona: ZonaRelativa | None = None
+        self._zona_nombre: ZonaRelativa | None = None
+        self._dibujando_nombre = False
         self._inicio: QPointF | None = None
         self._arrastre: QRectF | None = None
 
@@ -41,6 +52,14 @@ class SelectorZona(QWidget):
     @property
     def zona(self) -> ZonaRelativa | None:
         return self._zona
+
+    @property
+    def zona_nombre(self) -> ZonaRelativa | None:
+        return self._zona_nombre
+
+    @property
+    def dibujando_nombre(self) -> bool:
+        return self._dibujando_nombre
 
     @property
     def hay_imagen(self) -> bool:
@@ -55,6 +74,15 @@ class SelectorZona(QWidget):
         self._zona = zona
         self.update()
         self.zona_cambiada.emit(zona)
+
+    def poner_zona_nombre(self, zona: ZonaRelativa | None) -> None:
+        self._zona_nombre = zona
+        self.update()
+        self.zona_nombre_cambiada.emit(zona)
+
+    def dibujar_nombre(self, activo: bool) -> None:
+        """Si el próximo recuadro que se dibuje es la zona del nombre (True) o la de texto."""
+        self._dibujando_nombre = activo
 
     def area_imagen(self) -> QRectF:
         """Dónde se dibuja la captura: centrada y escalada sin deformar."""
@@ -98,7 +126,10 @@ class SelectorZona(QWidget):
             return
         zona = self.zona_entre(self._inicio, evento.position())
         self._inicio = self._arrastre = None
-        if zona is not None:
+        if zona is not None and self._dibujando_nombre:
+            self._dibujando_nombre = False
+            self.poner_zona_nombre(zona)
+        elif zona is not None:
             self.poner_zona(zona)
         self.update()
 
@@ -112,20 +143,25 @@ class SelectorZona(QWidget):
             return
         area = self.area_imagen()
         pintor.drawPixmap(area.toRect(), self._imagen)
-        recuadro = self._arrastre or self._recuadro_zona(area)
-        if recuadro is None:
-            return
-        # Oscurece lo que queda fuera de la zona y la enmarca.
-        fuera, dentro = QPainterPath(), QPainterPath()
-        fuera.addRect(area)
-        dentro.addRect(recuadro)
-        pintor.fillPath(fuera.subtracted(dentro), QColor(0, 0, 0, 120))
-        pintor.setPen(QPen(QColor(255, 200, 0), 2))
-        pintor.drawRect(recuadro)
+        arrastre_nombre = self._arrastre if self._dibujando_nombre else None
+        recuadro = (self._arrastre if arrastre_nombre is None else None) or _recuadro(self._zona, area)
+        if recuadro is not None:
+            # Oscurece lo que queda fuera de la zona y la enmarca.
+            fuera, dentro = QPainterPath(), QPainterPath()
+            fuera.addRect(area)
+            dentro.addRect(recuadro)
+            pintor.fillPath(fuera.subtracted(dentro), QColor(0, 0, 0, 120))
+            pintor.setPen(QPen(QColor(255, 200, 0), 2))
+            pintor.drawRect(recuadro)
+        nombre = arrastre_nombre or _recuadro(self._zona_nombre, area)
+        if nombre is not None:
+            pintor.setPen(QPen(QColor(0, 200, 255), 2))
+            pintor.drawRect(nombre)
 
-    def _recuadro_zona(self, area: QRectF) -> QRectF | None:
-        if self._zona is None:
-            return None
-        z = self._zona
-        ancho, alto = area.width(), area.height()
-        return QRectF(area.x() + z.x * ancho, area.y() + z.y * alto, z.ancho * ancho, z.alto * alto)
+
+def _recuadro(zona: ZonaRelativa | None, area: QRectF) -> QRectF | None:
+    """Dónde se dibuja la zona sobre la captura."""
+    if zona is None:
+        return None
+    ancho, alto = area.width(), area.height()
+    return QRectF(area.x() + zona.x * ancho, area.y() + zona.y * alto, zona.ancho * ancho, zona.alto * alto)

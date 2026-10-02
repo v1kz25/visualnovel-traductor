@@ -79,6 +79,25 @@ def test_paso_detecta_texto_y_llama_al_callback() -> None:
 
     assert len(eventos) == 1
     assert eventos[0].imagen.shape == (200, 400, 3)
+    assert eventos[0].nombre is None
+
+
+def test_con_zona_del_nombre_la_captura_cuando_el_texto_esta_estable() -> None:
+    eventos: list[ZonaEstable] = []
+    capturador = CapturadorFalso()
+    zona_nombre = ZonaRelativa(0, 0.5, 0.25, 0.1)
+    zona = ZonaRelativa(0, 0, 0.5, 1 / 3)
+    bucle = BucleCaptura(1, zona, eventos.append, VentanasFalsas(), capturador, zona_nombre=zona_nombre)
+
+    for i in range(6):
+        bucle.paso(i * 0.1)
+
+    assert len(eventos) == 1
+    nombre = eventos[0].nombre
+    assert nombre is not None
+    assert nombre.shape == (60, 200, 3)
+    # Solo se captura una vez, cuando el texto ya está estable.
+    assert capturador.zonas.count(Rectangulo(0, 300, 200, 60)) == 1
 
 
 def test_la_zona_sigue_a_la_ventana_si_se_redimensiona() -> None:

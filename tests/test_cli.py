@@ -89,7 +89,7 @@ class SesionFalsa:
         if SesionFalsa.fallo is not None:
             raise SesionFalsa.fallo
         self.al_linea(LineaJuego("一", "uno", desde_cache=True, leida=True))
-        self.al_linea(LineaJuego("二", "dos", desde_cache=False, leida=False))
+        self.al_linea(LineaJuego("二", "dos", desde_cache=False, leida=False, personaje="Rena"))
         return self.orquestador
 
     def detener(self) -> None:
@@ -130,6 +130,9 @@ def test_crear_y_listar(configuracion: AlmacenPerfiles, capsys: pytest.CaptureFi
         "0.5",
         "--destino",
         "en",
+        "--zona-nombre",
+        "0.1,0.62,0.2,0.06",
+        "--con-nombre",
     ]
     assert cli.main([*argumentos, *opciones, "--sin-bajar-volumen"]) == 0
 
@@ -139,6 +142,9 @@ def test_crear_y_listar(configuracion: AlmacenPerfiles, capsys: pytest.CaptureFi
     assert perfil.busqueda is BusquedaTexto.DETECTOR
     assert perfil.traductor is Motor.GEMINI
     assert perfil.zona.y == 0.7
+    assert perfil.zona_nombre is not None
+    assert perfil.zona_nombre.y == 0.62
+    assert not perfil.separar_personaje
     assert (perfil.voz.hablante, perfil.voz.velocidad) == (Hablante.HOMBRE, 1.2)
     assert (perfil.volumen.activo, perfil.volumen.nivel_juego) == (False, 0.5)
     assert perfil.lectura == AjustesLectura(ModoLectura.COLA, 2.0)
@@ -149,6 +155,8 @@ def test_crear_y_listar(configuracion: AlmacenPerfiles, capsys: pytest.CaptureFi
     assert otro.destino == "es"
     assert otro.busqueda is BusquedaTexto.COLOR
     assert otro.traductor is Motor.LOCAL
+    assert otro.zona_nombre is None
+    assert otro.separar_personaje
 
     assert cli.main(["juegos"]) == 0
     assert "Mi juego  (ventana «juego», ja → en" in capsys.readouterr().out
@@ -252,7 +260,7 @@ def test_jugar_muestra_las_lineas_y_atiende_las_ordenes(
     assert sesion.detenida
     salida = capsys.readouterr()
     assert "一\n→ uno\n" in salida.out
-    assert "二\n→ dos (no leída: llegó otra línea)" in salida.out
+    assert "二\n→ Rena: dos (no leída: llegó otra línea)" in salida.out
     assert "⏸ En pausa" in salida.out
     assert "▶ Reanudado" in salida.out
     assert "🔇 Voz silenciada" in salida.out

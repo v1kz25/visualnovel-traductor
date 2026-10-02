@@ -176,6 +176,10 @@ class Perfil:
     destino: str = DESTINOS[0]
     """Idioma de la traducción y de la voz. El glosario del juego va en este idioma."""
     zona: ZonaRelativa = TODA_LA_VENTANA
+    zona_nombre: ZonaRelativa | None = None
+    """Zona donde el juego escribe quién habla, si la tiene: ese texto no se lee en voz alta."""
+    separar_personaje: bool = True
+    """Sin zona del nombre, si se quita el de quien habla del principio de la línea (`Nombre：texto`)."""
     color: Color = Color.CLARO
     orientacion: Orientacion = Orientacion.HORIZONTAL
     busqueda: BusquedaTexto = BusquedaTexto.COLOR

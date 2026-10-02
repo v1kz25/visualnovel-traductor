@@ -1,4 +1,4 @@
-"""Editor de un juego: ventana, zona de texto dibujada sobre una captura, idiomas y aspecto del texto."""
+"""Editor de un juego: ventana, zonas de texto y del nombre sobre una captura, idiomas y aspecto."""
 
 import logging
 import threading
@@ -8,6 +8,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -22,7 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from vn_audiolibro import claves
-from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, Imagen, Rectangulo, Ventana
+from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, Imagen, Rectangulo, Ventana, ZonaRelativa
 from vn_audiolibro.descargas import asegurar_descarga
 from vn_audiolibro.guion.modelos import GuionNoEncontradoError, OrigenGuion
 from vn_audiolibro.guion.outputline import carpeta_scripts, leer_guion
@@ -88,7 +89,15 @@ AYUDA_BUSQUEDA = N_(
     "un modelo de 5 MB."
 )
 
-AYUDA_ZONA = N_("Captura la ventana y dibuja con el ratón un recuadro sobre la caja de texto.")
+AYUDA_ZONA = N_(
+    "Captura la ventana y dibuja con el ratón un recuadro sobre la caja de texto. Si el juego "
+    "muestra el nombre de quien habla en una caja aparte, pulsa «Zona del nombre» y dibuja otro "
+    "recuadro sobre ella: ese nombre no se leerá en voz alta."
+)
+AYUDA_PERSONAJE = N_(
+    "Si la línea empieza por el nombre de quien habla («Nombre：texto», «【Nombre】texto» o "
+    "«Nombre「texto」»), no se lee: se muestra delante de la traducción."
+)
 
 ListarVentanas = Callable[[], list[Ventana]]
 CapturarVentana = Callable[[Ventana], Imagen]
@@ -226,6 +235,9 @@ class EditorJuego(QDialog):
             self.origen_guion.addItem(_(texto), origen.value)
         self.estado_guion = QLabel(_(AYUDA_GUION))
         self.estado_guion.setWordWrap(True)
+        self.separar_personaje = QCheckBox(_("No leer el nombre de quien habla"))
+        self.separar_personaje.setChecked(True)
+        self.separar_personaje.setToolTip(_(AYUDA_PERSONAJE))
 
         fila_guion = QHBoxLayout()
         fila_guion.addWidget(self.carpeta_guion, 1)
@@ -242,6 +254,7 @@ class EditorJuego(QDialog):
         formulario.addRow(_("Texto"), self.color)
         formulario.addRow(_("Orientación"), self.orientacion)
         formulario.addRow(_("Buscar el texto"), self.busqueda)
+        formulario.addRow(_("Personajes"), self.separar_personaje)
         formulario.addRow(_("Traductor"), self.traductor)
         formulario.addRow(_("Clave de Gemini"), self.clave)
         formulario.addRow("", self.aviso_gemini)
@@ -253,6 +266,10 @@ class EditorJuego(QDialog):
         self.boton_capturar = QPushButton(_("Capturar ventana"))
         self.boton_probar = QPushButton(_("Probar OCR"))
         self.boton_toda = QPushButton(_("Toda la ventana"))
+        self.boton_nombre = QPushButton(_("Zona del nombre"))
+        self.boton_nombre.setCheckable(True)
+        self.boton_nombre.setToolTip(_("Dibuja un recuadro sobre la caja con el nombre de quien habla"))
+        self.boton_quitar_nombre = QPushButton(_("Quitar zona del nombre"))
         self.selector = SelectorZona()
         self.resultado = QLabel(_(AYUDA_ZONA))
         self.resultado.setWordWrap(True)
@@ -264,7 +281,14 @@ class EditorJuego(QDialog):
         self.botones = QDialogButtonBox(botones.Save | botones.Cancel)
 
         fila_zona = QHBoxLayout()
-        for boton in (self.boton_capturar, self.boton_probar, self.boton_toda):
+        botones_zona = (
+            self.boton_capturar,
+            self.boton_probar,
+            self.boton_toda,
+            self.boton_nombre,
+            self.boton_quitar_nombre,
+        )
+        for boton in botones_zona:
             fila_zona.addWidget(boton)
         fila_zona.addStretch()
         columna = QVBoxLayout(self)
@@ -287,6 +311,9 @@ class EditorJuego(QDialog):
         self.boton_probar.clicked.connect(self.probar_ocr)
         self.boton_toda.clicked.connect(lambda: self.selector.poner_zona(TODA_LA_VENTANA))
         self.selector.zona_cambiada.connect(lambda _: self._actualizar_botones())
+        self.boton_nombre.toggled.connect(self.selector.dibujar_nombre)
+        self.boton_quitar_nombre.clicked.connect(lambda: self.selector.poner_zona_nombre(None))
+        self.selector.zona_nombre_cambiada.connect(lambda _: self._al_cambiar_zona_nombre())
         self.texto_leido.connect(self._mostrar_texto)
         self.boton_guion.clicked.connect(self.elegir_guion)
         self.carpeta_guion.editingFinished.connect(self.comprobar_guion)
@@ -303,6 +330,8 @@ class EditorJuego(QDialog):
         self._elegir(self.busqueda, perfil.busqueda.value)
         self._elegir(self.traductor, perfil.traductor.value)
         self.selector.poner_zona(perfil.zona)
+        self.selector.poner_zona_nombre(perfil.zona_nombre)
+        self.separar_personaje.setChecked(perfil.separar_personaje)
         if perfil.guion is not None:
             self.carpeta_guion.setText(perfil.guion.carpeta)
             self._elegir(self.origen_guion, perfil.guion.origen.value)
@@ -377,11 +406,19 @@ class EditorJuego(QDialog):
         self.selector.mostrar(self._captura)
         self._actualizar_botones()
 
+    def _al_cambiar_zona_nombre(self) -> None:
+        self.boton_nombre.setChecked(False)  # el recuadro ya está dibujado
+        self._actualizar_botones()
+
     def probar_ocr(self) -> None:
-        """Lee el texto de la zona en segundo plano (la primera vez carga el modelo)."""
+        """Lee el texto de la zona (y el nombre, si tiene zona) en segundo plano.
+
+        La primera vez carga el modelo.
+        """
         recorte = self._recorte()
         if recorte is None:
             return
+        recorte_nombre = self._recorte(self.selector.zona_nombre) if self.selector.zona_nombre else None
         ajustes = AjustesLector(
             self.idioma.currentData(), self._color().color_texto, self._orientacion(), self._busqueda()
         )
@@ -391,6 +428,9 @@ class EditorJuego(QDialog):
         def leer() -> None:
             try:
                 texto = self._leer(recorte, ajustes) or _("(no se ha reconocido texto en la zona)")
+                if recorte_nombre is not None:
+                    nombre = self._leer(recorte_nombre, ajustes) or _("(ninguno)")
+                    texto = _("{texto} · Nombre: {nombre}").format(texto=texto, nombre=nombre)
             except Exception as error:
                 _registro.exception("Falló el OCR de prueba")
                 texto = _("No se pudo leer: {error}").format(error=error)
@@ -402,10 +442,11 @@ class EditorJuego(QDialog):
         self.resultado.setText(_("Texto leído: {texto}").format(texto=texto))
         self._actualizar_botones()
 
-    def _recorte(self) -> Imagen | None:
+    def _recorte(self, zona: ZonaRelativa | None = None) -> Imagen | None:
+        """Trozo de la captura en `zona` (por defecto, la de texto)."""
         if self._captura is None:
             return None
-        zona = self.selector.zona or TODA_LA_VENTANA
+        zona = zona or self.selector.zona or TODA_LA_VENTANA
         alto, ancho = self._captura.shape[:2]
         r = zona.en_pixeles(ancho, alto)
         return self._captura[r.y : r.y + r.alto, r.x : r.x + r.ancho]
@@ -469,6 +510,8 @@ class EditorJuego(QDialog):
                 idioma=self.idioma.currentData(),
                 destino=self.destino.currentData(),
                 zona=self.selector.zona or TODA_LA_VENTANA,
+                zona_nombre=self.selector.zona_nombre,
+                separar_personaje=self.separar_personaje.isChecked(),
                 color=self._color(),
                 orientacion=self._orientacion(),
                 busqueda=self._busqueda(),
@@ -529,5 +572,9 @@ class EditorJuego(QDialog):
         self.boton_capturar.setEnabled(self.ventana_elegida() is not None)
         self.boton_probar.setEnabled(self._captura is not None)
         self.boton_toda.setEnabled(self.selector.hay_imagen)
+        self.boton_nombre.setEnabled(self.selector.hay_imagen)
+        con_zona_nombre = self.selector.zona_nombre is not None
+        self.boton_quitar_nombre.setEnabled(con_zona_nombre)
+        self.separar_personaje.setEnabled(not con_zona_nombre)  # con zona, el nombre ya va aparte
         guardar = self.botones.button(QDialogButtonBox.StandardButton.Save)
         guardar.setEnabled(bool(self.nombre.text().strip() and self.titulo.text().strip()))

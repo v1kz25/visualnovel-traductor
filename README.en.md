@@ -45,6 +45,10 @@ and progress. After that it works offline.
 
 1. **Add game**: choose the game window, capture it and draw a box over the text box. This is also
    where you choose the language of the translation and the voice.
+   The speaker's name is not read aloud: it is shown before the translation. The app finds it at the
+   start of the line (`Name: text`, `【Name】text` or `Name「text」`) or, if the game shows it in a
+   separate box, in the **Name area** you draw. Each name is translated once and saved in the game's
+   glossary, where you can fix it.
 2. **Play**: the app reads each new line, translates it and says it aloud while you play.
 3. **Settings**: voice (female or male) and speed, what to do when you advance quickly, the volume
    of the game and other applications, and a glossary of names.

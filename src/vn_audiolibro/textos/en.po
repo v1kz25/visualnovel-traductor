@@ -64,6 +64,12 @@ msgstr "AREA"
 msgid "x,y,ancho,alto entre 0 y 1"
 msgstr "x,y,width,height between 0 and 1"
 
+msgid "zona donde el juego escribe quién habla (x,y,ancho,alto): ese nombre no se lee"
+msgstr "area where the game shows who is speaking (x,y,width,height): that name is not read aloud"
+
+msgid "leer también el nombre de quien habla al principio de la línea («Nombre：texto»)"
+msgstr "also read the speaker's name at the start of the line (“Name：text”)"
+
 msgid "idioma del juego"
 msgstr "language of the game"
 
@@ -309,6 +315,9 @@ msgstr "The saved game has an invalid value: {error}"
 msgid "Falta «{clave}» o no es un texto"
 msgstr "“{clave}” is missing or is not text"
 
+msgid "«{clave}» tiene que ser verdadero o falso: {valor!r}"
+msgstr "“{clave}” must be true or false: {valor!r}"
+
 msgid "se esperaba un número: {valor!r}"
 msgstr "a number was expected: {valor!r}"
 
@@ -386,6 +395,9 @@ msgstr "If translating from the script's English, the translation cannot be into
 
 msgid "Identificador de juego no válido: {id}"
 msgstr "Invalid game identifier: {id}"
+
+msgid "{personaje}: {traduccion}"
+msgstr "{personaje}: {traduccion}"
 
 msgid "Error al procesar la línea: {error}"
 msgstr "Error while processing the line: {error}"
@@ -785,8 +797,11 @@ msgstr "Optional. If the game stores its script in readable files, choose its fo
 msgid "Por color va bien con una caja de texto lisa. Si el juego escribe el texto directamente sobre la imagen y el OCR lee mal o nada, usa el detector: es más lento y la primera vez descarga un modelo de 5 MB."
 msgstr "By color works well with a plain text box. If the game writes the text directly over the picture and the OCR reads it wrong or not at all, use the detector: it is slower and downloads a 5 MB model the first time."
 
-msgid "Captura la ventana y dibuja con el ratón un recuadro sobre la caja de texto."
-msgstr "Capture the window and draw a box over the text box with the mouse."
+msgid "Captura la ventana y dibuja con el ratón un recuadro sobre la caja de texto. Si el juego muestra el nombre de quien habla en una caja aparte, pulsa «Zona del nombre» y dibuja otro recuadro sobre ella: ese nombre no se leerá en voz alta."
+msgstr "Capture the window and draw a box over the text box with the mouse. If the game shows the speaker's name in a separate box, press “Name area” and draw another box over it: that name will not be read aloud."
+
+msgid "Si la línea empieza por el nombre de quien habla («Nombre：texto», «【Nombre】texto» o «Nombre「texto」»), no se lee: se muestra delante de la traducción."
+msgstr "If the line starts with the speaker's name (“Name：text”, “【Name】text” or “Name「text」”), it is not read aloud: it is shown before the translation."
 
 msgid "Carpeta del juego"
 msgstr "Game folder"
@@ -812,6 +827,9 @@ msgstr "None: OCR only"
 msgid "Elegir…"
 msgstr "Choose…"
 
+msgid "No leer el nombre de quien habla"
+msgstr "Don't read the speaker's name"
+
 msgid "Nombre"
 msgstr "Name"
 
@@ -836,6 +854,9 @@ msgstr "Orientation"
 msgid "Buscar el texto"
 msgstr "Find the text"
 
+msgid "Personajes"
+msgstr "Characters"
+
 msgid "Traductor"
 msgstr "Translator"
 
@@ -857,6 +878,15 @@ msgstr "Test OCR"
 msgid "Toda la ventana"
 msgstr "Whole window"
 
+msgid "Zona del nombre"
+msgstr "Name area"
+
+msgid "Dibuja un recuadro sobre la caja con el nombre de quien habla"
+msgstr "Draw a box over the box with the speaker's name"
+
+msgid "Quitar zona del nombre"
+msgstr "Remove name area"
+
 msgid "Zona de texto"
 msgstr "Text area"
 
@@ -874,6 +904,12 @@ msgstr "Reading…"
 
 msgid "(no se ha reconocido texto en la zona)"
 msgstr "(no text recognized in the area)"
+
+msgid "(ninguno)"
+msgstr "(none)"
+
+msgid "{texto} · Nombre: {nombre}"
+msgstr "{texto} · Name: {nombre}"
 
 msgid "No se pudo leer: {error}"
 msgstr "Could not read: {error}"
