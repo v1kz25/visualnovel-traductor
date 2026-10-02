@@ -48,6 +48,7 @@ COMPLETO = Perfil(
     glosario=Glosario.desde_dict({"櫻": "Sakura", "先輩": "senpai"}),
     traductor=Motor.GEMINI,
     voz=AjustesVoz(Hablante.HOMBRE, 1.25),
+    personajes=(("小雨", Hablante.MUJER), ("林", None)),
     lectura=AjustesLectura(ModoLectura.ULTIMA, 0.5),
     volumen=AjustesVolumen(activo=False, nivel_juego=0.5, otras=(("Firefox", 0.0),), excluir=("Discord",)),
     subtitulos=AjustesSubtitulos(activo=True, posicion=PosicionSubtitulos.TAPAR, tamano=30, opacidad=0.5),
@@ -96,6 +97,15 @@ def test_perfil_no_valido(campos: dict[str, Any], mensaje: str) -> None:
     datos: dict[str, Any] = {"nombre": "Juego", "ventana": "juego", **campos}
     with pytest.raises(PerfilInvalidoError, match=mensaje):
         Perfil(**datos)
+
+
+def test_voces_de_los_personajes() -> None:
+    personajes = (("小雨", Hablante.HOMBRE), ("林", None), ("櫻", Hablante.MUJER))
+    perfil = Perfil("Juego", "juego", personajes=personajes)  # la voz del juego es de mujer
+
+    assert perfil.voces_personajes() == {"小雨": Hablante.HOMBRE}  # solo las que cambian algo
+    with pytest.raises(PerfilInvalidoError, match="sin repetirlo"):
+        Perfil("Juego", "juego", personajes=(("小雨", None), ("小雨", Hablante.HOMBRE)))
 
 
 def test_un_juego_en_ingles_se_traduce_al_espanol() -> None:
@@ -184,6 +194,7 @@ def test_los_campos_que_faltan_toman_su_valor_por_defecto() -> None:
     assert perfil.guion is None
     assert perfil.zona_nombre is None
     assert perfil.separar_personaje  # los juegos de antes también quitan el nombre de quien habla
+    assert perfil.personajes == ()
     con_guion = desde_dict({"version": 1, "nombre": "J", "ventana": "j", "guion": {"carpeta": "/j"}})
     assert con_guion.guion == AjustesGuion("/j", OrigenGuion.ORIGINAL)
 
@@ -211,6 +222,10 @@ def test_version_mas_nueva() -> None:
         {"zona": {"x": True, "y": 0, "ancho": 1, "alto": 1}},
         {"zona": {"x": 0}},
         {"zona_nombre": {"x": 0}},
+        {"personajes": {"小雨": "niño"}},
+        {"personajes": {"小雨": 1}},
+        {"personajes": ["小雨"]},
+        {"personajes": {" ": None}},
         {"separar_personaje": "no"},
         {"color": "verde"},
         {"orientacion": "diagonal"},

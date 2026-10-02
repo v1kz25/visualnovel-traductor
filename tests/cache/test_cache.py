@@ -1,6 +1,7 @@
 """Tests de la caché con una base de datos temporal."""
 
 import hashlib
+import sqlite3
 import threading
 from pathlib import Path
 
@@ -85,6 +86,70 @@ def test_guarda_el_audio_en_un_fichero(cache: CacheSQLite) -> None:
     assert entrada.audio == ruta
     assert ruta.read_bytes() == b"opus"
     assert ruta.parent == cache.directorio_audio
+
+
+def test_guarda_con_que_voz_se_sintetizo_el_audio(cache: CacheSQLite) -> None:
+    cache.guardar_traduccion(LINEA, "«Vámonos.»", "hy-mt2")
+    cache.guardar_audio(LINEA, b"opus")
+    entrada = cache.consultar(LINEA)
+    assert entrada is not None
+    assert entrada.voz is None  # la voz del juego
+
+    cache.guardar_audio(LINEA, b"opus de hombre", voz="M")
+
+    entrada = cache.consultar(LINEA)
+    assert entrada is not None
+    assert entrada.voz == "M"
+    assert entrada.audio is not None
+    assert entrada.audio.read_bytes() == b"opus de hombre"
+
+
+def test_una_cache_de_antes_sigue_valiendo_con_la_voz_del_juego(tmp_path: Path) -> None:
+    conexion = sqlite3.connect(tmp_path / "cache.sqlite3")
+    with conexion:
+        conexion.executescript(_ESQUEMA_V1)
+        conexion.execute(
+            "INSERT INTO entradas VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                LINEA.id,
+                LINEA.perfil,
+                LINEA.idioma,
+                LINEA.texto,
+                "«Vámonos.»",
+                "hy-mt2",
+                "a.opus",
+                10,
+                1.0,
+                1.0,
+            ),
+        )
+    conexion.close()
+    (tmp_path / "audio").mkdir()
+    (tmp_path / "audio" / "a.opus").write_bytes(b"opus")
+
+    cache = CacheSQLite(tmp_path)
+    try:
+        entrada = cache.consultar(LINEA)
+        assert entrada is not None
+        assert (entrada.traduccion, entrada.voz) == ("«Vámonos.»", None)
+        assert entrada.audio == tmp_path / "audio" / "a.opus"
+        cache.guardar_audio(LINEA, b"otro", voz="M")
+        nueva = cache.consultar(LINEA)
+        assert nueva is not None
+        assert nueva.voz == "M"
+    finally:
+        cache.cerrar()
+
+
+_ESQUEMA_V1 = """
+CREATE TABLE entradas (
+    id TEXT PRIMARY KEY, perfil TEXT NOT NULL, idioma TEXT NOT NULL, original TEXT NOT NULL,
+    traduccion TEXT NOT NULL, modelo TEXT NOT NULL, audio TEXT, bytes INTEGER NOT NULL,
+    creada REAL NOT NULL, usada REAL NOT NULL
+);
+PRAGMA user_version = 1;
+"""
+"""Esquema de la caché antes de guardar la voz del audio."""
 
 
 def test_no_guarda_audio_sin_traduccion(cache: CacheSQLite) -> None:

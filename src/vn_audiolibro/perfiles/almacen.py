@@ -63,6 +63,10 @@ def a_dict(perfil: Perfil) -> dict[str, Any]:
         "glosario": dict(perfil.glosario.terminos),
         "traductor": perfil.traductor.value,
         "voz": {"hablante": perfil.voz.hablante.name.lower(), "velocidad": perfil.voz.velocidad},
+        "personajes": {
+            nombre: None if hablante is None else hablante.name.lower()
+            for nombre, hablante in perfil.personajes
+        },
         "lectura": {"modo": perfil.lectura.modo.value, "pausa_s": perfil.lectura.pausa_s},
         "volumen": {
             "activo": perfil.volumen.activo,
@@ -105,6 +109,7 @@ def desde_dict(datos: Mapping[str, Any]) -> Perfil:
             glosario=_glosario(datos.get("glosario", {})),
             traductor=Motor(datos.get("traductor", Motor.LOCAL.value)),
             voz=_voz(datos.get("voz", {})),
+            personajes=_personajes(datos.get("personajes", {})),
             lectura=_lectura(datos.get("lectura", {})),
             volumen=_volumen(datos.get("volumen", {})),
             subtitulos=_subtitulos(datos.get("subtitulos", {})),
@@ -158,6 +163,14 @@ def _voz(datos: Mapping[str, Any]) -> AjustesVoz:
         hablante=Hablante[str(datos.get("hablante", "mujer")).upper()],
         velocidad=_numero(datos.get("velocidad", 1.0)),
     )
+
+
+def _personajes(datos: Mapping[str, Any]) -> tuple[tuple[str, Hablante | None], ...]:
+    if not all(
+        isinstance(nombre, str) and (voz is None or isinstance(voz, str)) for nombre, voz in datos.items()
+    ):
+        raise TypeError(_("los personajes tienen que ser nombres con su voz"))
+    return tuple((nombre, None if voz is None else Hablante[voz.upper()]) for nombre, voz in datos.items())
 
 
 def _lectura(datos: Mapping[str, Any]) -> AjustesLectura:

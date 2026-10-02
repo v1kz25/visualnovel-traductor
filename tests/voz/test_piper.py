@@ -69,6 +69,20 @@ def test_mujer_y_hombre_suenan_distinto(modelo: Path, sintetizador: Sintetizador
     assert len(de_mujer.pcm) != len(de_hombre.pcm) or bool((de_mujer.pcm != de_hombre.pcm).any())
 
 
+def test_con_hablante_reutiliza_el_modelo_con_otra_voz(modelo: Path, sintetizador: SintetizadorPiper) -> None:
+    rapido = SintetizadorPiper(modelo, velocidad=1.5)
+    hombre = rapido.con_hablante(Hablante.HOMBRE)
+    texto = "Buenos días."
+
+    (de_hombre,) = hombre.sintetizar(texto)
+    (de_hombre_aparte,) = SintetizadorPiper(modelo, Hablante.HOMBRE, velocidad=1.5).sintetizar(texto)
+    (de_mujer,) = rapido.sintetizar(texto)  # el original no cambia
+
+    assert hombre._voz is rapido._voz  # sin cargar el modelo otra vez
+    assert de_hombre.duracion_s == pytest.approx(de_hombre_aparte.duracion_s, rel=0.15)  # misma velocidad
+    assert len(de_mujer.pcm) != len(de_hombre.pcm) or bool((de_mujer.pcm != de_hombre.pcm).any())
+
+
 def test_hablante_que_la_voz_no_tiene(tmp_path: Path, modelo: Path) -> None:
     # Configuración sin hablantes, como la de las voces de un solo hablante.
     unico = tmp_path / "unico.onnx"

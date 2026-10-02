@@ -12,7 +12,8 @@ se traducen y leen con su texto exacto. Mientras no llega otra zona, se traducen
 los párrafos siguientes.
 
 El nombre del personaje que habla (de su propia zona o del principio de la línea) no se lee: se
-traduce una sola vez, se añade al glosario y acompaña a la línea al mostrarla.
+traduce una sola vez, se añade al glosario y acompaña a la línea al mostrarla. Si el personaje tiene
+otra voz, su línea se lee con ella.
 """
 
 import logging
@@ -62,9 +63,9 @@ class CacheTraducciones(Protocol):
 class Voz(Protocol):
     """Lo que el orquestador necesita del locutor."""
 
-    def decir(self, clave: Clave, texto: str) -> None: ...
+    def decir(self, clave: Clave, texto: str, voz: str | None = None) -> None: ...
 
-    def decir_por_partes(self, clave: Clave, texto: TextoPorPartes) -> None: ...
+    def decir_por_partes(self, clave: Clave, texto: TextoPorPartes, voz: str | None = None) -> None: ...
 
     def saltar(self) -> None: ...
 
@@ -139,12 +140,18 @@ class AjustesOrquestador:
     """Idioma al que se traduce."""
     separar_personaje: bool = True
     """Si se quita de la línea el nombre de quien habla (`Nombre：texto`, `【Nombre】texto`…)."""
+    voces: tuple[tuple[str, str], ...] = ()
+    """Voz de los personajes que no hablan con la del juego: nombre en el juego -> voz del locutor."""
 
 
 LARGO_MAX_PERSONAJE = 40
 """Una «traducción» de un nombre más larga que esto es que el traductor se ha ido por las ramas."""
 
 _SOBRA_EN_PERSONAJE = " \t\n.,:;!?¡¿\"'«»“”。：「」【】[]"
+
+
+def _tiene_letras(nombre: str) -> bool:
+    return any(caracter.isalnum() for caracter in nombre)
 
 
 def _limpiar_personaje(traduccion: str) -> str | None:
@@ -173,10 +180,13 @@ class Orquestador:
         guion: GuionJuego | None = None,
         al_personaje: Callable[[str, str], None] = lambda _original, _traduccion: None,
     ) -> None:
-        """`al_personaje` avisa de cada nombre nuevo traducido (original, traducción), para guardarlo."""
+        """`al_personaje` avisa la primera vez que habla cada personaje en la partida, con su nombre
+        en el juego y su traducción (la misma si no se ha podido traducir), para guardarlo."""
         self._ajustes = ajustes
         self._glosario = ajustes.glosario
         self._personajes: dict[str, str] = dict(ajustes.glosario.terminos)
+        self._vistos: set[str] = set()
+        self._voces = dict(ajustes.voces)
         self._al_personaje = al_personaje
         self._guion = guion
         self._anticipar = False
@@ -194,7 +204,7 @@ class Orquestador:
         self._cerrado = False
         self._ultimo_texto: tuple[str | None, str] = (None, "")
         self._ultimo_dialogo: tuple[str | None, str] = (None, "")
-        self._ultima: tuple[Clave, str] | None = None
+        self._ultima: tuple[Clave, str, str | None] | None = None
         self._contexto: deque[LineaPrevia] = deque(maxlen=LINEAS_CONTEXTO)
         self._hilo = threading.Thread(target=self._bucle, name="orquestador", daemon=True)
         self._hilo.start()
@@ -320,9 +330,18 @@ class Orquestador:
         """El nombre traducido: del glosario o, la primera vez que sale, del traductor."""
         if nombre is None:
             return None
-        if (conocido := self._personajes.get(nombre)) is not None:
-            return conocido
-        if not any(caracter.isalnum() for caracter in nombre):
+        traduccion = self._personajes.get(nombre)
+        if traduccion is None:
+            # Si no se puede traducir, se queda el original, sin reintentarlo en cada línea.
+            traduccion = self._personajes[nombre] = self._traducir_personaje(nombre)
+        if nombre not in self._vistos and _tiene_letras(nombre):
+            self._vistos.add(nombre)
+            self._al_personaje(nombre, traduccion)
+        return traduccion
+
+    def _traducir_personaje(self, nombre: str) -> str:
+        """Traduce un nombre y lo añade al glosario; si no se puede, devuelve el original."""
+        if not _tiene_letras(nombre):
             return nombre  # «？？？» y parecidos se quedan como están
         ajustes = self._ajustes
         try:
@@ -331,13 +350,10 @@ class Orquestador:
             )
         except TraduccionFallidaError as error:
             _registro.warning("No se pudo traducir el nombre «%s»: %s", nombre, error)
-            self._personajes[nombre] = nombre  # sin reintentarlo en cada línea
             return nombre
         traduccion = _limpiar_personaje(nueva.texto) or nombre
-        self._personajes[nombre] = traduccion
         if traduccion != nombre:
             self._glosario = self._glosario.unir(Glosario(((nombre, traduccion),)))
-            self._al_personaje(nombre, traduccion)
         return traduccion
 
     def _leer(
@@ -354,8 +370,13 @@ class Orquestador:
         El nombre de quien habla se traduce después de empezar a leer, para no retrasar la voz.
         """
         texto = clave.texto
+        voz_personaje = self._voces.get(nombre) if nombre is not None else None
         entrada = self._cache.consultar(clave)
-        resultado = _Resultado(entrada.traduccion, True, None) if entrada else self._traducir(clave, peticion)
+        resultado = (
+            _Resultado(entrada.traduccion, True, None)
+            if entrada
+            else self._traducir(clave, peticion, voz_personaje)
+        )
         if resultado is None:
             return
         traduccion_s = time.monotonic() - inicio - ocr_s
@@ -365,10 +386,10 @@ class Orquestador:
             # Si ya espera otra línea o se ha pausado, esta llega tarde: se guarda pero no se lee.
             silenciada = self._silenciado
             leer = resultado.voz is None and not silenciada and not self._llega_tarde_sin_cerrojo()
-            self._ultima = (clave, resultado.texto)
+            self._ultima = (clave, resultado.texto, voz_personaje)
         voz = resultado.voz
         if leer:
-            self._voz.decir(clave, resultado.texto)
+            self._voz.decir(clave, resultado.texto, voz_personaje)
             voz = time.monotonic()
         tiempos = Tiempos(ocr_s, traduccion_s, None if voz is None else voz - zona.instante)
         leida = voz is not None
@@ -426,11 +447,11 @@ class Orquestador:
         with self._condicion:
             return bool(self._pendientes) or self._pausado or self._cerrado
 
-    def _traducir(self, clave: Clave, peticion: Peticion) -> _Resultado | None:
+    def _traducir(self, clave: Clave, peticion: Peticion, voz: str | None = None) -> _Resultado | None:
         texto = clave.texto
         try:
             if isinstance(self._traductor, TraductorPorPartes):
-                return self._traducir_por_partes(clave, peticion, self._traductor)
+                return self._traducir_por_partes(clave, peticion, self._traductor, voz)
             nueva = self._traductor.traducir(peticion)
         except TraduccionFallidaError as error:
             _registro.warning("No se pudo traducir «%s»: %s", texto, error)
@@ -440,16 +461,16 @@ class Orquestador:
         return _Resultado(nueva.texto, False, None)
 
     def _traducir_por_partes(
-        self, clave: Clave, peticion: Peticion, traductor: TraductorPorPartes
+        self, clave: Clave, peticion: Peticion, traductor: TraductorPorPartes, voz: str | None
     ) -> _Resultado | None:
         partes = TextoPorPartes()
-        voz: float | None = None
+        empezo: float | None = None
 
         def al_parte(parte: str) -> None:
-            nonlocal voz
-            if voz is None and not self.silenciado:
-                self._voz.decir_por_partes(clave, partes)
-                voz = time.monotonic()
+            nonlocal empezo
+            if empezo is None and not self.silenciado:
+                self._voz.decir_por_partes(clave, partes, voz)
+                empezo = time.monotonic()
             partes.anadir(parte)
 
         try:
@@ -462,7 +483,7 @@ class Orquestador:
             partes.terminar()
 
         if resultado is None or not resultado.por_partes:
-            if voz is not None:
+            if empezo is not None:
                 self._voz.callar()  # cancelada, o lo leído no valía y se leerá la traducción entera
             return None if resultado is None else _Resultado(resultado.traduccion.texto, False, None)
-        return _Resultado(resultado.traduccion.texto, False, voz)
+        return _Resultado(resultado.traduccion.texto, False, empezo)

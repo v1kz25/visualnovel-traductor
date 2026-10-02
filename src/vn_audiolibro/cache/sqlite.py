@@ -19,7 +19,8 @@ from vn_audiolibro.cache.modelos import Clave, Entrada, ResumenPerfil
 from vn_audiolibro.rutas import directorio_datos
 from vn_audiolibro.textos import _
 
-VERSION_ESQUEMA = 1
+VERSION_ESQUEMA = 2
+"""2: columna `voz` (la voz del audio, si no es la del juego)."""
 
 _ESQUEMA = """
 CREATE TABLE IF NOT EXISTS entradas (
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS entradas (
     traduccion TEXT NOT NULL,
     modelo TEXT NOT NULL,
     audio TEXT,
+    voz TEXT,
     bytes INTEGER NOT NULL,
     creada REAL NOT NULL,
     usada REAL NOT NULL
@@ -38,7 +40,7 @@ CREATE INDEX IF NOT EXISTS entradas_perfil ON entradas (perfil);
 CREATE INDEX IF NOT EXISTS entradas_usada ON entradas (usada);
 """
 
-_Fila = tuple[str, str, str, str | None, float, float]
+_Fila = tuple[str, str, str, str | None, str | None, float, float]
 
 
 def directorio_cache() -> Path:
@@ -73,6 +75,9 @@ class CacheSQLite:
         with self._transaccion() as cursor:
             cursor.execute("PRAGMA journal_mode = WAL")
             cursor.executescript(_ESQUEMA)
+            columnas = {fila[1] for fila in cursor.execute("PRAGMA table_info(entradas)")}
+            if "voz" not in columnas:  # caché de la versión 1: el audio era de la voz del juego
+                cursor.execute("ALTER TABLE entradas ADD COLUMN voz TEXT")
             cursor.execute(f"PRAGMA user_version = {VERSION_ESQUEMA}")
 
     def cerrar(self) -> None:
@@ -90,12 +95,12 @@ class CacheSQLite:
         ahora = self._reloj()
         with self._transaccion() as cursor:
             fila: _Fila | None = cursor.execute(
-                "SELECT original, traduccion, modelo, audio, creada, usada FROM entradas WHERE id = ?",
+                "SELECT original, traduccion, modelo, audio, voz, creada, usada FROM entradas WHERE id = ?",
                 (clave.id,),
             ).fetchone()
             if fila is None:
                 return None
-            original, traduccion, modelo, audio, creada, _ = fila
+            original, traduccion, modelo, audio, voz, creada, _ = fila
             ruta = self.directorio_audio / audio if audio else None
             if ruta is not None and not ruta.is_file():
                 # El fichero ha desaparecido (borrado a mano): se volverá a sintetizar.
@@ -105,7 +110,7 @@ class CacheSQLite:
                     (_bytes_texto(original, traduccion), clave.id),
                 )
             cursor.execute("UPDATE entradas SET usada = ? WHERE id = ?", (ahora, clave.id))
-        return Entrada(original, traduccion, modelo, ruta, creada, ahora)
+        return Entrada(original, traduccion, modelo, ruta, creada, ahora, voz if ruta else None)
 
     def guardar_traduccion(self, clave: Clave, traduccion: str, modelo: str) -> None:
         """Guarda o sustituye la traducción de una línea.
@@ -145,8 +150,12 @@ class CacheSQLite:
             )
         self._aplicar_limite(proteger=clave.id)
 
-    def guardar_audio(self, clave: Clave, datos: bytes) -> Path:
-        """Guarda el audio Opus de una línea ya traducida y devuelve su ruta."""
+    def guardar_audio(self, clave: Clave, datos: bytes, voz: str | None = None) -> Path:
+        """Guarda el audio Opus de una línea ya traducida y devuelve su ruta.
+
+        `voz` es la del personaje que la dice, o None si se ha leído con la voz del juego. Cada línea
+        guarda un solo audio: el de la última voz con la que se leyó.
+        """
         nombre = f"{clave.id}.opus"
         ruta = self.directorio_audio / nombre
         with self._transaccion() as cursor:
@@ -159,8 +168,8 @@ class CacheSQLite:
             temporal.write_bytes(datos)
             temporal.replace(ruta)
             cursor.execute(
-                "UPDATE entradas SET audio = ?, bytes = ?, usada = ? WHERE id = ?",
-                (nombre, _bytes_texto(*fila) + len(datos), self._reloj(), clave.id),
+                "UPDATE entradas SET audio = ?, voz = ?, bytes = ?, usada = ? WHERE id = ?",
+                (nombre, voz, _bytes_texto(*fila) + len(datos), self._reloj(), clave.id),
             )
         self._aplicar_limite(proteger=clave.id)
         return ruta

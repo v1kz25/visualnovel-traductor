@@ -31,8 +31,8 @@ from vn_audiolibro.traduccion.llama import ServidorLlama, asegurar_llama_server,
 from vn_audiolibro.traduccion.local import TraductorLocal
 from vn_audiolibro.traduccion.modelos import Glosario, Motor, Traductor
 from vn_audiolibro.voz.locutor import Locutor
-from vn_audiolibro.voz.modelos import Atenuador
-from vn_audiolibro.voz.piper import SintetizadorPiper, asegurar_voz, elegir_voz
+from vn_audiolibro.voz.modelos import Atenuador, Sintetizador
+from vn_audiolibro.voz.piper import SintetizadorPiper, VozElegida, asegurar_voz, elegir_voz
 from vn_audiolibro.voz.volumen import AtenuadorJuego, Juego
 
 _registro = logging.getLogger(__name__)
@@ -128,6 +128,9 @@ class Sesion:
         modelo_detector = asegurar_descarga(DET_PPOCRV5_MOBILE) if con_detector else None
         voz = elegir_voz(perfil.destino, perfil.voz.hablante)
         modelo_voz = asegurar_voz(voz.voz)
+        voces_personajes = perfil.voces_personajes()
+        otras_voces = {h: elegir_voz(perfil.destino, h) for h in set(voces_personajes.values())}
+        modelos_otras = {h: asegurar_voz(elegida.voz) for h, elegida in otras_voces.items()}
         llama, modelo_traduccion = asegurar_llama_server(), asegurar_modelo_traduccion()
 
         self._al_estado(_("Arrancando el traductor…"))
@@ -138,13 +141,18 @@ class Sesion:
         cache = CacheSQLite(limite_bytes=cargar_ajustes().limite_cache_bytes)
         pila.callback(cache.cerrar)
         juego = juego_de_pid(ventana.pid) if ventana.pid is not None else None
+        sintetizador = SintetizadorPiper(modelo_voz, voz.hablante, perfil.voz.velocidad)
         locutor = Locutor(
-            SintetizadorPiper(modelo_voz, voz.hablante, perfil.voz.velocidad),
+            sintetizador,
             reproductor(),
             cache,
             self._atenuador(juego),
             modo=perfil.lectura.modo,
             pausa_s=perfil.lectura.pausa_s,
+            voces={
+                h.value: self._sintetizador_de(voz, sintetizador, elegida, modelos_otras[h])
+                for h, elegida in otras_voces.items()
+            },
         )
         pila.callback(locutor.cerrar)
 
@@ -169,6 +177,7 @@ class Sesion:
                 perfil.lectura.modo,
                 destino=perfil.destino,
                 separar_personaje=perfil.separar_personaje,
+                voces=tuple((nombre, hablante.value) for nombre, hablante in voces_personajes.items()),
             ),
             lector,
             traductor,
@@ -195,17 +204,30 @@ class Sesion:
         self.orquestador = orquestador
         return orquestador
 
-    def guardar_personaje(self, original: str, traduccion: str) -> None:
-        """Añade el nombre traducido al glosario del juego, salvo que el usuario ya le haya dado otro.
+    def _sintetizador_de(
+        self, del_juego: VozElegida, sintetizador: SintetizadorPiper, otra: VozElegida, modelo: Path
+    ) -> Sintetizador:
+        """Sintetizador de otra voz; si es otro hablante del mismo modelo, no lo carga dos veces."""
+        if otra.voz == del_juego.voz:
+            return sintetizador.con_hablante(otra.hablante)
+        return SintetizadorPiper(modelo, otra.hablante, self.perfil.voz.velocidad)
 
-        Se relee el juego guardado para no pisar lo que haya cambiado desde que empezó la partida.
+    def guardar_personaje(self, original: str, traduccion: str) -> None:
+        """Apunta en el juego al personaje que ha hablado y añade su nombre traducido al glosario.
+
+        Lo que el usuario ya haya puesto (la voz del personaje o otra traducción) se respeta. Se
+        relee el juego guardado para no pisar lo que haya cambiado desde que empezó la partida.
         """
         try:
             actual = self._almacen.cargar(self.perfil.id)
-            if any(termino == original for termino, _traduccion in actual.glosario.terminos):
-                return
-            glosario = actual.glosario.unir(Glosario(((original, traduccion),)))
-            self._almacen.guardar(replace(actual, glosario=glosario))
+            nuevo = actual
+            if all(nombre != original for nombre, _voz in actual.personajes):
+                nuevo = replace(nuevo, personajes=(*actual.personajes, (original, None)))
+            conocido = any(termino == original for termino, _traduccion in actual.glosario.terminos)
+            if traduccion != original and not conocido:
+                nuevo = replace(nuevo, glosario=actual.glosario.unir(Glosario(((original, traduccion),))))
+            if nuevo != actual:
+                self._almacen.guardar(nuevo)
         except (KeyError, OSError, ValueError):
             # Sin guardarlo se puede seguir jugando: se volverá a traducir en la próxima partida.
             _registro.warning("No se pudo guardar el nombre «%s» en el glosario", original, exc_info=True)

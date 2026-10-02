@@ -30,6 +30,7 @@ PERFIL = Perfil(
     "Juego",
     "juego",
     glosario=Glosario.desde_dict({"櫻": "Sakura"}),
+    personajes=(("櫻", None),),
     volumen=AjustesVolumen(nivel_juego=0.5, otras=(("Firefox", 0.0), ("Spotify", 0.4)), excluir=("Discord",)),
 )
 
@@ -190,6 +191,40 @@ def test_glosario_quitar_termino(
     dialogo._quitar_fila(dialogo.tabla_glosario)  # sin filas: nada
     dialogo.guardar()
     assert almacen.cargar(PERFIL.id).glosario == Glosario()
+
+
+def voz_de(dialogo: AjustesJuego, i: int) -> QComboBox:
+    voz = dialogo.tabla_personajes.cellWidget(i, 2)
+    assert isinstance(voz, QComboBox)
+    return voz
+
+
+def test_voces_de_los_personajes(dialogo: AjustesJuego, almacen: AlmacenPerfiles, cache: CacheFalsa) -> None:
+    tabla = dialogo.tabla_personajes
+    assert tabla.rowCount() == 1
+    assert [tabla.item(0, c).text() for c in (0, 1)] == ["櫻", "Sakura"]  # con su nombre traducido
+    assert voz_de(dialogo, 0).currentText() == "La del juego"
+
+    voz_de(dialogo, 0).setCurrentIndex(voz_de(dialogo, 0).findData(Hablante.HOMBRE.value))
+    dialogo.anadir_personaje("", None)
+    tabla.item(1, 0).setText("小雨")
+    dialogo.anadir_personaje("", None)  # fila a medias: no cuenta
+    dialogo.guardar()
+
+    assert almacen.cargar(PERFIL.id).personajes == (("櫻", Hablante.HOMBRE), ("小雨", None))
+    assert cache.llamadas == []  # el audio guardado sabe con qué voz se sintetizó
+
+
+def test_personaje_repetido_no_se_guarda(dialogo: AjustesJuego, almacen: AlmacenPerfiles) -> None:
+    dialogo.anadir_personaje("櫻", Hablante.MUJER)
+    dialogo.guardar()
+
+    assert "sin repetirlo" in dialogo.error.text()
+    assert almacen.cargar(PERFIL.id) == PERFIL
+    dialogo.tabla_personajes.setCurrentCell(1, 0)
+    dialogo._quitar_fila(dialogo.tabla_personajes)
+    dialogo.guardar()
+    assert dialogo.result() == QDialog.DialogCode.Accepted
 
 
 def test_escuchar_la_voz(qtbot: QtBot, dialogo: AjustesJuego, probadas: list[tuple[AjustesVoz, str]]) -> None:

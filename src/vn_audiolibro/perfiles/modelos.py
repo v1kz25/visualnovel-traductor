@@ -188,6 +188,8 @@ class Perfil:
     traductor: Motor = Motor.LOCAL
     """Traductor del juego: el local (por defecto) o Gemini, con la clave del usuario."""
     voz: AjustesVoz = field(default_factory=AjustesVoz)
+    personajes: tuple[tuple[str, Hablante | None], ...] = ()
+    """Personajes que han hablado al jugar (nombre en el juego) y su voz; None: la del juego."""
     lectura: AjustesLectura = field(default_factory=AjustesLectura)
     volumen: AjustesVolumen = field(default_factory=AjustesVolumen)
     subtitulos: AjustesSubtitulos = field(default_factory=AjustesSubtitulos)
@@ -220,9 +222,23 @@ class Perfil:
             raise PerfilInvalidoError(_("Un juego en inglés solo se puede traducir al español"))
         if self.idioma == INGLES and self.orientacion is Orientacion.VERTICAL:
             raise PerfilInvalidoError(_("El texto en inglés no puede ir en columnas verticales"))
+        self._validar_personajes()
         if self.guion is not None and self.guion.origen is OrigenGuion.INGLES and self.destino == "en":
             raise PerfilInvalidoError(
                 _("Si se traduce desde el inglés del guion, no se puede traducir al inglés")
             )
         if len(self.id) != 32 or any(c not in "0123456789abcdef" for c in self.id):
             raise PerfilInvalidoError(_("Identificador de juego no válido: {id}").format(id=self.id))
+
+    def _validar_personajes(self) -> None:
+        nombres = [nombre for nombre, _hablante in self.personajes]
+        if any(not nombre.strip() for nombre in nombres) or len(set(nombres)) != len(nombres):
+            raise PerfilInvalidoError(_("Cada personaje necesita un nombre, sin repetirlo"))
+
+    def voces_personajes(self) -> dict[str, Hablante]:
+        """Personajes que no hablan con la voz del juego, con la suya."""
+        return {
+            nombre: hablante
+            for nombre, hablante in self.personajes
+            if hablante is not None and hablante is not self.voz.hablante
+        }

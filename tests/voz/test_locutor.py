@@ -242,6 +242,52 @@ def test_el_audio_de_la_cache_es_el_sintetizado(cache: CacheSQLite) -> None:
     assert float(np.sqrt(np.mean(pcm.astype(np.float64) ** 2))) == pytest.approx(8000 / np.sqrt(2), rel=0.1)
 
 
+# Voces de los personajes
+
+
+def test_cada_personaje_con_su_voz_y_su_audio_guardado(cache: CacheSQLite) -> None:
+    del_juego, hombre, reproductor = SintetizadorFalso(), SintetizadorFalso(), ReproductorFalso()
+    locutor = Locutor(del_juego, reproductor, cache, pausa_s=0, voces={"M": hombre})
+    cache.guardar_traduccion(clave("a"), "hola", "hy-mt2")
+
+    locutor.decir(clave("a"), "hola", voz="M")
+    locutor.decir(clave("b"), "adiós")
+    locutor.decir(clave("c"), "qué", voz="no existe")  # voz desconocida: la del juego
+    assert locutor.esperar(ESPERA_S)
+    entrada = cache.consultar(clave("a"))
+    assert entrada is not None
+    assert entrada.voz == "M"
+
+    locutor.decir(clave("a"), "hola", voz="M")  # ya guardado con esa voz: no se sintetiza
+    locutor.decir(clave("a"), "hola")  # guardado con otra voz: se sintetiza con la del juego
+    assert locutor.esperar(ESPERA_S)
+    locutor.cerrar()
+
+    assert hombre.textos == ["hola"]
+    assert del_juego.textos == ["adiós", "qué", "hola"]
+    entrada = cache.consultar(clave("a"))
+    assert entrada is not None
+    assert entrada.voz is None
+
+
+def test_por_partes_con_la_voz_del_personaje(cache: CacheSQLite) -> None:
+    del_juego, hombre, reproductor = SintetizadorFalso(), SintetizadorFalso(), ReproductorFalso()
+    locutor = Locutor(del_juego, reproductor, cache, voces={"M": hombre})
+    cache.guardar_traduccion(clave("a"), "hola", "hy-mt2")
+    texto = TextoPorPartes()
+
+    locutor.decir_por_partes(clave("a"), texto, voz="M")
+    texto.anadir("hola")
+    texto.terminar()
+    assert locutor.esperar(ESPERA_S)
+    locutor.cerrar()
+
+    assert (hombre.textos, del_juego.textos) == (["hola"], [])
+    entrada = cache.consultar(clave("a"))
+    assert entrada is not None
+    assert entrada.voz == "M"
+
+
 # Volumen del juego
 
 

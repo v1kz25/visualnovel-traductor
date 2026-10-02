@@ -76,7 +76,8 @@ en `%LOCALAPPDATA%\vn-audiolibro` y los ajustes en `%APPDATA%\vn-audiolibro`.
    una vez y se guarda en el glosario del juego, donde puedes corregirlo.
 2. **Jugar**: la app lee cada línea nueva, la traduce y la dice en voz alta mientras juegas.
 3. **Ajustes**: voz (mujer u hombre) y velocidad, cómo leer cuando avanzas deprisa, volumen del juego
-   y de otras aplicaciones, y glosario de nombres propios.
+   y de otras aplicaciones, y glosario de nombres propios. En **Personajes** aparecen los que ya han
+   hablado y puedes darle a cada uno voz de mujer u hombre; los demás usan la voz del juego.
 
 **Juegos con el guion legible.** Algunos juegos guardan su guion en ficheros de texto (por ahora,
 los hechos con Unity que lo tienen en `StreamingAssets/Scripts` con órdenes `OutputLine`). Al

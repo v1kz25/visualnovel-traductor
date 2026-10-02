@@ -9,7 +9,7 @@ import queue
 import threading
 import time
 from collections import deque
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -36,7 +36,7 @@ class CacheAudio(Protocol):
 
     def consultar(self, clave: Clave) -> Entrada | None: ...
 
-    def guardar_audio(self, clave: Clave, datos: bytes) -> Path: ...
+    def guardar_audio(self, clave: Clave, datos: bytes, voz: str | None = None) -> Path: ...
 
 
 class TextoPorPartes:
@@ -76,6 +76,8 @@ class _Pedido:
     id: int
     """Orden de llegada; cortar es invalidar los pedidos hasta un id."""
     partes: TextoPorPartes | None = None
+    voz: str | None = None
+    """Voz del personaje que la dice, o None para la del juego."""
 
 
 class Locutor:
@@ -90,6 +92,9 @@ class Locutor:
 
     Con un `atenuador`, el juego se baja cuando empieza a sonar una línea y se restaura cuando
     no queda nada por leer (no entre una línea y la siguiente).
+
+    `voces` son otros sintetizadores, por su identificador, para las líneas de los personajes
+    que tienen otra voz. El audio guardado de una línea solo vale si es de la voz que toca.
     """
 
     def __init__(
@@ -101,8 +106,10 @@ class Locutor:
         modo: ModoLectura = ModoLectura.COLA,
         max_en_espera: int = MAX_EN_ESPERA,
         pausa_s: float = PAUSA_ENTRE_LINEAS_S,
+        voces: Mapping[str, Sintetizador] | None = None,
     ) -> None:
         self._sintetizador = sintetizador
+        self._voces = dict(voces or {})
         self._reproductor = reproductor
         self._cache = cache
         self._atenuador = atenuador
@@ -121,17 +128,25 @@ class Locutor:
         self._hilo = threading.Thread(target=self._bucle, name="locutor", daemon=True)
         self._hilo.start()
 
-    def decir(self, clave: Clave, texto: str) -> None:
-        """Lee la línea cuando le toque (o en el acto, cortando lo que suene, en modo `ULTIMA`)."""
-        self._anadir(lambda id_pedido: _Pedido(clave, texto, id_pedido))
+    def decir(self, clave: Clave, texto: str, voz: str | None = None) -> None:
+        """Lee la línea cuando le toque (o en el acto, cortando lo que suene, en modo `ULTIMA`).
 
-    def decir_por_partes(self, clave: Clave, texto: TextoPorPartes) -> None:
+        Con `voz`, la lee con esa de las `voces`; si no la hay, con la del juego.
+        """
+        voz = self._voz(voz)
+        self._anadir(lambda id_pedido: _Pedido(clave, texto, id_pedido, voz=voz))
+
+    def decir_por_partes(self, clave: Clave, texto: TextoPorPartes, voz: str | None = None) -> None:
         """Como `decir`, pero empieza a leer la primera parte sin esperar a las demás.
 
         El audio se guarda en la caché al terminar, si para entonces la traducción ya está en
         ella y ha llegado entera.
         """
-        self._anadir(lambda id_pedido: _Pedido(clave, "", id_pedido, texto))
+        voz = self._voz(voz)
+        self._anadir(lambda id_pedido: _Pedido(clave, "", id_pedido, texto, voz))
+
+    def _voz(self, voz: str | None) -> str | None:
+        return voz if voz in self._voces else None
 
     def saltar(self) -> None:
         """Corta la línea que suena y pasa a la siguiente de la cola, sin pausa."""
@@ -208,11 +223,12 @@ class Locutor:
                     self._condicion.notify_all()
 
     def _atender(self, pedido: _Pedido) -> None:
-        guardado = self._audio_guardado(pedido.clave) if pedido.partes is None else None
+        guardado = self._audio_guardado(pedido.clave, pedido.voz) if pedido.partes is None else None
         if guardado is not None:
             self._reproducir(pedido, [guardado])
             return
 
+        sintetizador = self._sintetizador if pedido.voz is None else self._voces[pedido.voz]
         sintetizados: list[Fragmento] = []
         textos: Iterable[str] = [pedido.texto]
         if pedido.partes is not None:
@@ -220,13 +236,13 @@ class Locutor:
 
         def sintetizar() -> Iterator[Fragmento]:
             for texto in textos:
-                for fragmento in self._sintetizador.sintetizar(texto):
+                for fragmento in sintetizador.sintetizar(texto):
                     sintetizados.append(fragmento)
                     yield fragmento
             if pedido.partes is not None and not self._vigente(pedido):
                 return  # se dejaron de esperar las partes: el audio está incompleto
             # Síntesis completa, aunque aún quede audio por sonar: ya se puede guardar.
-            self._guardar(pedido.clave, sintetizados)
+            self._guardar(pedido.clave, sintetizados, pedido.voz)
 
         self._reproducir(pedido, sintetizar())
 
@@ -291,21 +307,21 @@ class Locutor:
     def _vigente_sin_cerrojo(self, pedido: _Pedido) -> bool:
         return pedido.id > self._cortado_hasta and not self._cerrado
 
-    def _audio_guardado(self, clave: Clave) -> Fragmento | None:
+    def _audio_guardado(self, clave: Clave, voz: str | None) -> Fragmento | None:
         entrada = self._cache.consultar(clave) if self._cache else None
-        if entrada is None or entrada.audio is None:
-            return None
+        if entrada is None or entrada.audio is None or entrada.voz != voz:
+            return None  # sin audio, o es de otra voz: se sintetiza con la que toca
         try:
             return opus.decodificar(entrada.audio)
         except VozFallidaError:
             _registro.warning("Audio de la caché ilegible; se vuelve a sintetizar", exc_info=True)
             return None
 
-    def _guardar(self, clave: Clave, fragmentos: list[Fragmento]) -> None:
+    def _guardar(self, clave: Clave, fragmentos: list[Fragmento], voz: str | None) -> None:
         if self._cache is None or not fragmentos:
             return
         try:
-            self._cache.guardar_audio(clave, opus.codificar(fragmentos))
+            self._cache.guardar_audio(clave, opus.codificar(fragmentos), voz)
         except KeyError:
             # La traducción no está en la caché (p. ej. se ha invalidado el juego): no hay dónde guardarlo.
             _registro.debug("Sin traducción guardada para «%s»; el audio no se guarda", clave.texto)
