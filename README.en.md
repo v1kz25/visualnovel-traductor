@@ -51,7 +51,8 @@ and progress. After that it works offline.
    glossary, where you can fix it.
 2. **Play**: the app reads each new line, translates it and says it aloud while you play.
 3. **Settings**: voice (female or male) and speed, what to do when you advance quickly, the volume
-   of the game and other applications, and a glossary of names.
+   of the game and other applications, and a glossary of names. **Characters** lists those who have
+   already spoken, and you can give each one a female or male voice; the rest use the game's voice.
 
 **Games with a readable script.** Some games store their script in text files (for now, Unity games
 that keep it in `StreamingAssets/Scripts` with `OutputLine` commands). For those, the app finds the

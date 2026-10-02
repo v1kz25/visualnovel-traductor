@@ -1,5 +1,6 @@
 """Voz en español o en inglés con Piper (GPL-3.0), en CPU."""
 
+import copy
 from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import StrEnum
@@ -128,19 +129,33 @@ class SintetizadorPiper:
         """`velocidad` 1 es la de la voz; 1,25 lee un 25 % más deprisa."""
         if velocidad <= 0:
             raise VozFallidaError(_("Velocidad no válida: {velocidad}").format(velocidad=velocidad))
+        self._modelo = modelo
         self._voz = PiperVoice.load(modelo)
-        hablantes = self._voz.config.speaker_id_map or {}
-        if hablante is not None and hablante not in hablantes:
-            raise VozFallidaError(
-                _("La voz {voz} no tiene el hablante {hablante}").format(
-                    voz=modelo.stem, hablante=hablante.name.lower()
-                )
-            )
         self._ajustes = SynthesisConfig(
-            speaker_id=hablantes[hablante] if hablante is not None else None,
+            speaker_id=self._id_hablante(hablante),
             # Piper alarga los fonemas con `length_scale`: más velocidad, menos duración.
             length_scale=self._voz.config.length_scale / velocidad,
         )
+
+    def con_hablante(self, hablante: Hablante | None) -> "SintetizadorPiper":
+        """El mismo modelo, ya cargado en memoria, con otro hablante y la misma velocidad."""
+        otro = copy.copy(self)
+        otro._ajustes = SynthesisConfig(
+            speaker_id=self._id_hablante(hablante), length_scale=self._ajustes.length_scale
+        )
+        return otro
+
+    def _id_hablante(self, hablante: Hablante | None) -> int | None:
+        hablantes = self._voz.config.speaker_id_map or {}
+        if hablante is None:
+            return None
+        if hablante not in hablantes:
+            raise VozFallidaError(
+                _("La voz {voz} no tiene el hablante {hablante}").format(
+                    voz=self._modelo.stem, hablante=hablante.name.lower()
+                )
+            )
+        return hablantes[hablante]
 
     def sintetizar(self, texto: str) -> Iterator[Fragmento]:
         for trozo in self._voz.synthesize(texto, self._ajustes):

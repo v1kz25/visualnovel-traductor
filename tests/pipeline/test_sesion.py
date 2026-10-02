@@ -281,9 +281,26 @@ def test_guarda_los_nombres_aprendidos_en_el_glosario_del_juego(tmp_path: Path) 
 
     abierta.guardar_personaje("小雨", "Xiaoyu")
     abierta.guardar_personaje("林", "Bosque")  # ya tenía traducción: se respeta
+    abierta.guardar_personaje("？", "？")  # sin traducción: solo se apunta el personaje
 
-    terminos = dict(almacen.cargar(perfil.id).glosario.terminos)
-    assert terminos == {"櫻": "Sakura", "林": "Lin", "小雨": "Xiaoyu"}
+    guardado = almacen.cargar(perfil.id)
+    assert dict(guardado.glosario.terminos) == {"櫻": "Sakura", "林": "Lin", "小雨": "Xiaoyu"}
+    assert guardado.personajes == (("小雨", None), ("林", None), ("？", None))
+
+
+def test_no_cambia_la_voz_que_el_usuario_dio_al_personaje(tmp_path: Path) -> None:
+    almacen = AlmacenPerfiles(tmp_path)
+    perfil = Perfil(
+        "Juego", "juego", glosario=Glosario.desde_dict({"林": "Lin"}), personajes=(("林", Hablante.HOMBRE),)
+    )
+    almacen.guardar(perfil)
+    ruta = almacen.directorio / f"{perfil.id}.json"
+    antes = ruta.stat().st_mtime_ns
+
+    Sesion(perfil, lambda _: None, lambda _: None, almacen=almacen).guardar_personaje("林", "Lin")
+
+    assert almacen.cargar(perfil.id) == perfil
+    assert ruta.stat().st_mtime_ns == antes  # nada que guardar: no se reescribe
 
 
 def test_si_no_puede_guardar_el_nombre_se_sigue_jugando(tmp_path: Path) -> None:
@@ -293,3 +310,24 @@ def test_si_no_puede_guardar_el_nombre_se_sigue_jugando(tmp_path: Path) -> None:
     abierta.guardar_personaje("小雨", "Xiaoyu")
 
     assert not list(tmp_path.iterdir())
+
+
+def test_cada_personaje_con_otra_voz_tiene_su_sintetizador(registro: Registro) -> None:
+    personajes = (("小雨", Hablante.HOMBRE), ("林", None), ("櫻", Hablante.MUJER))
+    with sesion(Perfil("Juego", "juego", personajes=personajes)):
+        voces = registro.opciones["locutor"]["voces"]
+        assert set(voces) == {"M"}  # en español, el otro hablante del mismo modelo
+        assert registro.creados["orquestador"][0].voces == (("小雨", "M"),)
+    assert "con_hablante sintetizador" in registro.eventos
+
+
+def test_en_ingles_la_otra_voz_es_otro_modelo(registro: Registro, monkeypatch: pytest.MonkeyPatch) -> None:
+    descargadas: list[str] = []
+    monkeypatch.setattr(
+        modulo, "asegurar_voz", lambda voz: descargadas.append(voz.modelo.fichero) or Path(voz.modelo.fichero)
+    )
+    perfil = Perfil("Juego", "juego", destino="en", personajes=(("小雨", Hablante.HOMBRE),))
+    with sesion(perfil):
+        assert set(registro.opciones["locutor"]["voces"]) == {"M"}
+    assert descargadas == ["en_US-kristin-medium.onnx", "en_US-john-medium.onnx"]
+    assert registro.creados["sintetizador"] == (Path("en_US-john-medium.onnx"), None, 1.0)

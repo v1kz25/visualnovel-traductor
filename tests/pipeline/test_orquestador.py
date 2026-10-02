@@ -84,11 +84,14 @@ class TraductorFalso:
 class VozFalsa:
     def __init__(self) -> None:
         self.dichas: list[str] = []
+        self.voces: list[str | None] = []
+        """Con qué voz se pidió cada línea (None: la del juego)."""
         self.calladas = 0
         self.saltadas = 0
 
-    def decir(self, clave: Clave, texto: str) -> None:
+    def decir(self, clave: Clave, texto: str, voz: str | None = None) -> None:
         self.dichas.append(texto)
+        self.voces.append(voz)
 
     def callar(self) -> None:
         self.calladas += 1
@@ -109,6 +112,7 @@ class Montaje:
         guion: Guion | None = None,
         por_partes: bool = False,
         separar_personaje: bool = True,
+        voces: tuple[tuple[str, str], ...] = (),
     ) -> None:
         self.lector = LectorFalso()
         self.traductor: TraductorFalso | TraductorPorPartesFalso = (
@@ -129,7 +133,13 @@ class Montaje:
             )
         self.orquestador = Orquestador(
             AjustesOrquestador(
-                PERFIL, idioma, glosario, modo, destino=destino, separar_personaje=separar_personaje
+                PERFIL,
+                idioma,
+                glosario,
+                modo,
+                destino=destino,
+                separar_personaje=separar_personaje,
+                voces=voces,
             ),
             self.lector,
             self.traductor,
@@ -214,11 +224,11 @@ def test_no_lee_el_nombre_del_personaje_y_lo_traduce_una_sola_vez(montaje: Monta
 
 
 def test_el_nombre_del_glosario_no_se_traduce(montaje: Montaje) -> None:
-    montaje.llega("【櫻】走吧。")
+    montaje.llega("【櫻】走吧。", "【櫻】好。")
 
-    assert [p.texto for p in montaje.traductor.peticiones] == ["走吧。"]
+    assert [p.texto for p in montaje.traductor.peticiones] == ["走吧。", "好。"]  # el nombre, no
     assert montaje.lineas[0].personaje == "Sakura"
-    assert montaje.personajes == []
+    assert montaje.personajes == [("櫻", "Sakura")]  # avisa de que ha hablado, una vez por partida
 
 
 def test_un_nombre_sin_letras_se_queda_como_esta(montaje: Montaje) -> None:
@@ -233,7 +243,7 @@ def test_si_el_nombre_no_se_puede_traducir_se_muestra_el_original(montaje: Monta
 
     assert [p.texto for p in montaje.traductor.peticiones] == ["一", "fallo", "二"]  # sin reintentos
     assert [linea.personaje for linea in montaje.lineas] == ["fallo", "fallo"]
-    assert montaje.personajes == []
+    assert montaje.personajes == [("fallo", "fallo")]  # sin traducción, pero ha hablado
 
 
 def test_con_la_zona_del_nombre_lee_el_nombre_de_ella(montaje: Montaje) -> None:
@@ -243,6 +253,28 @@ def test_con_la_zona_del_nombre_lee_el_nombre_de_ella(montaje: Montaje) -> None:
 
     assert montaje.voz.dichas == ["es:我們走吧。", "es:我們走吧。", "es:林：好。"]
     assert [linea.personaje for linea in montaje.lineas] == ["es:小雨", "Sakura", None]
+
+
+def test_cada_personaje_se_lee_con_su_voz(cache: CacheSQLite) -> None:
+    montaje = Montaje(cache, voces=(("小雨", "M"),))
+    try:
+        montaje.llega("她走了。", "林：好。", "小雨：我們走吧。")
+        montaje.orquestador.repetir()  # repite con la misma voz
+    finally:
+        montaje.orquestador.cerrar()
+
+    assert montaje.voz.dichas == ["es:她走了。", "es:好。", "es:我們走吧。", "es:我們走吧。"]
+    assert montaje.voz.voces == [None, None, "M", "M"]
+
+
+def test_por_partes_cada_personaje_se_lee_con_su_voz(cache: CacheSQLite) -> None:
+    montaje = Montaje(cache, por_partes=True, voces=(("小雨", "M"),))
+    try:
+        montaje.llega("小雨：我們走吧。")
+    finally:
+        montaje.orquestador.cerrar()
+
+    assert montaje.voz.voces == ["M"]
 
 
 def test_si_no_se_separa_el_personaje_se_lee_la_linea_entera(cache: CacheSQLite) -> None:
@@ -423,7 +455,9 @@ class VozPorPartesFalsa(VozFalsa):
         self._cache = cache
         self._hilos: list[threading.Thread] = []
 
-    def decir_por_partes(self, clave: Clave, texto: TextoPorPartes) -> None:
+    def decir_por_partes(self, clave: Clave, texto: TextoPorPartes, voz: str | None = None) -> None:
+        self.voces.append(voz)
+
         def leer() -> None:
             self.partes.extend(texto.partes(lambda: True))
             self.en_cache_al_terminar.append(self._cache.consultar(clave) is not None)

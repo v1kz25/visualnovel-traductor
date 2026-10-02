@@ -1,4 +1,4 @@
-"""Ajustes de un juego: voz y lectura, volumen del juego y de otras aplicaciones, glosario y subtítulos."""
+"""Ajustes de un juego: voz y lectura, voces de los personajes, volumen, glosario y subtítulos."""
 
 import logging
 import threading
@@ -72,6 +72,13 @@ AYUDA_SUBTITULOS = N_(
     "al juego. Si no se ve con el juego en pantalla completa, ponlo en modo ventana o ventana sin bordes."
 )
 
+AYUDA_PERSONAJES = N_(
+    "Los personajes aparecen aquí la primera vez que hablan mientras juegas. Elige con qué voz se "
+    "leen sus líneas; los demás y la narración se leen con la voz del juego."
+)
+LA_DEL_JUEGO = ""
+"""Valor del desplegable de la voz de un personaje que habla con la del juego."""
+
 AbrirCache = Callable[[], CacheSQLite]
 ProbarVoz = Callable[[AjustesVoz, str], None]
 ListarAplicaciones = Callable[[], list[str]]
@@ -110,7 +117,7 @@ def listar_aplicaciones() -> list[str]:
 
 
 class AjustesJuego(QDialog):
-    """Cambia la voz, la lectura, el volumen y el glosario de un juego."""
+    """Cambia la voz, la lectura, las voces de los personajes, el volumen y el glosario de un juego."""
 
     prueba_terminada = Signal(str)
     """Mensaje de error de la voz de prueba, o vacío si ha sonado bien."""
@@ -136,6 +143,7 @@ class AjustesJuego(QDialog):
 
         pestanas = QTabWidget()
         pestanas.addTab(self._pestana_voz(), _("Voz y lectura"))
+        pestanas.addTab(self._pestana_personajes(), _("Personajes"))
         pestanas.addTab(self._pestana_volumen(), _("Volumen"))
         pestanas.addTab(self._pestana_glosario(), _("Glosario"))
         pestanas.addTab(self._pestana_subtitulos(), _("Subtítulos"))
@@ -188,6 +196,60 @@ class AjustesJuego(QDialog):
         formulario.addRow(_("Al avanzar deprisa"), self.modo)
         formulario.addRow(_("Pausa entre líneas"), self.pausa)
         return pestana
+
+    # Personajes
+
+    def _pestana_personajes(self) -> QWidget:
+        self.tabla_personajes = QTableWidget(0, 3)
+        self.tabla_personajes.setHorizontalHeaderLabels(
+            [_("Personaje en el juego"), _("Nombre traducido"), _("Voz")]
+        )
+        self.tabla_personajes.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.tabla_personajes.verticalHeader().setVisible(False)
+        boton_anadir = QPushButton(_("Añadir personaje"))
+        boton_anadir.clicked.connect(lambda: self.anadir_personaje("", None))
+        boton_quitar = QPushButton(_("Quitar el elegido"))
+        boton_quitar.clicked.connect(lambda: self._quitar_fila(self.tabla_personajes))
+        ayuda = QLabel(_(AYUDA_PERSONAJES))
+        ayuda.setWordWrap(True)
+        fila = QHBoxLayout()
+        fila.addWidget(boton_anadir)
+        fila.addWidget(boton_quitar)
+        fila.addStretch()
+        pestana = QWidget()
+        columna = QVBoxLayout(pestana)
+        columna.addWidget(ayuda)
+        columna.addWidget(self.tabla_personajes, 1)
+        columna.addLayout(fila)
+        return pestana
+
+    def anadir_personaje(self, nombre: str, hablante: Hablante | None) -> None:
+        """Añade una fila con el personaje, su nombre traducido (del glosario) y su voz."""
+        fila = self.tabla_personajes.rowCount()
+        self.tabla_personajes.insertRow(fila)
+        elemento = QTableWidgetItem(nombre)
+        self.tabla_personajes.setItem(fila, 0, elemento)
+        traducido = QTableWidgetItem(dict(self._perfil.glosario.terminos).get(nombre, ""))
+        traducido.setFlags(traducido.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        self.tabla_personajes.setItem(fila, 1, traducido)
+        voz = QComboBox()
+        voz.addItem(_("La del juego"), LA_DEL_JUEGO)
+        voz.addItem(_("Mujer"), Hablante.MUJER.value)
+        voz.addItem(_("Hombre"), Hablante.HOMBRE.value)
+        voz.setCurrentIndex(voz.findData(LA_DEL_JUEGO if hablante is None else hablante.value))
+        self.tabla_personajes.setCellWidget(fila, 2, voz)
+        if not nombre:
+            self.tabla_personajes.editItem(elemento)
+
+    def _personajes(self) -> tuple[tuple[str, Hablante | None], ...]:
+        personajes = []
+        for fila in range(self.tabla_personajes.rowCount()):
+            elemento, voz = self.tabla_personajes.item(fila, 0), self.tabla_personajes.cellWidget(fila, 2)
+            if elemento is None or not elemento.text().strip() or not isinstance(voz, QComboBox):
+                continue
+            valor = voz.currentData()
+            personajes.append((elemento.text().strip(), None if valor == LA_DEL_JUEGO else Hablante(valor)))
+        return tuple(personajes)
 
     # Subtítulos
 
@@ -427,6 +489,8 @@ class AjustesJuego(QDialog):
             self.anadir_aplicacion(nombre, NO_TOCAR)
         for termino, traduccion in perfil.glosario.terminos:
             self.anadir_termino(termino, traduccion)
+        for nombre, hablante in perfil.personajes:
+            self.anadir_personaje(nombre, hablante)
         self.subtitulos.setChecked(perfil.subtitulos.activo)
         self.posicion.setCurrentIndex(self.posicion.findData(perfil.subtitulos.posicion.value))
         self.tamano.setValue(perfil.subtitulos.tamano)
@@ -441,6 +505,7 @@ class AjustesJuego(QDialog):
             nuevo = replace(
                 self._perfil,
                 voz=self._voz(),
+                personajes=self._personajes(),
                 lectura=lectura,
                 volumen=self._volumen(),
                 glosario=self._glosario(),

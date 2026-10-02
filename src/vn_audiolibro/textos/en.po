@@ -324,6 +324,9 @@ msgstr "a number was expected: {valor!r}"
 msgid "el glosario tiene que ser de textos"
 msgstr "the glossary must contain text"
 
+msgid "los personajes tienen que ser nombres con su voz"
+msgstr "characters must be names with their voice"
+
 msgid "«activo» tiene que ser verdadero o falso: {activo!r}"
 msgstr "“activo” must be true or false: {activo!r}"
 
@@ -395,6 +398,9 @@ msgstr "If translating from the script's English, the translation cannot be into
 
 msgid "Identificador de juego no válido: {id}"
 msgstr "Invalid game identifier: {id}"
+
+msgid "Cada personaje necesita un nombre, sin repetirlo"
+msgstr "Each character needs a name, without repeating it"
 
 msgid "{personaje}: {traduccion}"
 msgstr "{personaje}: {traduccion}"
@@ -593,11 +599,17 @@ msgstr "Covering the text box (only the translation is shown)"
 msgid "La traducción aparece sobre el juego mientras es la ventana activa; los clics siguen llegando al juego. Si no se ve con el juego en pantalla completa, ponlo en modo ventana o ventana sin bordes."
 msgstr "The translation appears over the game while it is the active window; clicks still reach the game. If it does not show with the game in full screen, switch the game to windowed or borderless window mode."
 
+msgid "Los personajes aparecen aquí la primera vez que hablan mientras juegas. Elige con qué voz se leen sus líneas; los demás y la narración se leen con la voz del juego."
+msgstr "Characters appear here the first time they speak while you play. Choose the voice their lines are read with; everyone else and the narration are read with the game's voice."
+
 msgid "Ajustes de «{nombre}»"
 msgstr "Settings for “{nombre}”"
 
 msgid "Voz y lectura"
 msgstr "Voice and reading"
+
+msgid "Personajes"
+msgstr "Characters"
 
 msgid "Volumen"
 msgstr "Volume"
@@ -634,6 +646,21 @@ msgstr "When advancing quickly"
 
 msgid "Pausa entre líneas"
 msgstr "Pause between lines"
+
+msgid "Personaje en el juego"
+msgstr "Character in the game"
+
+msgid "Nombre traducido"
+msgstr "Translated name"
+
+msgid "Añadir personaje"
+msgstr "Add character"
+
+msgid "Quitar el elegido"
+msgstr "Remove selected"
+
+msgid "La del juego"
+msgstr "The game's voice"
 
 msgid "Mostrar la traducción encima del juego"
 msgstr "Show the translation over the game"
@@ -688,9 +715,6 @@ msgstr "Translation"
 
 msgid "Añadir término"
 msgstr "Add term"
-
-msgid "Quitar el elegido"
-msgstr "Remove selected"
 
 msgid "Nombres propios y términos que siempre se traducen igual, p. ej. 櫻 → Sakura. Escribe la traducción en el idioma al que se traduce el juego ({idioma})."
 msgstr "Names and terms that are always translated the same way, e.g. 櫻 → Sakura. Write the translation in the language the game is translated into ({idioma})."
@@ -853,9 +877,6 @@ msgstr "Orientation"
 
 msgid "Buscar el texto"
 msgstr "Find the text"
-
-msgid "Personajes"
-msgstr "Characters"
 
 msgid "Traductor"
 msgstr "Translator"
