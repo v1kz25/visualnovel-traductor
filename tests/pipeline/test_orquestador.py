@@ -60,6 +60,8 @@ class LectorFalso:
         self.leidas.append(texto)
         if texto == "ilegible":
             raise RuntimeError("fallo del OCR")
+        if "||" in texto:  # opciones de un menú
+            return TextoLeido(tuple(texto.split("||")), menu=True)
         return TextoLeido((texto,) if texto else ())
 
 
@@ -408,6 +410,62 @@ def test_tras_cerrar_ignora_las_zonas(montaje: Montaje) -> None:
     montaje.orquestador.cerrar()
     montaje.orquestador.recibir_zona(montaje.lector.zona("一"))
     assert montaje.lector.leidas == []
+
+
+# Menús de opciones
+
+
+def test_cada_opcion_se_traduce_aparte_y_se_leen_en_orden(montaje: Montaje) -> None:
+    montaje.llega("一", "返事||返す？")
+
+    peticiones = montaje.traductor.peticiones[1:]
+    assert [p.texto for p in peticiones] == ["返事", "返す？"]
+    assert all(p.contexto == () for p in peticiones)  # el menú no es parte del diálogo
+    assert montaje.voz.dichas[-1] == "Opción 1: es:返事. Opción 2: es:返す？."
+    menu = montaje.lineas[-1]
+    assert menu == LineaJuego(
+        "返事\n返す？", "Opciones:\n1. es:返事\n2. es:返す？", desde_cache=False, leida=True
+    )
+    assert montaje.cache.consultar(Clave(PERFIL, "zh-Hant", "返事")) is not None
+
+    montaje.llega("二")
+    assert [p.contexto[-1].original for p in montaje.traductor.peticiones[-1:]] == ["一"]
+
+
+def test_las_opciones_ya_traducidas_salen_de_la_cache(montaje: Montaje) -> None:
+    montaje.llega("はい", "はい||いいえ")
+
+    assert [p.texto for p in montaje.traductor.peticiones] == ["はい", "いいえ"]
+    assert not montaje.lineas[-1].desde_cache
+    montaje.llega("一", "はい||いいえ")
+    assert montaje.lineas[-1].desde_cache
+    montaje.orquestador.repetir()
+    assert montaje.voz.dichas[-1] == montaje.voz.dichas[-2] == "Opción 1: es:はい. Opción 2: es:いいえ."
+
+
+def test_la_voz_dice_las_opciones_en_el_idioma_de_la_traduccion(cache: CacheSQLite) -> None:
+    montaje = Montaje(cache, destino="en")
+    try:
+        montaje.llega("はい||いいえ")
+    finally:
+        montaje.orquestador.cerrar()
+    assert montaje.voz.dichas == ["Option 1: es:はい. Option 2: es:いいえ."]
+
+
+def test_si_falla_una_opcion_avisa_y_no_muestra_el_menu(montaje: Montaje) -> None:
+    montaje.llega("はい||fallo", "一")
+
+    assert montaje.errores == ["No se pudo traducir la línea: servidor caído"]
+    assert [linea.original for linea in montaje.lineas] == ["一"]
+
+
+def test_menu_con_la_voz_silenciada(montaje: Montaje) -> None:
+    montaje.orquestador.silenciar()
+    montaje.llega("はい||いいえ")
+
+    assert montaje.voz.dichas == []
+    assert montaje.lineas[0].silenciada
+    assert not montaje.lineas[0].leida
 
 
 # Traducción por partes (streaming)

@@ -143,6 +143,30 @@ def sobre_imagen(lineas: list[str], cara: ImageFont.FreeTypeFont, tamano: int = 
     return np.asarray(imagen).copy()
 
 
+def menu(
+    opciones: list[str], cara: ImageFont.FreeTypeFont, cartel: str = "", rotulo: str = "", tamano: int = 30
+) -> Imagen:
+    """Menú de opciones como los de las VN: botones grises centrados, uno debajo de otro, con el
+    texto centrado en cada uno, sobre un fondo con un cartel en vertical a la izquierda y un rótulo
+    horizontal en una esquina (texto del fondo que no es ninguna opción)."""
+    ancho, alto = 960, 540
+    imagen = _fondo(ancho, alto, Estilo(fondo=(70, 110, 160), degradado=(200, 210, 225)))
+    dibujo = ImageDraw.Draw(imagen)
+    if cartel:
+        dibujo.rectangle((10, 150, 20 + tamano, 170 + tamano * len(cartel)), fill=(230, 230, 230))
+        for i, caracter in enumerate(cartel):
+            dibujo.text((15, 160 + i * tamano), caracter, font=cara, fill=(30, 30, 30))
+    if rotulo:
+        dibujo.text((ancho - 30 - tamano * len(rotulo), 20), rotulo, font=cara, fill=(20, 20, 20))
+    salto = alto // (len(opciones) + 1)
+    for n, opcion in enumerate(opciones, 1):
+        centro = n * salto
+        dibujo.rectangle((ancho // 4, centro - tamano, 3 * ancho // 4, centro + tamano), fill=(90, 90, 100))
+        x = (ancho - dibujo.textlength(opcion, font=cara)) / 2
+        dibujo.text((x, centro - tamano * 0.6), opcion, font=cara, fill=(255, 255, 255))
+    return np.asarray(imagen).copy()
+
+
 def distancia(a: str, b: str) -> int:
     """Distancia de Levenshtein entre dos textos."""
     previa = list(range(len(b) + 1))

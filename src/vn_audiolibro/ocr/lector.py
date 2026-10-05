@@ -4,7 +4,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 from vn_audiolibro.captura.mascara import TEXTO_CLARO, ColorTexto
-from vn_audiolibro.captura.modelos import Imagen
+from vn_audiolibro.captura.modelos import Imagen, Rectangulo
+from vn_audiolibro.ocr.menu import Fila, alargada, opciones_menu
 from vn_audiolibro.ocr.normalizacion import normalizar, separa_palabras
 from vn_audiolibro.ocr.preprocesado import AjustesPreprocesado, BusquedaTexto, Linea, Orientacion, lineas
 from vn_audiolibro.ocr.reconocedor import Detector, Reconocedor, TextoDetectado
@@ -29,17 +30,20 @@ class TextoLeido:
     lineas: tuple[str, ...]
     separador: str = ""
     """Lo que va entre línea y línea: nada en chino y japonés, un espacio en inglés."""
+    menu: bool = False
+    """True si las líneas son las opciones de un menú: cada una va aparte."""
 
     @property
     def texto(self) -> str:
-        """Las líneas unidas: una frase puede seguir en la línea siguiente."""
-        return self.separador.join(self.lineas)
+        """Las líneas unidas: una frase puede seguir en la línea siguiente. Las opciones, una por línea."""
+        return ("\n" if self.menu else self.separador).join(self.lineas)
 
 
 class LectorOCR:
     """Lee el texto de una imagen de la zona de texto.
 
     Con `BusquedaTexto.DETECTOR` hace falta un `detector`; el reconocedor solo se usa por color.
+    Con el detector y texto horizontal, además, se reconocen los menús de opciones.
     """
 
     def __init__(
@@ -54,19 +58,28 @@ class LectorOCR:
     def leer(self, imagen: Imagen) -> TextoLeido:
         """Texto de la imagen, descartando las líneas en las que no se reconoce nada."""
         ajustes = self._ajustes
-        textos = (normalizar(texto, ajustes.idioma) for texto in self._lineas(imagen))
-        return TextoLeido(tuple(texto for texto in textos if texto), _separador(ajustes.idioma))
-
-    def _lineas(self, imagen: Imagen) -> Iterable[str]:
-        ajustes = self._ajustes
+        separador = _separador(ajustes.idioma)
         if self._detector is not None and ajustes.busqueda is BusquedaTexto.DETECTOR:
-            detectados = self._detector.detectar(imagen)
-            return lineas_detectadas(detectados, ajustes.orientacion, _separador(ajustes.idioma))
+            return self._leer_detectados(self._detector.detectar(imagen), imagen.shape[1])
         por_glifos = not separa_palabras(ajustes.idioma)
-        return (
-            self._leer_linea(linea)
-            for linea in lineas(imagen, ajustes.color, ajustes.orientacion, ajustes.preprocesado, por_glifos)
+        filas = lineas(imagen, ajustes.color, ajustes.orientacion, ajustes.preprocesado, por_glifos)
+        return TextoLeido(self._normalizar(self._leer_linea(fila) for fila in filas), separador)
+
+    def _leer_detectados(self, detectados: list[TextoDetectado], ancho: int) -> TextoLeido:
+        ajustes = self._ajustes
+        separador = _separador(ajustes.idioma)
+        if ajustes.orientacion is Orientacion.HORIZONTAL:
+            horizontales = [detectado for detectado in detectados if not alargada(detectado.caja)]
+            opciones = opciones_menu(filas_detectadas(horizontales, ajustes.orientacion, separador), ancho)
+            if len(normalizadas := self._normalizar(opciones or ())) >= 2:
+                return TextoLeido(normalizadas, separador, menu=True)
+        return TextoLeido(
+            self._normalizar(lineas_detectadas(detectados, ajustes.orientacion, separador)), separador
         )
+
+    def _normalizar(self, textos: Iterable[str]) -> tuple[str, ...]:
+        normalizados = (normalizar(texto, self._ajustes.idioma) for texto in textos)
+        return tuple(texto for texto in normalizados if texto)
 
     def _leer_linea(self, linea: Linea) -> str:
         return "".join(
@@ -82,7 +95,14 @@ def _separador(idioma: str) -> str:
 def lineas_detectadas(
     detectados: Iterable[TextoDetectado], orientacion: Orientacion, separador: str = ""
 ) -> list[str]:
-    """Une los trozos del detector en líneas, en orden de lectura.
+    """Une los trozos del detector en líneas, en orden de lectura (ver `filas_detectadas`)."""
+    return [fila.texto for fila in filas_detectadas(detectados, orientacion, separador)]
+
+
+def filas_detectadas(
+    detectados: Iterable[TextoDetectado], orientacion: Orientacion, separador: str = ""
+) -> list[Fila]:
+    """Une los trozos del detector en filas, en orden de lectura, con el recuadro de cada una.
 
     El detector puede partir una línea en varios trozos (si hay un hueco grande entre
     caracteres). Los trozos que se solapan en altura (en anchura si el texto es vertical) son de
@@ -105,9 +125,20 @@ def lineas_detectadas(
         else:
             grupos.append(((inicio, fin), [detectado]))
     return [
-        separador.join(d.texto for d in sorted(trozos, key=lambda d: d.caja.y if vertical else d.caja.x))
+        Fila(
+            separador.join(d.texto for d in sorted(trozos, key=lambda d: d.caja.y if vertical else d.caja.x)),
+            _union(d.caja for d in trozos),
+        )
         for _, trozos in grupos
     ]
+
+
+def _union(cajas: Iterable[Rectangulo]) -> Rectangulo:
+    """El menor rectángulo que contiene todas las cajas."""
+    lista = list(cajas)
+    x, y = min(c.x for c in lista), min(c.y for c in lista)
+    derecha, abajo = max(c.x + c.ancho for c in lista), max(c.y + c.alto for c in lista)
+    return Rectangulo(x, y, derecha - x, abajo - y)
 
 
 def _solapan(a: tuple[int, int], b: tuple[int, int]) -> bool:

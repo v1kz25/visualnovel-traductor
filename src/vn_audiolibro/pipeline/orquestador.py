@@ -14,6 +14,8 @@ los párrafos siguientes.
 El nombre del personaje que habla (de su propia zona o del principio de la línea) no se lee: se
 traduce una sola vez, se añade al glosario y acompaña a la línea al mostrarla. Si el personaje tiene
 otra voz, su línea se lee con ella.
+
+Las opciones de un menú se traducen cada una por separado y se leen en orden («Opción 1: …»).
 """
 
 import logging
@@ -147,11 +149,20 @@ class AjustesOrquestador:
 LARGO_MAX_PERSONAJE = 40
 """Una «traducción» de un nombre más larga que esto es que el traductor se ha ido por las ramas."""
 
+OPCION_DICHA = {"es": "Opción {numero}: {opcion}", "en": "Option {numero}: {opcion}"}
+"""Cómo lee la voz cada opción de un menú, en el idioma de la traducción (no en el de la app)."""
+
 _SOBRA_EN_PERSONAJE = " \t\n.,:;!?¡¿\"'«»“”。：「」【】[]"
 
 
 def _tiene_letras(nombre: str) -> bool:
     return any(caracter.isalnum() for caracter in nombre)
+
+
+def _con_punto(texto: str) -> str:
+    """El texto con un punto al final si no acaba ya en un signo, para leer seguidas las opciones."""
+    texto = texto.strip()
+    return texto if not texto or texto[-1] in ".!?…»\"'" else texto + "."
 
 
 def _limpiar_personaje(traduccion: str) -> str | None:
@@ -301,12 +312,16 @@ class Orquestador:
 
     def _procesar(self, zona: ZonaEstable) -> None:
         inicio = time.monotonic()
-        texto = self._lector.leer(zona.imagen).texto
+        leido = self._lector.leer(zona.imagen)
+        texto = leido.texto
         nombre = self._lector.leer(zona.nombre).texto or None if zona.nombre is not None else None
         ocr_s = time.monotonic() - inicio
         if not texto or (nombre, texto) == self._ultimo_texto:
             return  # sin texto, o la misma línea redibujada
         self._ultimo_texto = (nombre, texto)
+        if leido.menu:
+            self._leer_menu(leido.lineas, zona, inicio, ocr_s)
+            return
         if self._guion is not None and (parrafos := self._guion.seguidor.nuevos(texto)) is not None:
             preparador = self._guion.preparador
             for parrafo in parrafos:
@@ -398,6 +413,58 @@ class Orquestador:
             texto, resultado.texto, resultado.desde_cache, leida, tiempos, silenciada and not leida, personaje
         )
         self._al_linea(linea)
+
+    def _leer_menu(self, opciones: tuple[str, ...], zona: ZonaEstable, inicio: float, ocr_s: float) -> None:
+        """Traduce cada opción por separado (o la saca de la caché), las lee en orden y avisa del menú.
+
+        Las opciones no entran en el contexto del traductor: no son parte del diálogo.
+        """
+        ajustes = self._ajustes
+        traducciones: list[str] = []
+        desde_cache = True
+        for opcion in opciones:
+            clave = Clave(ajustes.perfil, ajustes.idioma, opcion, ajustes.destino)
+            entrada = self._cache.consultar(clave)
+            desde_cache = desde_cache and entrada is not None
+            traduccion = entrada.traduccion if entrada else self._traducir_opcion(clave)
+            if traduccion is None:
+                return
+            traducciones.append(traduccion)
+        traduccion_s = time.monotonic() - inicio - ocr_s
+        clave = Clave(ajustes.perfil, ajustes.idioma, "\n".join(opciones), ajustes.destino)
+        plantilla = OPCION_DICHA.get(ajustes.destino, OPCION_DICHA["es"])
+        dicho = " ".join(
+            plantilla.format(numero=numero, opcion=_con_punto(traduccion))
+            for numero, traduccion in enumerate(traducciones, 1)
+        )
+        with self._condicion:
+            silenciada = self._silenciado
+            leida = not silenciada and not self._llega_tarde_sin_cerrojo()
+            self._ultima = (clave, dicho, None)
+        if leida:
+            self._voz.decir(clave, dicho)
+        tiempos = Tiempos(ocr_s, traduccion_s, time.monotonic() - zona.instante if leida else None)
+        mostrada = "\n".join(
+            [_("Opciones:")]
+            + [
+                _("{numero}. {opcion}").format(numero=numero, opcion=traduccion)
+                for numero, traduccion in enumerate(traducciones, 1)
+            ]
+        )
+        self._al_linea(LineaJuego(clave.texto, mostrada, desde_cache, leida, tiempos, silenciada))
+
+    def _traducir_opcion(self, clave: Clave) -> str | None:
+        """Traduce una opción entera, sin contexto, y la guarda en la caché; None si falla."""
+        ajustes = self._ajustes
+        peticion = Peticion(clave.texto, ajustes.idioma, (), self._glosario, ajustes.destino)
+        try:
+            nueva = self._traductor.traducir(peticion)
+        except TraduccionFallidaError as error:
+            _registro.warning("No se pudo traducir la opción «%s»: %s", clave.texto, error)
+            self._al_error(_("No se pudo traducir la línea: {error}").format(error=error))
+            return None
+        self._cache.guardar_traduccion(clave, nueva.texto, nueva.modelo)
+        return nueva.texto
 
     def _llega_tarde_sin_cerrojo(self) -> bool:
         if self._pausado or self._cerrado:
