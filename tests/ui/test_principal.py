@@ -345,3 +345,38 @@ def test_subtitulos_se_cierran_al_cerrar_la_app(
     ventana.close()
 
     assert subtitulos.cerrados
+
+
+def test_el_historial_sigue_la_ultima_linea(qtbot: QtBot, ventana: VentanaPrincipal) -> None:
+    ventana.resize(1200, 300)
+    ventana.show()
+    qtbot.waitExposed(ventana)
+    jugar(qtbot, ventana)
+    barra = ventana.historial.verticalScrollBar()
+    larga = "una frase larga que ocupa varias filas del historial " * 6
+
+    def al_final() -> None:
+        assert barra.value() == barra.maximum()
+
+    def emitir(i: int) -> None:
+        ventana.puente.linea.emit(LineaJuego(f"原{i}", f"{i} {larga}", desde_cache=False, leida=True))
+
+    for i in range(30):
+        emitir(i)
+        qtbot.waitUntil(al_final, timeout=ESPERA_MS)
+    assert barra.maximum() > 0
+
+    ventana.resize(ventana.minimumSizeHint().width(), 300)  # más filas por línea: sigue abajo
+    qtbot.waitUntil(al_final, timeout=ESPERA_MS)
+
+    ventana.hide()  # minimizada o tapada por el juego mientras llegan líneas
+    for i in range(5):
+        emitir(100 + i)
+    ventana.show()
+    qtbot.waitUntil(al_final, timeout=ESPERA_MS)
+
+    barra.setValue(0)  # el usuario sube a releer: se respeta mientras no llegue otra línea
+    qtbot.wait(50)
+    assert barra.value() == 0
+    emitir(200)
+    qtbot.waitUntil(al_final, timeout=ESPERA_MS)

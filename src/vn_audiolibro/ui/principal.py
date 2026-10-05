@@ -144,6 +144,8 @@ class VentanaPrincipal(QMainWindow):
         self.estado.setWordWrap(True)
         self.historial = QTextBrowser()
         self._lineas: deque[LineaJuego] = deque(maxlen=MAX_LINEAS)
+        self._seguir_final = True
+        """Si el historial baja solo al crecer; deja de hacerlo si el usuario sube a releer."""
         self.boton_pausa = QPushButton(_("Pausa (P)"))
         self.boton_repetir = QPushButton(_("Repetir (R)"))
         self.boton_saltar = QPushButton(_("Saltar (S)"))
@@ -196,6 +198,9 @@ class VentanaPrincipal(QMainWindow):
 
         self.puente.estado.connect(self.estado.setText)
         self.puente.linea.connect(self._mostrar_linea)
+        barra = self.historial.verticalScrollBar()
+        barra.rangeChanged.connect(lambda _minimo, _maximo: self._bajar_historial())
+        barra.valueChanged.connect(self._al_mover_historial)
         self.puente.error.connect(self._mostrar_error)
         self.puente.iniciada.connect(self._al_iniciar)
         self.puente.terminada.connect(self._al_terminar)
@@ -327,8 +332,19 @@ class VentanaPrincipal(QMainWindow):
         if self._subtitulos is not None:
             self._subtitulos.mostrar(linea.traduccion_con_personaje)
         self.historial.setHtml("".join(_html(linea) for linea in self._lineas))
-        barra = self.historial.verticalScrollBar()
-        barra.setValue(barra.maximum())
+        # El documento se maqueta después y su altura cambia también al redimensionar la ventana:
+        # la barra se baja cada vez que cambia su rango (`_bajar_historial`), no solo aquí.
+        self._seguir_final = True
+        self._bajar_historial()
+
+    def _bajar_historial(self) -> None:
+        if self._seguir_final:
+            barra = self.historial.verticalScrollBar()
+            barra.setValue(barra.maximum())
+
+    def _al_mover_historial(self, valor: int) -> None:
+        # Al crecer el documento el valor no cambia; solo cambia si se mueve la barra o se recorta al final.
+        self._seguir_final = valor >= self.historial.verticalScrollBar().maximum()
 
     def _mostrar_error(self, mensaje: str) -> None:
         self._hubo_error = True  # que no lo tape el «Partida terminada» que llega después
