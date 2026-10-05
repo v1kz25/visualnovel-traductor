@@ -58,10 +58,16 @@ def _html(linea: LineaJuego) -> str:
     normal = linea.leida or linea.silenciada  # con la voz silenciada, el texto es lo que se lee
     sufijo = "" if normal else f' <span style="color: gray">{escape(_("(no leída)"))}</span>'
     color = "" if normal else " color: gray;"  # las no leídas, apagadas
+    traduccion = _lineas_html(linea.traduccion_con_personaje)
     return (
-        f'<p style="margin: 8px 0 0 0; color: gray">{escape(linea.original)}</p>'
-        f'<p style="margin: 0; font-size: large;{color}">{escape(linea.traduccion_con_personaje)}{sufijo}</p>'
+        f'<p style="margin: 8px 0 0 0; color: gray">{_lineas_html(linea.original)}</p>'
+        f'<p style="margin: 0; font-size: large;{color}">{traduccion}{sufijo}</p>'
     )
+
+
+def _lineas_html(texto: str) -> str:
+    """El texto escapado, con sus saltos de línea (las opciones de un menú van una por línea)."""
+    return escape(texto).replace("\n", "<br>")
 
 
 class VentanaPrincipal(QMainWindow):

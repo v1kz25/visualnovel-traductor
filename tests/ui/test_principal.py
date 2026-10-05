@@ -111,6 +111,12 @@ def test_marcas_de_las_lineas_e_historial_limitado(qtbot: QtBot, ventana: Ventan
     assert textos(ventana)[-1] == f"t{MAX_LINEAS + 4}"
 
 
+def test_un_menu_se_muestra_con_una_opcion_por_linea(qtbot: QtBot, ventana: VentanaPrincipal) -> None:
+    jugar(qtbot, ventana)
+    ventana.puente.linea.emit(LineaJuego("はい\nいいえ", "Opciones:\n1. Sí\n2. <No>", False, True))
+    assert textos(ventana)[-5:] == ["はい", "いいえ", "Opciones:", "1. Sí", "2. <No>"]
+
+
 def test_controles(qtbot: QtBot, ventana: VentanaPrincipal, fabrica: Fabrica) -> None:
     jugar(qtbot, ventana)
     ventana.boton_pausa.click()

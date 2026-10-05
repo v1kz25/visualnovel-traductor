@@ -408,6 +408,12 @@ msgstr "{personaje}: {traduccion}"
 msgid "Error al procesar la línea: {error}"
 msgstr "Error while processing the line: {error}"
 
+msgid "Opciones:"
+msgstr "Choices:"
+
+msgid "{numero}. {opcion}"
+msgstr "{numero}. {opcion}"
+
 msgid "No se pudo traducir la línea: {error}"
 msgstr "Could not translate the line: {error}"
 
