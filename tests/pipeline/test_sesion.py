@@ -120,6 +120,14 @@ def test_monta_todo_y_desmonta_en_orden_inverso(registro: Registro) -> None:
     assert registro.creados["sintetizador"] == (voz, perfil.voz.hablante, 1.0)
 
 
+def test_los_subtitulos_llegan_del_orquestador(registro: Registro) -> None:
+    subtitulos: list[str] = []
+    with Sesion(Perfil("Juego", "juego"), lambda _: None, lambda _: None, al_subtitulo=subtitulos.append):
+        pass
+    registro.opciones["orquestador"]["al_subtitulo"]("hola")
+    assert subtitulos == ["hola"]
+
+
 @pytest.mark.parametrize(
     ("hablante", "modelo"),
     [(Hablante.MUJER, "en_US-kristin-medium.onnx"), (Hablante.HOMBRE, "en_US-john-medium.onnx")],

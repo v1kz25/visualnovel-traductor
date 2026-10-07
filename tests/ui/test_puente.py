@@ -17,8 +17,10 @@ def test_arranca_en_segundo_plano_y_reenvia_los_avisos(qtbot: QtBot) -> None:
     puente = PuenteSesion(Fabrica())
     estados: list[str] = []
     lineas: list[LineaJuego] = []
+    subtitulos: list[str] = []
     puente.estado.connect(estados.append)
     puente.linea.connect(lineas.append)
+    puente.subtitulo.connect(subtitulos.append)
 
     with qtbot.waitSignal(puente.iniciada, timeout=ESPERA_MS):
         puente.iniciar(PERFIL)
@@ -26,6 +28,7 @@ def test_arranca_en_segundo_plano_y_reenvia_los_avisos(qtbot: QtBot) -> None:
     assert puente.jugando
     assert estados == ["Arrancando el traductor…"]
     assert [linea.traduccion for linea in lineas] == ["uno"]
+    assert subtitulos == ["uno"]
 
 
 def test_iniciar_dos_veces_no_crea_otra_sesion(qtbot: QtBot) -> None:
