@@ -198,6 +198,7 @@ class VentanaPrincipal(QMainWindow):
 
         self.puente.estado.connect(self.estado.setText)
         self.puente.linea.connect(self._mostrar_linea)
+        self.puente.subtitulo.connect(self._mostrar_subtitulo)
         barra = self.historial.verticalScrollBar()
         barra.rangeChanged.connect(lambda _minimo, _maximo: self._bajar_historial())
         barra.valueChanged.connect(self._al_mover_historial)
@@ -329,13 +330,15 @@ class VentanaPrincipal(QMainWindow):
 
     def _mostrar_linea(self, linea: LineaJuego) -> None:
         self._lineas.append(linea)
-        if self._subtitulos is not None:
-            self._subtitulos.mostrar(linea.traduccion_con_personaje)
         self.historial.setHtml("".join(_html(linea) for linea in self._lineas))
         # El documento se maqueta después y su altura cambia también al redimensionar la ventana:
         # la barra se baja cada vez que cambia su rango (`_bajar_historial`), no solo aquí.
         self._seguir_final = True
         self._bajar_historial()
+
+    def _mostrar_subtitulo(self, texto: str) -> None:
+        if self._subtitulos is not None:
+            self._subtitulos.mostrar(texto)
 
     def _bajar_historial(self) -> None:
         if self._seguir_final:

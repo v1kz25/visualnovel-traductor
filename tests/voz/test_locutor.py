@@ -549,3 +549,54 @@ def test_en_modo_ultima_no_hay_pausa() -> None:
     assert locutor.esperar(ESPERA_S)  # no espera la pausa larga
     locutor.cerrar()
     assert len(reproductor.salidas) == 2
+
+
+# Aviso de que una línea empieza a sonar (para los subtítulos)
+
+
+def test_avisa_cuando_empieza_a_sonar_cada_linea() -> None:
+    sintetizador, reproductor = SintetizadorFalso(), ReproductorFalso()
+    locutor = iniciar(sintetizador, reproductor)
+    avisos: list[str] = []
+
+    locutor.decir(clave("a"), "uno", al_empezar=lambda: avisos.append("a"))
+    texto = TextoPorPartes()
+    locutor.decir_por_partes(clave("b"), texto, al_empezar=lambda: avisos.append("b"))
+    texto.anadir("dos")
+    texto.terminar()
+    assert locutor.esperar(ESPERA_S)
+    locutor.cerrar()
+
+    assert avisos == ["a", "b"]
+
+
+def test_no_avisa_de_una_linea_descartada_sin_sonar() -> None:
+    puerta = threading.Event()
+    sintetizador, reproductor = SintetizadorFalso(), ReproductorFalso(puerta=puerta)
+    locutor = iniciar(sintetizador, reproductor, modo=ModoLectura.ULTIMA)
+    avisos: list[str] = []
+
+    locutor.decir(clave("a"), "a", al_empezar=lambda: avisos.append("a"))
+    assert reproductor.abriendo.wait(ESPERA_S)
+    locutor.decir(clave("b"), "bb", al_empezar=lambda: avisos.append("b"))
+    puerta.set()
+    assert locutor.esperar(ESPERA_S)
+    locutor.cerrar()
+
+    assert avisos == ["b"]
+
+
+def test_un_fallo_en_el_aviso_no_corta_la_linea(caplog: pytest.LogCaptureFixture) -> None:
+    sintetizador, reproductor = SintetizadorFalso(), ReproductorFalso()
+    locutor = iniciar(sintetizador, reproductor)
+
+    def fallar() -> None:
+        raise RuntimeError("subtítulos rotos")
+
+    locutor.decir(clave("a"), "sigue", al_empezar=fallar)
+    assert locutor.esperar(ESPERA_S)
+    locutor.cerrar()
+
+    assert "Falló el aviso" in caplog.text
+    assert reproductor.salidas[0].valores == [len("sigue")]
+    assert reproductor.salidas[0].terminada

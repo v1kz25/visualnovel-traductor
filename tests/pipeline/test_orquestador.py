@@ -84,6 +84,8 @@ class TraductorFalso:
 
 
 class VozFalsa:
+    """Las líneas «suenan» en cuanto se piden."""
+
     def __init__(self) -> None:
         self.dichas: list[str] = []
         self.voces: list[str | None] = []
@@ -91,9 +93,17 @@ class VozFalsa:
         self.calladas = 0
         self.saltadas = 0
 
-    def decir(self, clave: Clave, texto: str, voz: str | None = None) -> None:
+    def decir(
+        self,
+        clave: Clave,
+        texto: str,
+        voz: str | None = None,
+        al_empezar: Callable[[], None] | None = None,
+    ) -> None:
         self.dichas.append(texto)
         self.voces.append(voz)
+        if al_empezar is not None:
+            al_empezar()
 
     def callar(self) -> None:
         self.calladas += 1
@@ -115,16 +125,18 @@ class Montaje:
         por_partes: bool = False,
         separar_personaje: bool = True,
         voces: tuple[tuple[str, str], ...] = (),
+        voz: VozFalsa | None = None,
     ) -> None:
         self.lector = LectorFalso()
         self.traductor: TraductorFalso | TraductorPorPartesFalso = (
             TraductorPorPartesFalso(puerta) if por_partes else TraductorFalso(puerta)
         )
-        self.voz: VozFalsa = VozPorPartesFalsa(cache) if por_partes else VozFalsa()
+        self.voz: VozFalsa = voz or (VozPorPartesFalsa(cache) if por_partes else VozFalsa())
         self.cache = cache
         self.lineas: list[LineaJuego] = []
         self.errores: list[str] = []
         self.personajes: list[tuple[str, str]] = []
+        self.subtitulos: list[str] = []
         glosario = Glosario.desde_dict({"櫻": "Sakura"})
         idioma = "zh-Hant" if guion is None else "ja"
         self.guion = None
@@ -151,6 +163,7 @@ class Montaje:
             self.errores.append,
             self.guion,
             al_personaje=lambda original, traduccion: self.personajes.append((original, traduccion)),
+            al_subtitulo=self.subtitulos.append,
         )
 
     def llega(self, *textos: str) -> None:
@@ -513,11 +526,20 @@ class VozPorPartesFalsa(VozFalsa):
         self._cache = cache
         self._hilos: list[threading.Thread] = []
 
-    def decir_por_partes(self, clave: Clave, texto: TextoPorPartes, voz: str | None = None) -> None:
+    def decir_por_partes(
+        self,
+        clave: Clave,
+        texto: TextoPorPartes,
+        voz: str | None = None,
+        al_empezar: Callable[[], None] | None = None,
+    ) -> None:
         self.voces.append(voz)
 
         def leer() -> None:
-            self.partes.extend(texto.partes(lambda: True))
+            for i, parte in enumerate(texto.partes(lambda: True)):
+                if i == 0 and al_empezar is not None:
+                    al_empezar()  # empieza a sonar con la primera parte
+                self.partes.append(parte)
             self.en_cache_al_terminar.append(self._cache.consultar(clave) is not None)
 
         hilo = threading.Thread(target=leer)
@@ -544,6 +566,7 @@ def por_partes(
         montaje.voz,
         montaje.lineas.append,
         montaje.errores.append,
+        al_subtitulo=montaje.subtitulos.append,
     )
     return montaje
 
@@ -797,3 +820,116 @@ def test_con_guion_un_error_inesperado_por_adelantado_no_se_repite(
 
     assert len(fallos) == 1
     assert montaje.voz.dichas == [f"es:{g.parrafos[0].original}"]
+
+
+# Subtítulos
+
+
+class VozManual(VozFalsa):
+    """Las líneas no empiezan a sonar hasta que se llama a `sonar`."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._por_sonar: list[Callable[[], None] | None] = []
+
+    def decir(
+        self,
+        clave: Clave,
+        texto: str,
+        voz: str | None = None,
+        al_empezar: Callable[[], None] | None = None,
+    ) -> None:
+        super().decir(clave, texto, voz)
+        self._por_sonar.append(al_empezar)
+
+    def decir_por_partes(
+        self,
+        clave: Clave,
+        texto: TextoPorPartes,
+        voz: str | None = None,
+        al_empezar: Callable[[], None] | None = None,
+    ) -> None:
+        self.voces.append(voz)
+        self._por_sonar.append(al_empezar)
+
+    def sonar(self) -> None:
+        al_empezar = self._por_sonar.pop(0)
+        assert al_empezar is not None
+        al_empezar()
+
+
+def test_subtitulos_con_la_linea_que_suena(montaje: Montaje) -> None:
+    montaje.llega("她走了。")
+    assert montaje.subtitulos == ["es:她走了。"]
+
+
+def test_subtitulos_en_cola_muestran_la_linea_que_suena_no_la_ultima_traducida(cache: CacheSQLite) -> None:
+    voz = VozManual()
+    montaje = Montaje(cache, voz=voz)
+    montaje.llega("一", "二")
+
+    assert montaje.subtitulos == []  # traducidas, pero aún no suena ninguna
+    voz.sonar()
+    assert montaje.subtitulos == ["es:一"]
+    voz.sonar()
+    assert montaje.subtitulos == ["es:一", "es:二"]
+    montaje.orquestador.cerrar()
+
+
+def test_subtitulos_con_la_voz_silenciada_en_cuanto_esta_traducida(montaje: Montaje) -> None:
+    montaje.orquestador.silenciar()
+    montaje.llega("一")
+    assert montaje.subtitulos == ["es:一"]
+
+
+def test_subtitulos_con_el_nombre_del_personaje(montaje: Montaje) -> None:
+    montaje.llega_con_nombre("你好", "櫻")  # en el glosario: se conoce desde el principio
+    montaje.llega_con_nombre("我們走吧。", "小雨")  # se traduce después de empezar a leer
+
+    assert montaje.subtitulos == ["Sakura: es:你好", "es:我們走吧。", "es:小雨: es:我們走吧。"]
+
+
+def test_subtitulos_de_un_menu(montaje: Montaje) -> None:
+    montaje.llega("一||二")
+    assert montaje.subtitulos == ["Opciones:\n1. es:一\n2. es:二"]
+
+
+def test_subtitulos_por_partes_aparecen_con_la_primera_y_crecen(cache: CacheSQLite) -> None:
+    puerta = threading.Event()
+    montaje = por_partes(cache, puerta)
+
+    montaje.orquestador.recibir_zona(montaje.lector.zona("一|二"))
+    _hasta(lambda: montaje.subtitulos == ["es:一"])  # suena la primera parte, falta la segunda
+    puerta.set()
+    assert montaje.orquestador.esperar(ESPERA_S)
+    montaje.orquestador.cerrar()
+    voz = montaje.voz
+    assert isinstance(voz, VozPorPartesFalsa)
+    voz.esperar()
+
+    assert montaje.subtitulos == ["es:一", "es:一 es:二"]
+
+
+def test_subtitulos_por_partes_que_no_valian_se_sustituyen_por_la_entera(cache: CacheSQLite) -> None:
+    montaje = por_partes(cache)
+    montaje.llega("mal|dos")
+    montaje.orquestador.cerrar()
+    voz = montaje.voz
+    assert isinstance(voz, VozPorPartesFalsa)
+    voz.esperar()
+
+    assert montaje.subtitulos[0].startswith("es:mal")
+    assert montaje.subtitulos[-1] == "es:bien"
+
+
+def test_subtitulos_por_partes_en_cola_no_tapan_la_linea_que_suena(cache: CacheSQLite) -> None:
+    voz = VozManual()
+    montaje = Montaje(cache, por_partes=True, voz=voz)
+    montaje.llega("一")
+    voz.sonar()
+    montaje.llega("二|三")  # se traduce por partes mientras «一» sigue sonando
+
+    assert montaje.subtitulos == ["es:一"]
+    voz.sonar()
+    assert montaje.subtitulos == ["es:一", "es:二 es:三"]
+    montaje.orquestador.cerrar()

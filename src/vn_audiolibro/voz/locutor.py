@@ -78,6 +78,8 @@ class _Pedido:
     partes: TextoPorPartes | None = None
     voz: str | None = None
     """Voz del personaje que la dice, o None para la del juego."""
+    al_empezar: Callable[[], None] | None = None
+    """Se llama cuando la línea empieza a sonar (no si se descarta o se corta antes)."""
 
 
 class Locutor:
@@ -128,22 +130,35 @@ class Locutor:
         self._hilo = threading.Thread(target=self._bucle, name="locutor", daemon=True)
         self._hilo.start()
 
-    def decir(self, clave: Clave, texto: str, voz: str | None = None) -> None:
+    def decir(
+        self,
+        clave: Clave,
+        texto: str,
+        voz: str | None = None,
+        al_empezar: Callable[[], None] | None = None,
+    ) -> None:
         """Lee la línea cuando le toque (o en el acto, cortando lo que suene, en modo `ULTIMA`).
 
-        Con `voz`, la lee con esa de las `voces`; si no la hay, con la del juego.
+        Con `voz`, la lee con esa de las `voces`; si no la hay, con la del juego. `al_empezar` se
+        llama, desde el hilo del locutor, cuando empieza a sonar.
         """
         voz = self._voz(voz)
-        self._anadir(lambda id_pedido: _Pedido(clave, texto, id_pedido, voz=voz))
+        self._anadir(lambda id_pedido: _Pedido(clave, texto, id_pedido, voz=voz, al_empezar=al_empezar))
 
-    def decir_por_partes(self, clave: Clave, texto: TextoPorPartes, voz: str | None = None) -> None:
+    def decir_por_partes(
+        self,
+        clave: Clave,
+        texto: TextoPorPartes,
+        voz: str | None = None,
+        al_empezar: Callable[[], None] | None = None,
+    ) -> None:
         """Como `decir`, pero empieza a leer la primera parte sin esperar a las demás.
 
         El audio se guarda en la caché al terminar, si para entonces la traducción ya está en
         ella y ha llegado entera.
         """
         voz = self._voz(voz)
-        self._anadir(lambda id_pedido: _Pedido(clave, "", id_pedido, texto, voz))
+        self._anadir(lambda id_pedido: _Pedido(clave, "", id_pedido, texto, voz, al_empezar))
 
     def _voz(self, voz: str | None) -> str | None:
         return voz if voz in self._voces else None
@@ -256,6 +271,7 @@ class Locutor:
                     salida = self._abrir(pedido, fragmento.frecuencia)
                     if salida is not None:
                         self._atenuar(bajar=True)
+                        self._avisar_inicio(pedido)
                 if salida is None or not self._vigente(pedido):
                     return
                 salida.escribir(fragmento.pcm)
@@ -287,6 +303,15 @@ class Locutor:
                 return salida
         salida.detener()
         return None
+
+    def _avisar_inicio(self, pedido: _Pedido) -> None:
+        if pedido.al_empezar is None:
+            return
+        try:
+            pedido.al_empezar()
+        except Exception:
+            # Un fallo de quien escucha no debe cortar la línea.
+            _registro.exception("Falló el aviso de que empieza a sonar «%s»", pedido.texto)
 
     def _atenuar(self, bajar: bool) -> None:
         if self._atenuador is None:
