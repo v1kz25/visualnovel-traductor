@@ -1,13 +1,19 @@
 """Tests de los subtítulos encima del juego, con un gestor de ventanas falso (sin X11 ni Win32)."""
 
 import pytest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QPoint, Qt
 from pytestqt.qtbot import QtBot
 
+from vn_audiolibro.atajos.modelos import Accion
 from vn_audiolibro.captura.modelos import Rectangulo, VentanaMinimizadaError, ZonaRelativa
 from vn_audiolibro.perfiles.modelos import AjustesSubtitulos, Perfil, PosicionSubtitulos
 from vn_audiolibro.ui import subtitulos as modulo
-from vn_audiolibro.ui.subtitulos import Subtitulos, abrir_subtitulos, rectangulo_subtitulos
+from vn_audiolibro.ui.subtitulos import (
+    VUELTAS_CONTROLES,
+    Subtitulos,
+    abrir_subtitulos,
+    rectangulo_subtitulos,
+)
 
 JUEGO = Rectangulo(100, 50, 800, 600)
 ZONA = ZonaRelativa(0.1, 0.7, 0.8, 0.25)  # en píxeles del juego: x=80, y=420, 640×150
@@ -150,14 +156,121 @@ def test_abrir_subtitulos(qtbot: QtBot, monkeypatch: pytest.MonkeyPatch, ventana
     qtbot.addWidget(abiertos)
 
 
-def test_ocultar_y_volver_a_mostrar(qtbot: QtBot, ventanas: VentanasFalsas) -> None:
+def test_ocultar_deja_una_marca_y_volver_a_mostrar(qtbot: QtBot, ventanas: VentanasFalsas) -> None:
     subtitulos = abrir(qtbot, ventanas)
     subtitulos.mostrar("Hola")
 
     subtitulos.alternar()
-    assert subtitulos.isHidden()
-    subtitulos.mostrar("Adiós")  # sigue oculto aunque cambie el texto
-    assert subtitulos.isHidden()
+    assert subtitulos.isVisible()  # queda la marca, para que no parezca que han desaparecido
+    assert subtitulos.texto.isHidden()
+    assert subtitulos.marca.isVisible()
+    assert subtitulos.geometry().height() < 60
+    assert subtitulos.controles.botones[Accion.SUBTITULOS].text() == "Mostrar"
+    subtitulos.mostrar("Adiós")  # el texto se sigue actualizando, sin verse
+    assert subtitulos.texto.isHidden()
+
     subtitulos.alternar()
-    assert subtitulos.isVisible()
+    assert subtitulos.texto.isVisible()
+    assert subtitulos.marca.isHidden()
     assert subtitulos.texto.text() == "Adiós"
+    assert subtitulos.controles.botones[Accion.SUBTITULOS].text() == "Ocultar"
+
+
+def test_la_marca_tampoco_se_ve_con_el_juego_en_segundo_plano(qtbot: QtBot, ventanas: VentanasFalsas) -> None:
+    subtitulos = abrir(qtbot, ventanas)
+    subtitulos.alternar()
+    assert subtitulos.isVisible()  # oculto antes de que llegue ningún texto: la marca se ve
+    ventanas.activa_ahora = 0x99
+    subtitulos.seguir()
+    assert subtitulos.isHidden()
+
+
+# Controles flotantes
+
+
+class Raton:
+    def __init__(self) -> None:
+        self.donde = QPoint(0, 0)
+
+    def __call__(self) -> QPoint:
+        return self.donde
+
+
+def con_raton(qtbot: QtBot, ventanas: VentanasFalsas) -> tuple[Subtitulos, Raton]:
+    raton = Raton()
+    subtitulos = Subtitulos(
+        AjustesSubtitulos(activo=True), ZONA, ventanas, 0x42, intervalo_ms=10_000, cursor=raton
+    )
+    qtbot.addWidget(subtitulos)
+    qtbot.addWidget(subtitulos.controles)
+    return subtitulos, raton
+
+
+def test_los_controles_salen_al_pasar_el_raton(qtbot: QtBot, ventanas: VentanasFalsas) -> None:
+    subtitulos, raton = con_raton(qtbot, ventanas)
+    subtitulos.mostrar("Hola")
+    assert subtitulos.controles.isHidden()
+
+    raton.donde = subtitulos.geometry().center()
+    subtitulos.seguir()
+    controles = subtitulos.controles
+    assert controles.isVisible()
+    assert controles.geometry().bottom() + 1 == subtitulos.geometry().top()  # justo encima
+    assert controles.geometry().right() == subtitulos.geometry().right()  # a la derecha
+    assert controles.windowFlags() & Qt.WindowType.WindowDoesNotAcceptFocus
+    assert not controles.windowFlags() & Qt.WindowType.WindowTransparentForInput  # sí recibe clics
+
+    # Con el ratón sobre los propios controles, siguen.
+    raton.donde = controles.geometry().center()
+    for _vuelta in range(VUELTAS_CONTROLES + 1):
+        subtitulos.seguir()
+    assert controles.isVisible()
+
+    # Al irse el ratón, se van un poco después.
+    raton.donde = QPoint(0, 0)
+    for _vuelta in range(VUELTAS_CONTROLES - 1):
+        subtitulos.seguir()
+    assert controles.isVisible()
+    subtitulos.seguir()
+    assert controles.isHidden()
+
+
+def test_los_controles_se_van_con_el_juego(qtbot: QtBot, ventanas: VentanasFalsas) -> None:
+    subtitulos, raton = con_raton(qtbot, ventanas)
+    subtitulos.mostrar("Hola")
+    raton.donde = subtitulos.geometry().center()
+    subtitulos.seguir()
+
+    ventanas.activa_ahora = 0x99
+    subtitulos.seguir()
+    assert subtitulos.controles.isHidden()
+
+
+def test_sobre_la_marca_tambien_salen_los_controles(qtbot: QtBot, ventanas: VentanasFalsas) -> None:
+    subtitulos, raton = con_raton(qtbot, ventanas)
+    subtitulos.mostrar("Hola")
+    subtitulos.alternar()
+
+    raton.donde = subtitulos.geometry().center()
+    subtitulos.seguir()
+    assert subtitulos.controles.isVisible()
+
+
+def test_los_botones_hacen_su_accion(qtbot: QtBot, ventanas: VentanasFalsas) -> None:
+    subtitulos, _raton = con_raton(qtbot, ventanas)
+    pulsadas: list[Accion] = []
+    subtitulos.conectar(pulsadas.append)
+
+    for boton in subtitulos.controles.botones.values():
+        boton.click()
+    assert pulsadas == [Accion.PAUSA, Accion.REPETIR, Accion.SALTAR, Accion.SUBTITULOS]
+
+
+def test_cerrar_cierra_los_controles(qtbot: QtBot, ventanas: VentanasFalsas) -> None:
+    subtitulos, raton = con_raton(qtbot, ventanas)
+    subtitulos.mostrar("Hola")
+    raton.donde = subtitulos.geometry().center()
+    subtitulos.seguir()
+
+    subtitulos.cerrar()
+    assert subtitulos.controles.isHidden()

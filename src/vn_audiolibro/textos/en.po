@@ -827,6 +827,21 @@ msgstr "It will be translated again when you play."
 msgid "Vaciar caché"
 msgstr "Clear cache"
 
+msgid "Pausa"
+msgstr "Pause"
+
+msgid "Repetir"
+msgstr "Repeat"
+
+msgid "Saltar"
+msgstr "Skip"
+
+msgid "Ocultar"
+msgstr "Hide"
+
+msgid "Mostrar"
+msgstr "Show"
+
 msgid "Chino tradicional"
 msgstr "Traditional Chinese"
 
@@ -1237,6 +1252,9 @@ msgstr "Resume (P)"
 
 msgid "Error al parar: {error}"
 msgstr "Error while stopping: {error}"
+
+msgid "Subtítulos ocultos · pasa el ratón para ver los controles"
+msgstr "Subtitles hidden · hover here for the controls"
 
 msgid "Versiones nuevas"
 msgstr "New versions"

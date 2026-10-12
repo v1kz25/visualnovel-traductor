@@ -85,6 +85,9 @@ class SubtitulosFalsos:
     def mostrar(self, texto: str) -> None:
         pass
 
+    def conectar(self, al_control: object) -> None:
+        self.al_control = al_control
+
     def alternar(self) -> None:
         self.alternados += 1
 
@@ -201,3 +204,18 @@ def test_no_se_configuran_los_atajos_mientras_se_juega(
     assert ventana.boton_atajos.isEnabled()
     jugar(qtbot, ventana)
     assert not ventana.boton_atajos.isEnabled()
+
+
+def test_los_botones_de_los_subtitulos_controlan_la_partida(
+    qtbot: QtBot, almacen: AlmacenPerfiles, ruta: Path
+) -> None:
+    fabrica = Fabrica()
+    subtitulos = SubtitulosFalsos()
+    ventana = ventana_(qtbot, almacen, fabrica, ruta, subtitulos)
+    jugar(qtbot, ventana)
+    control = fabrica.sesiones[-1].control
+
+    for accion in (Accion.SALTAR, Accion.REPETIR, Accion.SUBTITULOS):
+        subtitulos.al_control(accion)  # type: ignore[operator]
+    assert control.acciones == ["saltar", "repetir"]
+    assert subtitulos.alternados == 1

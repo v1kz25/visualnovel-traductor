@@ -2,19 +2,22 @@
 
 La ventana es transparente al ratón (los clics llegan al juego) y no coge el foco. Sigue a la
 ventana del juego si se mueve y solo se ve mientras el juego es la ventana activa: si se
-minimiza, se cambia a otra ventana o se cierra, se oculta.
+minimiza, se cambia a otra ventana o se cierra, se oculta. Al pasar el ratón por encima aparecen
+los controles de la partida (`ControlesFlotantes`).
 
 Con el juego en pantalla completa exclusiva puede no verse nada encima: entonces hay que poner
 el juego en modo ventana o ventana sin bordes.
 """
 
 import logging
+from collections.abc import Callable
 from typing import Protocol
 
-from PySide6.QtCore import QRect, Qt, QTimer
-from PySide6.QtGui import QFont, QGuiApplication
+from PySide6.QtCore import QPoint, QRect, Qt, QTimer
+from PySide6.QtGui import QCursor, QFont, QGuiApplication
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
+from vn_audiolibro.atajos.modelos import Accion
 from vn_audiolibro.captura.modelos import (
     Rectangulo,
     VentanaMinimizadaError,
@@ -23,6 +26,8 @@ from vn_audiolibro.captura.modelos import (
 )
 from vn_audiolibro.perfiles.modelos import AjustesSubtitulos, Perfil, PosicionSubtitulos
 from vn_audiolibro.plataforma import gestor_ventanas
+from vn_audiolibro.textos import _
+from vn_audiolibro.ui.controles import ControlesFlotantes
 
 _registro = logging.getLogger(__name__)
 
@@ -30,6 +35,8 @@ INTERVALO_MS = 250
 """Cada cuánto se mira dónde está el juego y si sigue activo."""
 MARGEN = 0.4
 """Relleno alrededor del texto, en tamaños de letra."""
+VUELTAS_CONTROLES = 6
+"""Vueltas del reloj (1,5 s) sin el ratón encima tras las que se van los controles flotantes."""
 
 
 class PantallaSubtitulos(Protocol):
@@ -38,6 +45,8 @@ class PantallaSubtitulos(Protocol):
     def mostrar(self, texto: str) -> None: ...
 
     def alternar(self) -> None: ...
+
+    def conectar(self, al_control: Callable[[Accion], None]) -> None: ...
 
     def cerrar(self) -> None: ...
 
@@ -74,7 +83,11 @@ def rectangulo_subtitulos(
 
 
 class Subtitulos(QWidget):
-    """Ventana de subtítulos sobre el juego `id_ventana`."""
+    """Ventana de subtítulos sobre el juego `id_ventana`, con sus controles flotantes.
+
+    Al pasar el ratón por los subtítulos aparecen encima los controles de la partida. Si se
+    ocultan, queda una marca pequeña en su lugar; al pasar el ratón por ella vuelven los controles.
+    """
 
     def __init__(
         self,
@@ -83,14 +96,16 @@ class Subtitulos(QWidget):
         ventanas: FuenteVentanas,
         id_ventana: int,
         intervalo_ms: int = INTERVALO_MS,
+        cursor: Callable[[], QPoint] = QCursor.pos,
     ) -> None:
         super().__init__(None)
         self._ajustes = ajustes
         self._zona = zona
         self._ventanas = ventanas
         self._id_ventana = id_ventana
+        self._cursor = cursor
         self.ocultos = False
-        """Si el usuario los ha ocultado con el atajo; el texto se sigue actualizando."""
+        """Si el usuario los ha ocultado; el texto se sigue actualizando."""
         bandera = Qt.WindowType
         self.setWindowFlags(
             bandera.FramelessWindowHint
@@ -113,13 +128,27 @@ class Subtitulos(QWidget):
             f"background-color: rgba(0, 0, 0, {round(opacidad * 255)}); color: white; "
             f"padding: {relleno}px; border-radius: {relleno // 2}px;"
         )
+        self.marca = QLabel(_("Subtítulos ocultos · pasa el ratón para ver los controles"))
+        self.marca.setStyleSheet(
+            "background-color: rgba(0, 0, 0, 140); color: rgba(255, 255, 255, 200); "
+            "padding: 2px 8px; border-radius: 4px;"
+        )
+        self.marca.hide()
         columna = QVBoxLayout(self)
         columna.setContentsMargins(0, 0, 0, 0)
         columna.addWidget(self.texto)
+        columna.addWidget(self.marca)
+        self.controles = ControlesFlotantes()
+        self._sin_raton = 0
+        """Vueltas del reloj seguidas sin el ratón encima; al llegar a `VUELTAS_CONTROLES`, se van."""
         self._reloj = QTimer(self)
         self._reloj.setInterval(intervalo_ms)
         self._reloj.timeout.connect(self.seguir)
         self._reloj.start()
+
+    def conectar(self, al_control: Callable[[Accion], None]) -> None:
+        """`al_control` recibe la acción de cada botón de los controles flotantes."""
+        self.controles.pulsado.connect(lambda accion: al_control(Accion(accion)))
 
     def mostrar(self, texto: str) -> None:
         """Cambia el subtítulo y lo coloca sobre el juego."""
@@ -127,30 +156,67 @@ class Subtitulos(QWidget):
         self.seguir()
 
     def alternar(self) -> None:
-        """Oculta los subtítulos o los vuelve a mostrar (con el atajo, sin salir del juego)."""
+        """Oculta los subtítulos o los vuelve a mostrar (con el atajo o el botón)."""
         self.ocultos = not self.ocultos
+        self.controles.subtitulos_ocultos(self.ocultos)
         self.seguir()
 
     def seguir(self) -> None:
         """Coloca los subtítulos sobre el juego, o los oculta si el juego no está a la vista."""
-        if self.ocultos or not self.texto.text() or self._ventanas.activa() != self._id_ventana:
+        juego = self._juego_a_la_vista()
+        if juego is None or not (self.texto.text() or self.ocultos):
             self.hide()
+            self.controles.hide()
             return
-        try:
-            juego = _a_logico(self._ventanas.geometria(self._id_ventana))
-        except (VentanaNoEncontradaError, VentanaMinimizadaError):
-            self.hide()
-            return
-        ancho = round(self._zona.ancho * juego.ancho)
-        alto = self.texto.heightForWidth(ancho) if ancho > 0 else 0
-        sitio = rectangulo_subtitulos(juego, self._zona, self._ajustes.posicion, max(alto, 1))
+        self.texto.setVisible(not self.ocultos)
+        self.marca.setVisible(self.ocultos)
+        if self.ocultos:
+            alto = self.marca.sizeHint().height()
+            sitio = rectangulo_subtitulos(juego, self._zona, self._ajustes.posicion, alto)
+            sitio = Rectangulo(sitio.x, sitio.y, min(sitio.ancho, self.marca.sizeHint().width()), alto)
+        else:
+            ancho = round(self._zona.ancho * juego.ancho)
+            alto = self.texto.heightForWidth(ancho) if ancho > 0 else 0
+            sitio = rectangulo_subtitulos(juego, self._zona, self._ajustes.posicion, max(alto, 1))
         self.setGeometry(QRect(sitio.x, sitio.y, sitio.ancho, sitio.alto))
         if self.isHidden():
             self.show()
+        self._seguir_raton(juego)
+
+    def _juego_a_la_vista(self) -> Rectangulo | None:
+        """Dónde está el juego (en píxeles de Qt), o None si no es la ventana activa o no está."""
+        if self._ventanas.activa() != self._id_ventana:
+            return None
+        try:
+            return _a_logico(self._ventanas.geometria(self._id_ventana))
+        except (VentanaNoEncontradaError, VentanaMinimizadaError):
+            return None
+
+    def _seguir_raton(self, juego: Rectangulo) -> None:
+        """Muestra los controles con el ratón encima de los subtítulos (o de los propios controles)."""
+        raton = self._cursor()
+        encima = self.geometry().contains(raton) or (
+            self.controles.isVisible() and self.controles.geometry().contains(raton)
+        )
+        if not encima:
+            self._sin_raton += 1
+            if self._sin_raton >= VUELTAS_CONTROLES:
+                self.controles.hide()
+            return
+        self._sin_raton = 0
+        tamano = self.controles.sizeHint()
+        subtitulos = self.geometry()
+        x = max(juego.x, subtitulos.right() + 1 - tamano.width())
+        y = subtitulos.top() - tamano.height()
+        if y < juego.y:  # no cabe encima dentro del juego: debajo
+            y = subtitulos.bottom() + 1
+        self.controles.setGeometry(QRect(x, y, tamano.width(), tamano.height()))
+        self.controles.show()
 
     def cerrar(self) -> None:
-        """Para el seguimiento y cierra la ventana."""
+        """Para el seguimiento y cierra la ventana y los controles."""
         self._reloj.stop()
+        self.controles.close()
         self.close()
 
 

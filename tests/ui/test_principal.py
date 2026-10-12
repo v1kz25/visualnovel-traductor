@@ -311,6 +311,9 @@ class SubtitulosFalsos:
     def mostrar(self, texto: str) -> None:
         self.textos.append(texto)
 
+    def conectar(self, al_control: object) -> None:
+        self.al_control = al_control
+
     def alternar(self) -> None:
         pass
 
