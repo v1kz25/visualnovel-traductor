@@ -2,7 +2,17 @@
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Protocol, runtime_checkable
+
+
+class Motor(StrEnum):
+    """Traductor que usa un juego."""
+
+    LOCAL = "local"
+    """Hy-MT2 en el equipo: gratis y sin conexión. El de por defecto."""
+    GEMINI = "gemini"
+    """Gemini de Google, en la nube: opcional, con la clave del usuario. Si falla, se traduce en local."""
 
 
 @dataclass(frozen=True)
@@ -112,3 +122,24 @@ class TraductorPorPartes(Protocol):
 
 class TraduccionFallidaError(Exception):
     """El traductor no ha podido traducir la línea (servidor caído, error de red…)."""
+
+
+class LimiteAgotadoError(TraduccionFallidaError):
+    """Se ha agotado el límite diario de peticiones del traductor en la nube: hay que seguir otro día."""
+
+
+@runtime_checkable
+class TraductorPorLotes(Protocol):
+    """Traductor que traduce varias líneas en una sola petición, para el guion por adelantado."""
+
+    tamano_lote: int
+    """Líneas que caben en una petición."""
+
+    def traducir_lote(
+        self, peticiones: Sequence[Peticion], cancelado: Callable[[], bool]
+    ) -> list[Traduccion] | None:
+        """Una traducción por petición, en el mismo orden; None si `cancelado` pasa a ser True.
+
+        Lanza `LimiteAgotadoError` si no quedan peticiones por hoy.
+        """
+        ...

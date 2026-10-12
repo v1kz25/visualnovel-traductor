@@ -56,9 +56,12 @@ def _piper() -> str:
     from piper.phonemize_espeak import EspeakPhonemizer
 
     fonetizador = EspeakPhonemizer()
-    fonemas = {idioma: fonetizador.phonemize(idioma, "hola") for idioma in ("es", "en")}
-    if not all(frases and frases[0] for frases in fonemas.values()):
-        raise RuntimeError("espeak-ng no ha devuelto fonemas en español e inglés")
+    # Las voces de espeak-ng que usan las de Piper de cada idioma de destino.
+    idiomas = ("es", "en", "fr", "pt-br", "de", "it")
+    fonemas = {idioma: fonetizador.phonemize(idioma, "hola") for idioma in idiomas}
+    sin_fonemas = [idioma for idioma, frases in fonemas.items() if not (frases and frases[0])]
+    if sin_fonemas:
+        raise RuntimeError(f"espeak-ng no ha devuelto fonemas en: {', '.join(sin_fonemas)}")
     return "".join(fonemas["es"][0])
 
 
@@ -95,6 +98,31 @@ def _qt() -> str:
     return str(version_qt)
 
 
+def _textos() -> str:
+    from vn_audiolibro import textos
+
+    idiomas = textos.disponibles()
+    if "en" not in idiomas or textos.catalogo("en").gettext("Jugar") != "Play":
+        raise RuntimeError(f"faltan los catálogos de idiomas: {idiomas}")
+    return ", ".join(idiomas)
+
+
+def _llavero(plataforma: str = sys.platform) -> str:
+    """El llavero del sistema, donde se guarda la clave de Gemini: su backend y sus metadatos.
+
+    `keyring` encuentra los backends por los metadatos del paquete: si el empaquetado los pierde,
+    no encontraría ninguno y la clave no se podría guardar.
+    """
+    from importlib import import_module
+    from importlib.metadata import entry_points
+
+    modulo = "keyring.backends.Windows" if plataforma == "win32" else "keyring.backends.SecretService"
+    import_module(modulo)
+    if not entry_points(group="keyring.backends"):
+        raise RuntimeError("faltan los metadatos de keyring")
+    return modulo
+
+
 def comprobaciones(plataforma: str = sys.platform) -> list[Comprobacion]:
     """Lo que se comprueba en este sistema."""
     lista: list[Comprobacion] = [
@@ -106,6 +134,8 @@ def comprobaciones(plataforma: str = sys.platform) -> list[Comprobacion]:
         ("piper y espeak-ng", _piper),
         ("libsndfile", _soundfile),
         ("Qt e icono", _qt),
+        ("idiomas de la interfaz", _textos),
+        ("llavero del sistema", lambda: _llavero(plataforma)),
     ]
     if plataforma == "win32":
         lista += [("PortAudio", _sounddevice), ("Core Audio", _pycaw)]

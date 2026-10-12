@@ -13,7 +13,16 @@ from vn_audiolibro.ocr.normalizacion import normalizar
 from vn_audiolibro.ocr.preprocesado import Orientacion
 from vn_audiolibro.ocr.reconocedor import ReconocedorRapidOCR
 
-from .sinteticas import Estilo, cara, error_por_caracter, horizontal, vertical
+from .sinteticas import (
+    FUENTES_LATINAS,
+    Estilo,
+    cara,
+    error_por_caracter,
+    horizontal,
+    latina,
+    texto_latino,
+    vertical,
+)
 
 ERROR_MAX = 0.05
 TIEMPO_MAX_S = 0.2
@@ -80,6 +89,7 @@ def test_una_pantalla_tarda_menos_de_200_ms(reconocedor: ReconocedorRapidOCR) ->
 
 def test_texto_leido_une_las_lineas_sin_separador() -> None:
     assert TextoLeido(("「你好，", "再見。」")).texto == "「你好，再見。」"
+    assert TextoLeido(("I told you", "already."), " ").texto == "I told you already."
 
 
 PANTALLA_VN = {
@@ -103,3 +113,23 @@ def test_pantalla_de_vn_con_letra_pequena_y_signos(
     assert leido.lineas[0] == "？？"
     esperado = normalizar("".join(lineas), idioma)  # la racha de rayas queda en ——
     assert error_por_caracter(leido.texto, esperado) < ERROR_MAX, leido.texto
+
+
+# Inglés: fuentes latinas libres, con el texto y el espaciado de una VN en inglés
+
+INGLES = [
+    "I told you already, didn't I?",
+    '"Well... it\'s a well-known secret."',
+    "She smiled and said nothing.",
+]
+
+
+@pytest.mark.parametrize("fuente", FUENTES_LATINAS)
+@pytest.mark.parametrize("tamano", [18, 24, 32])
+def test_texto_en_ingles(reconocedor: ReconocedorRapidOCR, fuente: str, tamano: int) -> None:
+    imagen = texto_latino(INGLES, latina(fuente, tamano))
+
+    leido = LectorOCR(reconocedor, AjustesLector("en")).leer(imagen)
+
+    assert leido.lineas[0].startswith("I told you already")  # con sus espacios
+    assert error_por_caracter(leido.texto, " ".join(INGLES)) < ERROR_MAX, leido.texto

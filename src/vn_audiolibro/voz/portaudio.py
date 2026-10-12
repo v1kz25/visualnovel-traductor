@@ -9,6 +9,7 @@ import threading
 from collections.abc import Callable
 from typing import Protocol
 
+from vn_audiolibro.textos import _
 from vn_audiolibro.voz.modelos import Muestras, VozFallidaError
 
 TROZO_S = 0.05
@@ -99,5 +100,7 @@ class ReproductorPortAudio:
             # sounddevice lanza PortAudioError, o OSError si falta la biblioteca de PortAudio.
             if flujo is not None:
                 flujo.close()
-            raise VozFallidaError(f"No se pudo abrir la salida de audio: {error}") from error
+            raise VozFallidaError(
+                _("No se pudo abrir la salida de audio: {error}").format(error=error)
+            ) from error
         return SalidaPortAudio(flujo, frecuencia)

@@ -23,10 +23,12 @@ from PySide6.QtWidgets import (
 from vn_audiolibro.configuracion import formato_tamano
 from vn_audiolibro.descargas import DescargaCanceladaError
 from vn_audiolibro.preparacion import AVISO_COPYRIGHT, Aviso, Componente
+from vn_audiolibro.textos import N_, _
 
 _registro = logging.getLogger(__name__)
 
-PENDIENTE, DESCARGANDO, LISTO, ERROR = "Pendiente", "Descargando…", "Listo", "Error"
+PENDIENTE, DESCARGANDO, LISTO, ERROR = N_("Pendiente"), N_("Descargando…"), N_("Listo"), N_("Error")
+"""Estados de cada componente; se traducen al mostrarlos, con `_()`."""
 
 
 class PrimerArranque(QDialog):
@@ -52,7 +54,7 @@ class PrimerArranque(QDialog):
     ) -> None:
         """`acceso`, si se da, crea el acceso directo del menú Inicio: se ofrece con una casilla."""
         super().__init__(parent)
-        self.setWindowTitle("Preparar vn-audiolibro")
+        self.setWindowTitle(_("Preparar vn-audiolibro"))
         self.resize(660, 460)
         self._pendientes = pendientes
         self._cancelar = threading.Event()
@@ -61,22 +63,24 @@ class PrimerArranque(QDialog):
 
         columna = QVBoxLayout(self)
         for aviso in avisos:
-            etiqueta = QLabel(("⚠ " if aviso.grave else "Aviso: ") + aviso.texto)
+            etiqueta = QLabel(("⚠ " if aviso.grave else _("Aviso: ")) + aviso.texto)
             etiqueta.setWordWrap(True)
             etiqueta.setStyleSheet("color: #c0392b" if aviso.grave else "")
             columna.addWidget(etiqueta)
         total = sum(componente.tamano for componente in pendientes)
         explicacion = QLabel(
-            f"Para funcionar sin conexión, la app necesita descargar estos componentes una sola vez "
-            f"({formato_tamano(total)} en total). Después no hace falta Internet."
+            _(
+                "Para funcionar sin conexión, la app necesita descargar estos componentes una sola vez "
+                "({total} en total). Después no hace falta Internet."
+            ).format(total=formato_tamano(total))
             if pendientes
-            else "Todos los componentes están descargados."
+            else _("Todos los componentes están descargados.")
         )
         explicacion.setWordWrap(True)
         columna.addWidget(explicacion)
 
         self.tabla = QTableWidget(len(pendientes), 4)
-        self.tabla.setHorizontalHeaderLabels(["Componente", "Licencia", "Tamaño", "Estado"])
+        self.tabla.setHorizontalHeaderLabels([_("Componente"), _("Licencia"), _("Tamaño"), _("Estado")])
         self.tabla.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         for indice in (1, 2, 3):
             self.tabla.horizontalHeader().setSectionResizeMode(
@@ -95,18 +99,18 @@ class PrimerArranque(QDialog):
                 )
             ):
                 self.tabla.setItem(fila, columna_tabla, elemento)
-            self.tabla.setItem(fila, 3, QTableWidgetItem(PENDIENTE))
+            self.tabla.setItem(fila, 3, QTableWidgetItem(_(PENDIENTE)))
         columna.addWidget(self.tabla, 1)
 
         self.barra = QProgressBar()
         self.barra.setVisible(False)
         self.mensaje = QLabel()
         self.mensaje.setWordWrap(True)
-        copyright_ = QLabel(AVISO_COPYRIGHT)
+        copyright_ = QLabel(_(AVISO_COPYRIGHT))
         copyright_.setWordWrap(True)
         copyright_.setStyleSheet("color: gray")
-        self.boton_descargar = QPushButton("Descargar")
-        self.boton_cerrar = QPushButton("Ahora no")
+        self.boton_descargar = QPushButton(_("Descargar"))
+        self.boton_cerrar = QPushButton(_("Ahora no"))
         fila_botones = QHBoxLayout()
         fila_botones.addStretch()
         fila_botones.addWidget(self.boton_cerrar)
@@ -115,7 +119,7 @@ class PrimerArranque(QDialog):
         columna.addWidget(self.mensaje)
         columna.addWidget(copyright_)
         self._acceso = acceso
-        self.casilla_acceso = QCheckBox("Añadir vn-audiolibro al menú Inicio")
+        self.casilla_acceso = QCheckBox(_("Añadir vn-audiolibro al menú Inicio"))
         self.casilla_acceso.setChecked(True)
         self.casilla_acceso.setVisible(acceso is not None)
         columna.addWidget(self.casilla_acceso)
@@ -146,7 +150,7 @@ class PrimerArranque(QDialog):
         self._descargando = True
         self._cancelar.clear()
         self.boton_descargar.setEnabled(False)
-        self.boton_cerrar.setText("Cancelar")
+        self.boton_cerrar.setText(_("Cancelar"))
         self.barra.setVisible(True)
         self.mensaje.clear()
         self._hilo = threading.Thread(target=self._descargar_todo, name="descargas", daemon=True)
@@ -171,7 +175,8 @@ class PrimerArranque(QDialog):
             except Exception as error:
                 _registro.exception("No se pudo descargar %s", componente.nombre)
                 self.estado.emit(fila, ERROR)
-                self.terminado.emit(f"No se pudo descargar «{componente.nombre}»: {error}")
+                mensaje = _("No se pudo descargar «{componente}»: {error}")
+                self.terminado.emit(mensaje.format(componente=componente.nombre, error=error))
                 return
             self.estado.emit(fila, LISTO)
         self.terminado.emit("")
@@ -186,22 +191,23 @@ class PrimerArranque(QDialog):
             self.barra.setValue(hecho // 1024)
         else:
             self.barra.setRange(0, 0)  # sin tamaño conocido: barra en movimiento
-        self.barra.setFormat(f"{formato_tamano(hecho)} de {formato_tamano(total)}" if total else "")
+        progreso = _("{hecho} de {total}").format(hecho=formato_tamano(hecho), total=formato_tamano(total))
+        self.barra.setFormat(progreso if total else "")
 
     def _mostrar_estado(self, fila: int, estado: str) -> None:
-        self.tabla.setItem(fila, 3, QTableWidgetItem(estado))
+        self.tabla.setItem(fila, 3, QTableWidgetItem(_(estado)))
 
     def _al_terminar(self, error: str) -> None:
         self._descargando = False
         self.barra.setVisible(False)
-        self.boton_cerrar.setText("Ahora no")
+        self.boton_cerrar.setText(_("Ahora no"))
         if not error:
-            self.mensaje.setText("Todo listo.")
+            self.mensaje.setText(_("Todo listo."))
             self.accept()
             return
-        self.boton_descargar.setText("Reintentar")
+        self.boton_descargar.setText(_("Reintentar"))
         self.boton_descargar.setEnabled(True)
-        self.mensaje.setText("Descarga cancelada." if error == "cancelado" else error)
+        self.mensaje.setText(_("Descarga cancelada.") if error == "cancelado" else error)
 
     def _cerrar_o_cancelar(self) -> None:
         if self.descargando:

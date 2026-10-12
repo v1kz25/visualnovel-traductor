@@ -24,7 +24,7 @@ TOKENS_POR_CARACTER = 3
 una salida desbocada sin esperar a los 512 tokens."""
 
 
-FRASES_CALENTAMIENTO = {"zh-Hant": "你好。", "zh-Hans": "你好。", "ja": "こんにちは。"}
+FRASES_CALENTAMIENTO = {"zh-Hant": "你好。", "zh-Hans": "你好。", "ja": "こんにちは。", "en": "Hello."}
 
 
 def max_tokens(texto: str) -> int:

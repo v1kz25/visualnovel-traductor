@@ -3,8 +3,9 @@
 from pathlib import Path
 
 import pytest
-from PySide6.QtWidgets import QApplication, QDialogButtonBox
+from PySide6.QtWidgets import QApplication, QDialogButtonBox, QMessageBox
 
+from vn_audiolibro.configuracion import cargar_ajustes
 from vn_audiolibro.preparacion import Aviso
 from vn_audiolibro.ui import app
 from vn_audiolibro.ui.principal import VentanaPrincipal
@@ -16,8 +17,21 @@ def test_abre_la_ventana_principal(
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     monkeypatch.setattr(QApplication, "exec", lambda _: 0)
     monkeypatch.setattr(app, "preparar", lambda: None)  # sin el diálogo de descargas
+    traductores: list[object] = []
+    original = app.instalar_traduccion
+    monkeypatch.setattr(app, "instalar_traduccion", lambda qt: traductores.append(original(qt)))
+    preguntas: list[object] = []
+    # La primera vez pregunta si avisar de versiones nuevas; con «No», no se conecta a nada.
+
+    def preguntar(*args: object) -> QMessageBox.StandardButton:
+        preguntas.append(args)
+        return QMessageBox.StandardButton.No
+
+    monkeypatch.setattr(QMessageBox, "question", preguntar)
 
     assert app.ejecutar(["vn-audiolibro"]) == 0
+    assert len(preguntas) == 1
+    assert cargar_ajustes().avisar_versiones is False
 
     ventanas = [w for w in qapp.topLevelWidgets() if isinstance(w, VentanaPrincipal) and w.isVisible()]
     assert ventanas
@@ -26,6 +40,10 @@ def test_abre_la_ventana_principal(
     assert not QApplication.windowIcon().isNull()
     for ventana in ventanas:
         ventana.close()
+    # Que la traducción de Qt no se quede instalada para los tests siguientes.
+    for traductor in traductores:
+        if traductor is not None:
+            qapp.removeTranslator(traductor)  # type: ignore[arg-type]
 
 
 def test_icono(qapp: QApplication) -> None:

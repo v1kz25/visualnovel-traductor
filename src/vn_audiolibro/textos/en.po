@@ -1,0 +1,1284 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: en\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Pausar o seguir"
+msgstr "Pause or continue"
+
+msgid "Repetir la línea"
+msgstr "Repeat the line"
+
+msgid "Saltar la línea"
+msgstr "Skip the line"
+
+msgid "Mostrar u ocultar los subtítulos"
+msgstr "Show or hide the subtitles"
+
+msgid "Atajo no válido: «{atajo}». Usa una letra, un número o de F1 a F12."
+msgstr "Invalid shortcut: “{atajo}”. Use a letter, a number or F1 to F12."
+
+msgid "Atajo no válido: «{atajo}». Los modificadores son Ctrl, Alt, Shift y Meta."
+msgstr "Invalid shortcut: “{atajo}”. The modifiers are Ctrl, Alt, Shift and Meta."
+
+msgid "Atajo no válido: «{atajo}». Ctrl+Alt con F1 a F12 cambia de consola en Linux."
+msgstr "Invalid shortcut: “{atajo}”. Ctrl+Alt with F1 to F12 switches console on Linux."
+
+msgid "Atajo no válido: «{atajo}». Una letra o un número necesitan Ctrl, Alt o Meta."
+msgstr "Invalid shortcut: “{atajo}”. A letter or a number needs Ctrl, Alt or Meta."
+
+msgid "El atajo «{atajo}» está repetido: «{una}» y «{otra}»."
+msgstr "The shortcut “{atajo}” is used twice: “{una}” and “{otra}”."
+
+msgid "Jugar"
+msgstr "Play"
+
+msgid "No hay traducción guardada para «{texto}»"
+msgstr "No saved translation for “{texto}”"
+
+msgid "No hay ninguna ventana con «{texto}» en el título"
+msgstr "No window has “{texto}” in its title"
+
+msgid "La ventana {id_ventana:#x} ya no existe"
+msgstr "Window {id_ventana:#x} no longer exists"
+
+msgid "La ventana {id_ventana:#x} está minimizada"
+msgstr "Window {id_ventana:#x} is minimized"
+
+msgid "Windows no da el contenido de la ventana {id_ventana:#x}"
+msgstr "Windows does not provide the contents of window {id_ventana:#x}"
+
+msgid "El servidor X no tiene la extensión Composite"
+msgstr "The X server does not have the Composite extension"
+
+msgid "No se puede usar el llavero del sistema para guardar la clave: {error}"
+msgstr "The system keyring cannot be used to store the key: {error}"
+
+msgid "Controles (escribe y pulsa Intro): p pausa/reanuda · r repite · s calla · m silencia la voz · q sale"
+msgstr "Controls (type and press Enter): p pause/resume · r repeat · s skip · m mute voice · q quit"
+
+msgid "zona no válida (x,y,ancho,alto entre 0 y 1): {zona}"
+msgstr "invalid area (x,y,width,height between 0 and 1): {zona}"
+
+msgid "Audiolibro en tiempo real para novelas visuales en chino y japonés."
+msgstr "Real-time audiobook for Chinese and Japanese visual novels."
+
+msgid "comprueba el sistema y descarga lo que falte para usar la app"
+msgstr "check the system and download whatever the app still needs"
+
+msgid "lista los juegos configurados"
+msgstr "list the configured games"
+
+msgid "configura un juego nuevo"
+msgstr "set up a new game"
+
+msgid "nombre"
+msgstr "name"
+
+msgid "cómo se llamará el juego en la lista"
+msgstr "name of the game in the list"
+
+msgid "TÍTULO"
+msgstr "TITLE"
+
+msgid "texto del título de la ventana del juego"
+msgstr "text from the title of the game window"
+
+msgid "ZONA"
+msgstr "AREA"
+
+msgid "x,y,ancho,alto entre 0 y 1"
+msgstr "x,y,width,height between 0 and 1"
+
+msgid "zona donde el juego escribe quién habla (x,y,ancho,alto): ese nombre no se lee"
+msgstr "area where the game shows who is speaking (x,y,width,height): that name is not read aloud"
+
+msgid "leer también el nombre de quien habla al principio de la línea («Nombre：texto»)"
+msgstr "also read the speaker's name at the start of the line (“Name：text”)"
+
+msgid "idioma del juego"
+msgstr "language of the game"
+
+msgid "idioma de la traducción y de la voz"
+msgstr "language of the translation and the voice"
+
+msgid "el texto es oscuro sobre fondo claro"
+msgstr "the text is dark on a light background"
+
+msgid "el texto va en columnas verticales"
+msgstr "the text runs in vertical columns"
+
+msgid "buscar el texto con el detector: para el texto escrito sobre la imagen, sin caja de texto"
+msgstr "find the text with the detector: for text written over the picture, with no text box"
+
+msgid "voz de hombre (por defecto, de mujer)"
+msgstr "male voice (female by default)"
+
+msgid "VELOCIDAD"
+msgstr "SPEED"
+
+msgid "velocidad de la voz (1 = normal)"
+msgstr "voice speed (1 = normal)"
+
+msgid "NIVEL"
+msgstr "LEVEL"
+
+msgid "volumen del juego"
+msgstr "game volume"
+
+msgid "no bajar el juego mientras habla"
+msgstr "do not lower the game while the voice speaks"
+
+msgid "al avanzar deprisa, cortar la línea que suena y leer solo la última (por defecto, en cola)"
+msgstr "when skipping ahead quickly, cut off the current line and read only the latest one (queued by default)"
+
+msgid "SEGUNDOS"
+msgstr "SECONDS"
+
+msgid "segundos de silencio entre líneas"
+msgstr "seconds of silence between lines"
+
+msgid "traducir con Gemini en la nube (opcional; antes, guarda tu clave con la orden «gemini»)"
+msgstr "translate with Gemini in the cloud (optional; first save your key with the \"gemini\" command)"
+
+msgid "CARPETA"
+msgstr "FOLDER"
+
+msgid "carpeta del juego: el texto se saca de su guion y el OCR solo sirve para seguirlo"
+msgstr "game folder: the text is taken from its script and OCR is only used to follow it"
+
+msgid "traducir desde la traducción oficial al inglés que trae el guion"
+msgstr "translate from the official English translation included in the script"
+
+msgid "muestra lo que ocupa la caché; permite vaciarla o limitarla"
+msgstr "show how much space the cache uses; clear or limit it"
+
+msgid "JUEGO"
+msgstr "GAME"
+
+msgid "vacía la caché de un juego"
+msgstr "clear the cache of one game"
+
+msgid "vacía la caché de todos los juegos"
+msgstr "clear the cache of all games"
+
+msgid "tamaño máximo de la caché"
+msgstr "maximum cache size"
+
+msgid "no limitar el tamaño de la caché"
+msgstr "do not limit the cache size"
+
+msgid "añade vn-audiolibro al menú de aplicaciones (en Windows, al menú Inicio)"
+msgstr "add vn-audiolibro to the applications menu (the Start menu on Windows)"
+
+msgid "guarda en el llavero del sistema tu clave de API de Gemini (la pide sin mostrarla)"
+msgstr "saves your Gemini API key in the system keyring (asks for it without showing it)"
+
+msgid "borra la clave guardada"
+msgstr "deletes the saved key"
+
+msgid "traduce por adelantado el guion de un juego (se puede cortar con Ctrl+C y seguir otro día)"
+msgstr "translates a game's script in advance (you can stop with Ctrl+C and continue another day)"
+
+msgid "juego"
+msgstr "game"
+
+msgid "nombre del juego"
+msgstr "name of the game"
+
+msgid "juega con un juego configurado"
+msgstr "play a configured game"
+
+msgid "muestra cuánto tarda cada etapa de cada línea"
+msgstr "show how long each stage takes for each line"
+
+msgid "{orden} crear \"Mi juego\" --ventana \"título\""
+msgstr "{orden} crear \"My game\" --ventana \"title\""
+
+msgid "No hay juegos. Configura uno con: {orden}"
+msgstr "No games yet. Set one up with: {orden}"
+
+msgid "{nombre}  (ventana «{ventana}», {idioma} → {destino}, id {id})"
+msgstr "{nombre}  (window “{ventana}”, {idioma} → {destino}, id {id})"
+
+msgid "Clave de Gemini borrada del llavero."
+msgstr "Gemini key deleted from the keyring."
+
+msgid "Clave de API de Gemini: "
+msgstr "Gemini API key: "
+
+msgid "No se ha guardado nada: la clave está vacía."
+msgstr "Nothing was saved: the key is empty."
+
+msgid "Clave guardada en el llavero del sistema. Elige Gemini como traductor en el editor del juego."
+msgstr "Key saved in the system keyring. Choose Gemini as the translator in the game editor."
+
+msgid "Acceso directo creado en {ruta}"
+msgstr "Shortcut created at {ruta}"
+
+msgid "Aviso: "
+msgstr "Note: "
+
+msgid "Todos los componentes están descargados."
+msgstr "All components are downloaded."
+
+msgid "Descargando {componente} ({tamano}, {licencia})…"
+msgstr "Downloading {componente} ({tamano}, {licencia})…"
+
+msgid "Todo listo."
+msgstr "All set."
+
+msgid "Vaciada la caché de «{nombre}»: {n} línea"
+msgid_plural "Vaciada la caché de «{nombre}»: {n} líneas"
+msgstr[0] "Cleared the cache of “{nombre}”: {n} line"
+msgstr[1] "Cleared the cache of “{nombre}”: {n} lines"
+
+msgid "Vaciada la caché: {n} línea"
+msgid_plural "Vaciada la caché: {n} líneas"
+msgstr[0] "Cleared the cache: {n} line"
+msgstr[1] "Cleared the cache: {n} lines"
+
+msgid "(juego borrado)"
+msgstr "(deleted game)"
+
+msgid "{nombre}: {n} línea, {tamano}"
+msgid_plural "{nombre}: {n} líneas, {tamano}"
+msgstr[0] "{nombre}: {n} line, {tamano}"
+msgstr[1] "{nombre}: {n} lines, {tamano}"
+
+msgid "vacía"
+msgstr "empty"
+
+msgid "sin límite"
+msgstr "no limit"
+
+msgid "máximo {limite} MB"
+msgstr "maximum {limite} MB"
+
+msgid "Total: {total} ({limite})"
+msgstr "Total: {total} ({limite})"
+
+msgid "Juego «{nombre}» guardado en {ruta}"
+msgstr "Game “{nombre}” saved to {ruta}"
+
+msgid "--desde-ingles necesita --guion"
+msgstr "--desde-ingles needs --guion"
+
+msgid "{hechos} de {total} párrafos ({porcentaje} %) · {minutos:.0f} min"
+msgstr "{hechos} of {total} paragraphs ({porcentaje} %) · {minutos:.0f} min"
+
+msgid "Traduciendo el guion. Ctrl+C para cortar: lo traducido se conserva."
+msgstr "Translating the script. Ctrl+C to stop: what has been translated is kept."
+
+msgid "Cortado. La próxima vez seguirá por donde lo ha dejado."
+msgstr "Stopped. Next time it will continue where it left off."
+
+msgid "Listo: {n} párrafo traducido."
+msgid_plural "Listo: {n} párrafos traducidos."
+msgstr[0] "Done: {n} paragraph translated."
+msgstr[1] "Done: {n} paragraphs translated."
+
+msgid " (no leída: llegó otra línea)"
+msgstr " (not read: another line arrived)"
+
+msgid "no se leyó"
+msgstr "not read"
+
+msgid "  OCR {ocr:.2f} s · traducción {traduccion:.2f} s · hasta la voz {voz}"
+msgstr "  OCR {ocr:.2f} s · translation {traduccion:.2f} s · until the voice {voz}"
+
+msgid "▶ Reanudado"
+msgstr "▶ Resumed"
+
+msgid "⏸ En pausa (p para seguir)"
+msgstr "⏸ Paused (p to resume)"
+
+msgid "🔊 Voz activada"
+msgstr "🔊 Voice on"
+
+msgid "🔇 Voz silenciada: se sigue traduciendo (m para oírla)"
+msgstr "🔇 Voice muted: still translating (m to hear it)"
+
+msgid "El límite de la caché tiene que ser de al menos {minimo} MB"
+msgstr "The cache limit must be at least {minimo} MB"
+
+msgid "Solo se descarga por HTTPS: {url}"
+msgstr "Downloads are only allowed over HTTPS: {url}"
+
+msgid "Descarga cancelada: {fichero}"
+msgstr "Download cancelled: {fichero}"
+
+msgid "SHA-256 inesperado en {fichero}: {obtenido} (se esperaba {esperado})"
+msgstr "Unexpected SHA-256 for {fichero}: {obtenido} (expected {esperado})"
+
+msgid "No se pudo descargar {fichero}: {error}"
+msgstr "Could not download {fichero}: {error}"
+
+msgid "No se pudo extraer {fichero}: {error}"
+msgstr "Could not extract {fichero}: {error}"
+
+msgid "No se pudo extraer {fichero}: {entrada} sale del destino"
+msgstr "Could not extract {fichero}: {entrada} points outside the destination"
+
+msgid "No se ha encontrado el guion del juego en {carpeta}"
+msgstr "The game's script was not found in {carpeta}"
+
+msgid "El guion de {carpeta} no tiene texto"
+msgstr "The script in {carpeta} has no text"
+
+msgid "No se pudo leer {fichero}: {error}"
+msgstr "Could not read {fichero}: {error}"
+
+msgid "Versión de formato no válida: {version!r}"
+msgstr "Invalid format version: {version!r}"
+
+msgid "Este juego se guardó con una versión más nueva de la app: actualízala"
+msgstr "This game was saved with a newer version of the app: please update it"
+
+msgid "Juego guardado con un valor no válido: {error}"
+msgstr "The saved game has an invalid value: {error}"
+
+msgid "Falta «{clave}» o no es un texto"
+msgstr "“{clave}” is missing or is not text"
+
+msgid "«{clave}» tiene que ser verdadero o falso: {valor!r}"
+msgstr "“{clave}” must be true or false: {valor!r}"
+
+msgid "se esperaba un número: {valor!r}"
+msgstr "a number was expected: {valor!r}"
+
+msgid "el glosario tiene que ser de textos"
+msgstr "the glossary must contain text"
+
+msgid "los personajes tienen que ser nombres con su voz"
+msgstr "characters must be names with their voice"
+
+msgid "«activo» tiene que ser verdadero o falso: {activo!r}"
+msgstr "“activo” must be true or false: {activo!r}"
+
+msgid "los nombres de las aplicaciones tienen que ser textos"
+msgstr "application names must be text"
+
+msgid "subtítulos no válidos: {datos!r}"
+msgstr "invalid subtitles: {datos!r}"
+
+msgid "No hay ningún juego con el identificador {id_perfil}"
+msgstr "There is no game with the identifier {id_perfil}"
+
+msgid "No hay ningún juego llamado «{texto}»"
+msgstr "There is no game called “{texto}”"
+
+msgid "Ya hay un juego llamado «{nombre}»"
+msgstr "There is already a game called “{nombre}”"
+
+msgid "Identificador de juego no válido: {id_perfil}"
+msgstr "Invalid game identifier: {id_perfil}"
+
+msgid "{fichero} no contiene un juego"
+msgstr "{fichero} does not contain a game"
+
+msgid "{fichero} contiene el juego {id}"
+msgstr "{fichero} contains game {id}"
+
+msgid "El nivel de {que} tiene que estar entre 0 y 1: {nivel}"
+msgstr "The level for {que} must be between 0 and 1: {nivel}"
+
+msgid "La velocidad tiene que estar entre {minima} y {maxima}: {velocidad}"
+msgstr "The speed must be between {minima} and {maxima}: {velocidad}"
+
+msgid "La pausa entre líneas tiene que estar entre 0 y {maximo} s"
+msgstr "The pause between lines must be between 0 and {maximo} s"
+
+msgid "El tamaño de los subtítulos tiene que estar entre {minimo} y {maximo}"
+msgstr "The subtitle size must be between {minimo} and {maximo}"
+
+msgid "opacidad"
+msgstr "opacity"
+
+msgid "Falta la carpeta del juego para leer su guion"
+msgstr "The game folder is missing to read its script"
+
+msgid "El juego necesita un nombre"
+msgstr "The game needs a name"
+
+msgid "El nombre no puede pasar de {maximo} caracteres"
+msgstr "The name cannot be longer than {maximo} characters"
+
+msgid "Falta el título de la ventana del juego"
+msgstr "The title of the game window is missing"
+
+msgid "Idioma no admitido: {idioma} (admitidos: {admitidos})"
+msgstr "Unsupported language: {idioma} (supported: {admitidos})"
+
+msgid "Idioma de traducción no admitido: {destino} (admitidos: {admitidos})"
+msgstr "Unsupported translation language: {destino} (supported: {admitidos})"
+
+msgid "Un juego en inglés no se puede traducir al inglés"
+msgstr "A game in English can't be translated into English"
+
+msgid "El texto en inglés no puede ir en columnas verticales"
+msgstr "English text cannot be in vertical columns"
+
+msgid "Si se traduce desde el inglés del guion, no se puede traducir al inglés"
+msgstr "If translating from the script's English, the translation cannot be into English"
+
+msgid "Identificador de juego no válido: {id}"
+msgstr "Invalid game identifier: {id}"
+
+msgid "Cada personaje necesita un nombre, sin repetirlo"
+msgstr "Each character needs a name, without repeating it"
+
+msgid "{personaje}: {traduccion}"
+msgstr "{personaje}: {traduccion}"
+
+msgid "Error al procesar la línea: {error}"
+msgstr "Error while processing the line: {error}"
+
+msgid "Opciones:"
+msgstr "Choices:"
+
+msgid "{numero}. {opcion}"
+msgstr "{numero}. {opcion}"
+
+msgid "No se pudo traducir la línea: {error}"
+msgstr "Could not translate the line: {error}"
+
+msgid "«{nombre}» no tiene configurado el guion del juego"
+msgstr "“{nombre}” has no game script configured"
+
+msgid "Leyendo el guion del juego…"
+msgstr "Reading the game's script…"
+
+msgid "Preparando el traductor (la primera vez se descarga)…"
+msgstr "Preparing the translator (downloaded the first time)…"
+
+msgid "Arrancando el traductor…"
+msgstr "Starting the translator…"
+
+msgid "Falta la clave de Gemini: se traducirá en local. Añádela en el editor del juego."
+msgstr "The Gemini key is missing: translating locally. Add it in the game editor."
+
+msgid "Buscando la ventana «{ventana}»…"
+msgstr "Looking for the window “{ventana}”…"
+
+msgid "Preparando los modelos (la primera vez se descargan)…"
+msgstr "Preparing the models (they are downloaded the first time)…"
+
+msgid "Calentando el traductor…"
+msgstr "Warming up the translator…"
+
+msgid "Leyendo «{ventana}»."
+msgstr "Reading “{ventana}”."
+
+msgid "No se usará el guion, solo el OCR: {error}"
+msgstr "The script will not be used, only OCR: {error}"
+
+msgid "No se podrá bajar el volumen del juego: {error}"
+msgstr "The game volume cannot be lowered: {error}"
+
+msgid "{que} todavía no está disponible en este sistema ({sistema})"
+msgstr "{que} is not available on this system yet ({sistema})"
+
+msgid "El listado de ventanas"
+msgstr "Listing windows"
+
+msgid "La captura de ventanas"
+msgstr "Window capture"
+
+msgid "La reproducción de audio"
+msgstr "Audio playback"
+
+msgid "El acceso directo en el menú"
+msgstr "The menu shortcut"
+
+msgid "Los atajos de teclado globales"
+msgstr "Global keyboard shortcuts"
+
+msgid "El control del volumen"
+msgstr "Volume control"
+
+msgid "vn-audiolibro no incluye ningún juego ni textos de juegos. Las traducciones y el audio que genera se guardan solo en tu equipo y no se comparten con nadie."
+msgstr "vn-audiolibro does not include any games or game text. The translations and audio it creates are stored only on your computer and are never shared."
+
+msgid "Reconocimiento de texto (PP-OCRv5)"
+msgstr "Text recognition (PP-OCRv5)"
+
+msgid "Lee el texto chino o japonés de la pantalla"
+msgstr "Reads the Chinese or Japanese text on screen"
+
+msgid "Servidor de traducción (llama.cpp)"
+msgstr "Translation server (llama.cpp)"
+
+msgid "Ejecuta el modelo de traducción en tu equipo"
+msgstr "Runs the translation model on your computer"
+
+msgid "Voz en español (Piper, sharvard)"
+msgstr "Spanish voice (Piper, sharvard)"
+
+msgid "Lee las traducciones en voz alta, con voz de mujer u hombre"
+msgstr "Reads the translations aloud, with a female or male voice"
+
+msgid "Piper GPL-3.0; voz CC BY 3.0"
+msgstr "Piper GPL-3.0; voice CC BY 3.0"
+
+msgid "Modelo de traducción (Hy-MT2 1.8B, Tencent)"
+msgstr "Translation model (Hy-MT2 1.8B, Tencent)"
+
+msgid "Traduce sin conexión"
+msgstr "Translates offline"
+
+msgid "La sesión no es X11: no se podrá capturar la ventana del juego. Entra en una sesión «Xorg» o «X11» desde la pantalla de inicio de sesión."
+msgstr "This is not an X11 session: the game window cannot be captured. Choose an “Xorg” or “X11” session on the login screen."
+
+msgid "Falta «paplay»: no se oirá la voz. Instálalo con: sudo apt install pulseaudio-utils"
+msgstr "“paplay” is missing: the voice will not be heard. Install it with: sudo apt install pulseaudio-utils"
+
+msgid "Falta libpulse: no se podrá bajar el volumen del juego mientras habla la voz."
+msgstr "libpulse is missing: the game volume cannot be lowered while the voice speaks."
+
+msgctxt "nombre de este idioma"
+msgid "Español"
+msgstr "English"
+
+msgctxt "separador decimal"
+msgid ","
+msgstr "."
+
+msgid "No se pudo conectar con Gemini: {error}"
+msgstr "Could not connect to Gemini: {error}"
+
+msgid "Respuesta de Gemini no válida: {error}"
+msgstr "Invalid response from Gemini: {error}"
+
+msgid "Gemini: límite de peticiones agotado ({mensaje})"
+msgstr "Gemini: request limit reached ({mensaje})"
+
+msgid "Gemini no acepta la clave de API: revísala en el editor del juego"
+msgstr "Gemini does not accept the API key: check it in the game editor"
+
+msgid "Error de Gemini ({codigo}): {mensaje}"
+msgstr "Gemini error ({codigo}): {mensaje}"
+
+msgid "Gemini ha bloqueado la línea ({motivo})"
+msgstr "Gemini blocked the line ({motivo})"
+
+msgid "Gemini no ha devuelto ninguna traducción"
+msgstr "Gemini returned no translation"
+
+msgid "Gemini no ha traducido la línea ({motivo})"
+msgstr "Gemini did not translate the line ({motivo})"
+
+msgid "Lo traducido se conserva: sigue mañana, o elige el traductor local en el editor del juego para seguir ahora."
+msgstr "What has been translated is kept: continue tomorrow, or choose the local translator in the game editor to continue now."
+
+msgid "Google sigue diciendo que se ha agotado el límite de Gemini. {seguir}"
+msgstr "Google keeps saying the Gemini limit has been reached. {seguir}"
+
+msgid "Se ha agotado el límite diario de Gemini ({peticiones} peticiones). {seguir}"
+msgstr "The daily Gemini limit ({peticiones} requests) has been reached. {seguir}"
+
+msgid "límite de peticiones por minuto o por día"
+msgstr "requests per minute or per day limit"
+
+msgid "Se traduce en local mientras Gemini no esté disponible: {motivo}"
+msgstr "Translating locally while Gemini is unavailable: {motivo}"
+
+msgid "Gemini vuelve a traducir"
+msgstr "Gemini is translating again"
+
+msgid "El texto del juego se envía a Google para traducirlo."
+msgstr "The game's text is sent to Google to be translated."
+
+msgid "En el plan gratuito, Google puede usar ese texto para mejorar sus productos."
+msgstr "On the free plan, Google may use that text to improve its products."
+
+msgid "Necesitas tu propia clave gratuita de Google AI Studio: {url}"
+msgstr "You need your own free Google AI Studio key: {url}"
+
+msgid "Respuesta inesperada de llama-server: {respuesta}"
+msgstr "Unexpected response from llama-server: {respuesta}"
+
+msgid "Error al llamar a llama-server en streaming: {error}"
+msgstr "Error while streaming from llama-server: {error}"
+
+msgid "Error al llamar a llama-server ({ruta}): {error}"
+msgstr "Error while calling llama-server ({ruta}): {error}"
+
+msgid "Evento inesperado de llama-server: {datos}"
+msgstr "Unexpected event from llama-server: {datos}"
+
+msgid "llama-server no arrancó; detalles en {registro}"
+msgstr "llama-server did not start; details in {registro}"
+
+msgid "Audiolibro para novelas visuales"
+msgstr "Audiobook for visual novels"
+
+msgid "Traduce novelas visuales en chino y japonés y las lee en voz alta"
+msgstr "Translates Chinese and Japanese visual novels and reads them aloud"
+
+msgid "No se pudo crear el acceso directo: {error}"
+msgstr "Could not create the shortcut: {error}"
+
+msgid "El acceso directo del menú Inicio solo se puede crear desde la versión empaquetada ({exe})."
+msgstr "The Start menu shortcut can only be created from the packaged version ({exe})."
+
+msgid "Bajar a"
+msgstr "Lower to"
+
+msgid "Silenciar"
+msgstr "Mute"
+
+msgid "No tocar nunca"
+msgstr "Never touch"
+
+msgid "Encima de la caja de texto"
+msgstr "Above the text box"
+
+msgid "Debajo de la caja de texto"
+msgstr "Below the text box"
+
+msgid "Tapando la caja de texto (solo se ve la traducción)"
+msgstr "Covering the text box (only the translation is shown)"
+
+msgid "La traducción aparece sobre el juego mientras es la ventana activa; los clics siguen llegando al juego. Si no se ve con el juego en pantalla completa, ponlo en modo ventana o ventana sin bordes."
+msgstr "The translation appears over the game while it is the active window; clicks still reach the game. If it does not show with the game in full screen, switch the game to windowed or borderless window mode."
+
+msgid "Los personajes aparecen aquí la primera vez que hablan mientras juegas. Elige con qué voz se leen sus líneas; los demás y la narración se leen con la voz del juego."
+msgstr "Characters appear here the first time they speak while you play. Choose the voice their lines are read with; everyone else and the narration are read with the game's voice."
+
+msgid "Ajustes de «{nombre}»"
+msgstr "Settings for “{nombre}”"
+
+msgid "Voz y lectura"
+msgstr "Voice and reading"
+
+msgid "Personajes"
+msgstr "Characters"
+
+msgid "Volumen"
+msgstr "Volume"
+
+msgid "Glosario"
+msgstr "Glossary"
+
+msgid "Subtítulos"
+msgstr "Subtitles"
+
+msgid "Mujer"
+msgstr "Female"
+
+msgid "Hombre"
+msgstr "Male"
+
+msgid "Escuchar"
+msgstr "Listen"
+
+msgid "En cola: leer todas las líneas en orden"
+msgstr "Queue: read every line in order"
+
+msgid "Saltar a la última: cortar al avanzar"
+msgstr "Jump to the latest: cut off when you advance"
+
+msgid "Voz"
+msgstr "Voice"
+
+msgid "Velocidad"
+msgstr "Speed"
+
+msgid "Al avanzar deprisa"
+msgstr "When advancing quickly"
+
+msgid "Pausa entre líneas"
+msgstr "Pause between lines"
+
+msgid "Personaje en el juego"
+msgstr "Character in the game"
+
+msgid "Nombre traducido"
+msgstr "Translated name"
+
+msgid "Añadir personaje"
+msgstr "Add character"
+
+msgid "Quitar el elegido"
+msgstr "Remove selected"
+
+msgid "La del juego"
+msgstr "The game's voice"
+
+msgid "Mostrar la traducción encima del juego"
+msgstr "Show the translation over the game"
+
+msgid "Posición"
+msgstr "Position"
+
+msgid "Tamaño de la letra"
+msgstr "Font size"
+
+msgid "Opacidad del fondo"
+msgstr "Background opacity"
+
+msgid "No se pudo probar la voz: {error}"
+msgstr "Could not test the voice: {error}"
+
+msgid "Bajar el volumen del juego mientras habla la voz"
+msgstr "Lower the game volume while the voice speaks"
+
+msgid "Aplicación"
+msgstr "Application"
+
+msgid "Qué hacer"
+msgstr "Action"
+
+msgid "Nivel"
+msgstr "Level"
+
+msgid "Nombre de la aplicación (p. ej. Firefox)"
+msgstr "Application name (e.g. Firefox)"
+
+msgid "Ver las que suenan"
+msgstr "Show those playing sound"
+
+msgid "Añadir"
+msgstr "Add"
+
+msgid "Quitar la elegida"
+msgstr "Remove selected"
+
+msgid "Volumen del juego"
+msgstr "Game volume"
+
+msgid "<b>Otras aplicaciones</b> (un vídeo, música…)"
+msgstr "<b>Other applications</b> (a video, music…)"
+
+msgid "Término en el juego"
+msgstr "Term in the game"
+
+msgid "Traducción"
+msgstr "Translation"
+
+msgid "Añadir término"
+msgstr "Add term"
+
+msgid "Nombres propios y términos que siempre se traducen igual, p. ej. 櫻 → Sakura. Escribe la traducción en el idioma al que se traduce el juego ({idioma})."
+msgstr "Names and terms that are always translated the same way, e.g. 櫻 → Sakura. Write the translation in the language the game is translated into ({idioma})."
+
+msgid "Glosario cambiado"
+msgstr "Glossary changed"
+
+msgid "Las líneas ya traducidas no usan el glosario nuevo.\n\n¿Borrar sus traducciones guardadas para que se vuelvan a traducir al jugar?"
+msgstr "Lines that were already translated do not use the new glossary.\n\nDelete their saved translations so they are translated again when you play?"
+
+msgid "Atajos de teclado"
+msgstr "Keyboard shortcuts"
+
+msgid "Mientras juegas, estas combinaciones funcionan aunque el juego esté en primer plano, y el juego deja de recibirlas. Si alguna choca con las del juego o con otra aplicación, cámbiala o desactiva los atajos."
+msgstr "While you play, these key combinations work even with the game in the foreground, and the game no longer receives them. If one clashes with the game's or another application's, change it or turn the shortcuts off."
+
+msgid "Usar atajos de teclado mientras juegas"
+msgstr "Use keyboard shortcuts while playing"
+
+msgid "Restablecer"
+msgstr "Reset"
+
+msgid "Caché de traducciones y audio"
+msgstr "Translation and audio cache"
+
+msgid "Cada línea traducida se guarda con su audio: la segunda vez suena al instante y sin traducir. Vaciarla solo hace que se vuelva a traducir."
+msgstr "Each translated line is saved with its audio: the second time it plays instantly, without translating. Clearing it only means it will be translated again."
+
+msgid "Juego"
+msgstr "Game"
+
+msgid "Líneas"
+msgstr "Lines"
+
+msgid "Tamaño"
+msgstr "Size"
+
+msgid "Vaciar el elegido"
+msgstr "Clear selected"
+
+msgid "Vaciar todo"
+msgstr "Clear all"
+
+msgid "Tamaño máximo"
+msgstr "Maximum size"
+
+msgid "Al llegar al máximo se borra primero lo que se usó hace más tiempo."
+msgstr "When the maximum is reached, whatever was used longest ago is deleted first."
+
+msgid "Total: {total}"
+msgstr "Total: {total}"
+
+msgid "La caché está vacía."
+msgstr "The cache is empty."
+
+msgid "¿Vaciar la caché de «{nombre}»?"
+msgstr "Clear the cache of “{nombre}”?"
+
+msgid "¿Vaciar la caché de todos los juegos?"
+msgstr "Clear the cache of all games?"
+
+msgid "Se volverá a traducir al jugar."
+msgstr "It will be translated again when you play."
+
+msgid "Vaciar caché"
+msgstr "Clear cache"
+
+msgid "Chino tradicional"
+msgstr "Traditional Chinese"
+
+msgid "Chino simplificado"
+msgstr "Simplified Chinese"
+
+msgid "Japonés"
+msgstr "Japanese"
+
+msgid "Inglés"
+msgstr "English"
+
+msgid "Español"
+msgstr "Spanish"
+
+msgid "Francés"
+msgstr "French"
+
+msgid "Portugués"
+msgstr "Portuguese"
+
+msgid "Alemán"
+msgstr "German"
+
+msgid "Italiano"
+msgstr "Italian"
+
+msgid "Claro sobre fondo oscuro"
+msgstr "Light on a dark background"
+
+msgid "Oscuro sobre fondo claro"
+msgstr "Dark on a light background"
+
+msgid "Horizontal"
+msgstr "Horizontal"
+
+msgid "Vertical (columnas)"
+msgstr "Vertical (columns)"
+
+msgid "Local (gratis y sin conexión)"
+msgstr "Local (free and offline)"
+
+msgid "Gemini (en la nube, con tu clave de Google)"
+msgstr "Gemini (in the cloud, with your Google key)"
+
+msgid "Por color (caja de texto lisa)"
+msgstr "By color (plain text box)"
+
+msgid "Con el detector (texto sobre la imagen)"
+msgstr "With the detector (text over the picture)"
+
+msgid "El texto del juego"
+msgstr "The game's text"
+
+msgid "La traducción oficial al inglés del guion"
+msgstr "The script's official English translation"
+
+msgid "Opcional. Si el juego guarda su guion en ficheros legibles, elige su carpeta: el texto sale exacto del guion, se traduce por adelantado y el OCR solo sirve para saber por dónde vas."
+msgstr "Optional. If the game stores its script in readable files, choose its folder: the text comes exactly from the script, it is translated in advance and OCR is only used to know where you are."
+
+msgid "Por color va bien con una caja de texto lisa. Si el juego escribe el texto directamente sobre la imagen y el OCR lee mal o nada, usa el detector: es más lento y la primera vez descarga un modelo de 5 MB."
+msgstr "By color works well with a plain text box. If the game writes the text directly over the picture and the OCR reads it wrong or not at all, use the detector: it is slower and downloads a 5 MB model the first time."
+
+msgid "Captura la ventana y dibuja con el ratón un recuadro sobre la caja de texto. Si el juego muestra el nombre de quien habla en una caja aparte, pulsa «Zona del nombre» y dibuja otro recuadro sobre ella: ese nombre no se leerá en voz alta."
+msgstr "Capture the window and draw a box over the text box with the mouse. If the game shows the speaker's name in a separate box, press “Name area” and draw another box over it: that name will not be read aloud."
+
+msgid "Si la línea empieza por el nombre de quien habla («Nombre：texto», «【Nombre】texto» o «Nombre「texto」»), no se lee: se muestra delante de la traducción."
+msgstr "If the line starts with the speaker's name (“Name：text”, “【Name】text” or “Name「text」”), it is not read aloud: it is shown before the translation."
+
+msgid "Carpeta del juego"
+msgstr "Game folder"
+
+msgid "Editar juego"
+msgstr "Edit game"
+
+msgid "Añadir juego"
+msgstr "Add game"
+
+msgid "Cómo lo verás en la lista"
+msgstr "How it will appear in the list"
+
+msgid "Actualizar"
+msgstr "Refresh"
+
+msgid "Parte del título de la ventana que la identifica"
+msgstr "Part of the window title that identifies it"
+
+msgid "Ninguno: solo OCR"
+msgstr "None: OCR only"
+
+msgid "Elegir…"
+msgstr "Choose…"
+
+msgid "No leer el nombre de quien habla"
+msgstr "Don't read the speaker's name"
+
+msgid "Nombre"
+msgstr "Name"
+
+msgid "Ventana del juego"
+msgstr "Game window"
+
+msgid "Buscar por el título"
+msgstr "Find by title"
+
+msgid "Idioma del juego"
+msgstr "Game language"
+
+msgid "Traducir y leer en"
+msgstr "Translate and read in"
+
+msgid "Texto"
+msgstr "Text"
+
+msgid "Orientación"
+msgstr "Orientation"
+
+msgid "Buscar el texto"
+msgstr "Find the text"
+
+msgid "Traductor"
+msgstr "Translator"
+
+msgid "Clave de Gemini"
+msgstr "Gemini key"
+
+msgid "Guion del juego"
+msgstr "Game script"
+
+msgid "Traducir desde"
+msgstr "Translate from"
+
+msgid "Capturar ventana"
+msgstr "Capture window"
+
+msgid "Probar OCR"
+msgstr "Test OCR"
+
+msgid "Toda la ventana"
+msgstr "Whole window"
+
+msgid "Zona del nombre"
+msgstr "Name area"
+
+msgid "Dibuja un recuadro sobre la caja con el nombre de quien habla"
+msgstr "Draw a box over the box with the speaker's name"
+
+msgid "Quitar zona del nombre"
+msgstr "Remove name area"
+
+msgid "Zona de texto"
+msgstr "Text area"
+
+msgid "No se pudieron listar las ventanas: {error}"
+msgstr "Could not list the windows: {error}"
+
+msgid "{titulo}  (proceso {pid})"
+msgstr "{titulo}  (process {pid})"
+
+msgid "No se pudo capturar la ventana: {error}"
+msgstr "Could not capture the window: {error}"
+
+msgid "Leyendo…"
+msgstr "Reading…"
+
+msgid "(no se ha reconocido texto en la zona)"
+msgstr "(no text recognized in the area)"
+
+msgid "(ninguno)"
+msgstr "(none)"
+
+msgid "{texto} · Nombre: {nombre}"
+msgstr "{texto} · Name: {nombre}"
+
+msgid "No se pudo leer: {error}"
+msgstr "Could not read: {error}"
+
+msgid "Texto leído: {texto}"
+msgstr "Text read: {texto}"
+
+msgid "Guion encontrado: {n} párrafo, con la traducción oficial al inglés."
+msgid_plural "Guion encontrado: {n} párrafos, con la traducción oficial al inglés."
+msgstr[0] "Script found: {n} paragraph, with the official English translation."
+msgstr[1] "Script found: {n} paragraphs, with the official English translation."
+
+msgid "Guion encontrado: {n} párrafo."
+msgid_plural "Guion encontrado: {n} párrafos."
+msgstr[0] "Script found: {n} paragraph."
+msgstr[1] "Script found: {n} paragraphs."
+
+msgid "Para traducir con Gemini, pega tu clave de API de Google AI Studio"
+msgstr "To translate with Gemini, paste your Google AI Studio API key"
+
+msgid "Guardada en el llavero (escribe otra para cambiarla)"
+msgstr "Saved in the keyring (type another one to change it)"
+
+msgid "Pega aquí tu clave de Google AI Studio"
+msgstr "Paste your Google AI Studio key here"
+
+msgid "menos de 1 min"
+msgstr "less than 1 min"
+
+msgid "{minutos} min"
+msgstr "{minutos} min"
+
+msgid "{horas} h {minutos:02d} min"
+msgstr "{horas} h {minutos:02d} min"
+
+msgid "Traducir el guion"
+msgstr "Translate the script"
+
+msgid "Con Gemini se traducen {lineas} líneas por petición. El plan gratuito permite unas {peticiones} peticiones al día: si se agotan, sigue otro día."
+msgstr "With Gemini, {lineas} lines are translated per request. The free plan allows about {peticiones} requests a day: if they run out, continue another day."
+
+msgid "Con el traductor local puede tardar varias horas en un guion largo."
+msgstr "With the local translator, a long script can take several hours."
+
+msgid "Traduce entero el guion de «{nombre}» antes de jugar: al jugar, todo saldrá de la caché al momento.\n\n{como} Puedes parar cuando quieras y seguir otro día: lo traducido se conserva. Mientras traduce no se puede jugar."
+msgstr "Translates the whole script of “{nombre}” before you play: while playing, everything will come straight from the cache.\n\n{como} You can stop whenever you like and continue another day: what's already translated is kept. You can't play while it's translating."
+
+msgid "Empezar"
+msgstr "Start"
+
+msgid "Cerrar"
+msgstr "Close"
+
+msgid "Parar"
+msgstr "Stop"
+
+msgid "Buscando lo que falta por traducir…"
+msgstr "Looking for what's left to translate…"
+
+msgid "Traduciendo…"
+msgstr "Translating…"
+
+msgid "{hechos} de {total} párrafos ({porcentaje} %)"
+msgstr "{hechos} of {total} paragraphs ({porcentaje}%)"
+
+msgid "Tiempo: {transcurrido}"
+msgstr "Time: {transcurrido}"
+
+msgid "Tiempo: {transcurrido} · Falta, más o menos: {restante}"
+msgstr "Time: {transcurrido} · About {restante} left"
+
+msgid "Seguir"
+msgstr "Continue"
+
+msgid "Parado. La próxima vez seguirá por donde lo ha dejado."
+msgstr "Stopped. Next time it will pick up where it left off."
+
+msgid "Reintentar"
+msgstr "Retry"
+
+msgid "Listo: {n} párrafo traducido. El guion está entero en la caché."
+msgid_plural "Listo: {n} párrafos traducidos. El guion está entero en la caché."
+msgstr[0] "Done: {n} paragraph translated. The whole script is in the cache."
+msgstr[1] "Done: {n} paragraphs translated. The whole script is in the cache."
+
+msgid "Parando…"
+msgstr "Stopping…"
+
+msgid "Pendiente"
+msgstr "Pending"
+
+msgid "Descargando…"
+msgstr "Downloading…"
+
+msgid "Listo"
+msgstr "Done"
+
+msgid "Error"
+msgstr "Error"
+
+msgid "Preparar vn-audiolibro"
+msgstr "Set up vn-audiolibro"
+
+msgid "Para funcionar sin conexión, la app necesita descargar estos componentes una sola vez ({total} en total). Después no hace falta Internet."
+msgstr "To work offline, the app needs to download these components once ({total} in total). After that, no Internet connection is needed."
+
+msgid "Componente"
+msgstr "Component"
+
+msgid "Licencia"
+msgstr "License"
+
+msgid "Estado"
+msgstr "Status"
+
+msgid "Descargar"
+msgstr "Download"
+
+msgid "Ahora no"
+msgstr "Not now"
+
+msgid "Añadir vn-audiolibro al menú Inicio"
+msgstr "Add vn-audiolibro to the Start menu"
+
+msgid "Cancelar"
+msgstr "Cancel"
+
+msgid "No se pudo descargar «{componente}»: {error}"
+msgstr "Could not download “{componente}”: {error}"
+
+msgid "{hecho} de {total}"
+msgstr "{hecho} of {total}"
+
+msgid "Descarga cancelada."
+msgstr "Download cancelled."
+
+msgid "El idioma cambiará la próxima vez que abras vn-audiolibro."
+msgstr "The language will change the next time you open vn-audiolibro."
+
+msgid "(no leída)"
+msgstr "(not read)"
+
+msgid "Editar"
+msgstr "Edit"
+
+msgid "Ajustes"
+msgstr "Settings"
+
+msgid "Borrar"
+msgstr "Delete"
+
+msgid "Caché…"
+msgstr "Cache…"
+
+msgid "Atajos de teclado…"
+msgstr "Keyboard shortcuts…"
+
+msgid "Traducir el guion…"
+msgstr "Translate the script…"
+
+msgid "Traduce entero el guion del juego antes de jugar (solo en los juegos con guion)."
+msgstr "Translates the game's whole script before you play (only for games with a script)."
+
+msgid "Juegos"
+msgstr "Games"
+
+msgid "El del sistema"
+msgstr "System default"
+
+msgid "Idioma de la app"
+msgstr "App language"
+
+msgid "Avisar de versiones nuevas"
+msgstr "Notify me of new versions"
+
+msgid "Al abrir la app, consulta en GitHub como mucho una vez al día si hay una versión nueva."
+msgstr "When the app opens, it checks GitHub for a new version at most once a day."
+
+msgid "Elige un juego y pulsa Jugar."
+msgstr "Choose a game and press Play."
+
+msgid "Pausa (P)"
+msgstr "Pause (P)"
+
+msgid "Repetir (R)"
+msgstr "Repeat (R)"
+
+msgid "Saltar (S)"
+msgstr "Skip (S)"
+
+msgid "Detener"
+msgstr "Stop"
+
+msgid "Silenciar voz (M)"
+msgstr "Mute voice (M)"
+
+msgid "Sigue traduciendo y mostrando cada línea, pero sin leerla."
+msgstr "Keeps translating and showing each line, without reading it aloud."
+
+msgid "Mantener encima del juego"
+msgstr "Keep on top of the game"
+
+msgid "Solo subtítulos: minimizar la app al jugar"
+msgstr "Subtitles only: minimize the app while playing"
+
+msgid "Al jugar, la app se minimiza y sobre el juego solo quedan los subtítulos. Controla la partida con los atajos de teclado y, al terminar, la app vuelve."
+msgstr "While you play, the app is minimized and only the subtitles stay over the game. Control it with the keyboard shortcuts; when you stop, the app comes back."
+
+msgid "Ventana «{ventana}» · {idioma} → {destino}"
+msgstr "Window “{ventana}” · {idioma} → {destino}"
+
+msgid "Borrar juego"
+msgstr "Delete game"
+
+msgid "¿Borrar «{nombre}» de la lista?\n\nSus traducciones y su audio guardados también se borrarán."
+msgstr "Delete “{nombre}” from the list?\n\nIts saved translations and audio will also be deleted."
+
+msgid "Preparando «{nombre}»…"
+msgstr "Preparing “{nombre}”…"
+
+msgid "Leyendo «{nombre}». Juega con normalidad."
+msgstr "Reading “{nombre}”. Play as usual."
+
+msgid "No se pueden usar los atajos de teclado en este sistema."
+msgstr "Keyboard shortcuts can't be used on this system."
+
+msgid "Estos atajos ya los usa otra aplicación y no funcionarán: {atajos}"
+msgstr "These shortcuts are already used by another application and won't work: {atajos}"
+
+msgid "Partida terminada. Elige un juego y pulsa Jugar."
+msgstr "Session finished. Choose a game and press Play."
+
+msgid "Seguir (P)"
+msgstr "Resume (P)"
+
+msgid "Error al parar: {error}"
+msgstr "Error while stopping: {error}"
+
+msgid "Versiones nuevas"
+msgstr "New versions"
+
+msgid "¿Quieres que la app te avise cuando haya una versión nueva?\n\nPara saberlo, consultará GitHub como mucho una vez al día al abrirse. No descarga ni instala nada. Se puede cambiar cuando quieras en «Avisar de versiones nuevas»."
+msgstr "Do you want the app to tell you when there's a new version?\n\nTo find out, it will check GitHub at most once a day when it opens. It doesn't download or install anything. You can change this at any time with “Notify me of new versions”."
+
+msgid "Hay una versión nueva: {version}."
+msgstr "A new version is available: {version}."
+
+msgid "Novedades"
+msgstr "What's new"
+
+msgid "Novedades de la versión {version}"
+msgstr "What's new in version {version}"
+
+msgid "Esta versión no tiene notas."
+msgstr "This version has no release notes."
+
+msgid "Pulsa «Capturar ventana»"
+msgstr "Press “Capture window”"
+
+msgid "No se pudo acceder al audio de Windows: {error}"
+msgstr "Could not access Windows audio: {error}"
+
+msgid "Audio ilegible en {fichero}: {error}"
+msgstr "Unreadable audio in {fichero}: {error}"
+
+msgid "Velocidad no válida: {velocidad}"
+msgstr "Invalid speed: {velocidad}"
+
+msgid "La voz {voz} no tiene el hablante {hablante}"
+msgstr "Voice {voz} does not have speaker {hablante}"
+
+msgid "No se pudo abrir la salida de audio: {error}"
+msgstr "Could not open the audio output: {error}"
+
+msgid "No se encuentra `paplay`: instala pulseaudio-utils"
+msgstr "`paplay` not found: install pulseaudio-utils"
+
+msgid "Falta libpulse: no se puede controlar el volumen"
+msgstr "libpulse is missing: the volume cannot be controlled"
+
+msgid "No se pudo conectar con el servidor de sonido: {error}"
+msgstr "Could not connect to the sound server: {error}"

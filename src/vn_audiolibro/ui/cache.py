@@ -1,6 +1,7 @@
 """Ventana de la caché: cuánto ocupa cada juego, vaciarla y su tamaño máximo."""
 
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -24,15 +25,15 @@ from vn_audiolibro.cache.sqlite import CacheSQLite
 from vn_audiolibro.configuracion import (
     LIMITE_CACHE_MB,
     LIMITE_MIN_MB,
-    AjustesApp,
     cargar_ajustes,
     formato_tamano,
     guardar_ajustes,
 )
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
+from vn_audiolibro.textos import N_, _
 
 AbrirCache = Callable[[], CacheSQLite]
-JUEGO_BORRADO = "(juego borrado)"
+JUEGO_BORRADO = N_("(juego borrado)")
 
 
 class VentanaCache(QDialog):
@@ -46,7 +47,7 @@ class VentanaCache(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Caché de traducciones y audio")
+        self.setWindowTitle(_("Caché de traducciones y audio"))
         self.resize(560, 420)
         self._almacen = almacen
         self._abrir_cache = abrir_cache
@@ -54,20 +55,22 @@ class VentanaCache(QDialog):
         self._ajustes = cargar_ajustes(ruta_ajustes)
 
         explicacion = QLabel(
-            "Cada línea traducida se guarda con su audio: la segunda vez suena al instante y sin "
-            "traducir. Vaciarla solo hace que se vuelva a traducir."
+            _(
+                "Cada línea traducida se guarda con su audio: la segunda vez suena al instante y sin "
+                "traducir. Vaciarla solo hace que se vuelva a traducir."
+            )
         )
         explicacion.setWordWrap(True)
         self.tabla = QTableWidget(0, 3)
-        self.tabla.setHorizontalHeaderLabels(["Juego", "Líneas", "Tamaño"])
+        self.tabla.setHorizontalHeaderLabels([_("Juego"), _("Líneas"), _("Tamaño")])
         self.tabla.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.tabla.verticalHeader().setVisible(False)
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.total = QLabel()
-        self.boton_vaciar = QPushButton("Vaciar el elegido")
-        self.boton_vaciar_todo = QPushButton("Vaciar todo")
-        self.limitar = QCheckBox("Tamaño máximo")
+        self.boton_vaciar = QPushButton(_("Vaciar el elegido"))
+        self.boton_vaciar_todo = QPushButton(_("Vaciar todo"))
+        self.limitar = QCheckBox(_("Tamaño máximo"))
         self.limite = QSpinBox()
         self.limite.setRange(LIMITE_MIN_MB, 1024 * 1024)
         self.limite.setSingleStep(256)
@@ -89,7 +92,7 @@ class VentanaCache(QDialog):
         columna.addLayout(fila_vaciar)
         columna.addLayout(fila_limite)
         columna.addWidget(
-            QLabel("Al llegar al máximo se borra primero lo que se usó hace más tiempo."),
+            QLabel(_("Al llegar al máximo se borra primero lo que se usó hace más tiempo.")),
         )
         columna.addWidget(botones)
 
@@ -115,13 +118,15 @@ class VentanaCache(QDialog):
         self.tabla.setRowCount(0)
         for fila, juego in enumerate(resumen):
             self.tabla.insertRow(fila)
-            nombre = QTableWidgetItem(nombres.get(juego.perfil, JUEGO_BORRADO))
+            nombre = QTableWidgetItem(nombres.get(juego.perfil, _(JUEGO_BORRADO)))
             nombre.setData(Qt.ItemDataRole.UserRole, juego.perfil)
             self.tabla.setItem(fila, 0, nombre)
             self.tabla.setItem(fila, 1, QTableWidgetItem(str(juego.entradas)))
             self.tabla.setItem(fila, 2, QTableWidgetItem(formato_tamano(juego.bytes)))
         total = sum(juego.bytes for juego in resumen)
-        self.total.setText(f"Total: {formato_tamano(total)}" if resumen else "La caché está vacía.")
+        self.total.setText(
+            _("Total: {total}").format(total=formato_tamano(total)) if resumen else _("La caché está vacía.")
+        )
         self._actualizar_botones()
 
     def perfil_elegido(self) -> tuple[str, str] | None:
@@ -134,12 +139,14 @@ class VentanaCache(QDialog):
 
     def vaciar_elegido(self) -> None:
         elegido = self.perfil_elegido()
-        if elegido is None or not self._confirmar(f"¿Vaciar la caché de «{elegido[1]}»?"):
+        if elegido is None or not self._confirmar(
+            _("¿Vaciar la caché de «{nombre}»?").format(nombre=elegido[1])
+        ):
             return
         self._con_cache(lambda cache: cache.invalidar(elegido[0]))
 
     def vaciar_todo(self) -> None:
-        if self._confirmar("¿Vaciar la caché de todos los juegos?"):
+        if self._confirmar(_("¿Vaciar la caché de todos los juegos?")):
             self._con_cache(lambda cache: cache.vaciar())
 
     def guardar_limite(self) -> None:
@@ -147,7 +154,7 @@ class VentanaCache(QDialog):
         limite = self.limite.value() if self.limitar.isChecked() else None
         if limite == self._ajustes.limite_cache_mb:
             return
-        self._ajustes = AjustesApp(limite_cache_mb=limite)
+        self._ajustes = replace(self._ajustes, limite_cache_mb=limite)
         guardar_ajustes(self._ajustes, self._ruta_ajustes)
         if limite is not None:
             limite_bytes = self._ajustes.limite_cache_bytes
@@ -172,8 +179,8 @@ class VentanaCache(QDialog):
         self.recargar()
 
     def _confirmar(self, pregunta: str) -> bool:
-        texto = f"{pregunta}\n\nSe volverá a traducir al jugar."
-        respuesta = QMessageBox.question(self, "Vaciar caché", texto)
+        texto = f"{pregunta}\n\n{_('Se volverá a traducir al jugar.')}"
+        respuesta = QMessageBox.question(self, _("Vaciar caché"), texto)
         return respuesta == QMessageBox.StandardButton.Yes
 
     def _actualizar_botones(self) -> None:

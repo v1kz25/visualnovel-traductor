@@ -1,22 +1,30 @@
 """Tests de la línea de comandos `vn-audiolibro`, con la sesión sustituida por una falsa."""
 
+import contextlib
 import io
+import re
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import ClassVar
 
 import pytest
 
-from vn_audiolibro import cli
+from tests.conftest import parece_espanol
+from vn_audiolibro import cli, plataforma
 from vn_audiolibro.cache.modelos import Clave
 from vn_audiolibro.cache.sqlite import CacheSQLite
 from vn_audiolibro.captura.modelos import VentanaNoEncontradaError
+from vn_audiolibro.configuracion import AjustesApp, guardar_ajustes
 from vn_audiolibro.descargas import DescargaFallidaError
+from vn_audiolibro.guion.modelos import GuionNoEncontradoError, OrigenGuion
+from vn_audiolibro.ocr.preprocesado import BusquedaTexto
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
-from vn_audiolibro.perfiles.modelos import AjustesLectura, Color, Perfil
+from vn_audiolibro.perfiles.modelos import AjustesGuion, AjustesLectura, Color, Perfil
 from vn_audiolibro.pipeline.orquestador import LineaJuego, Tiempos
 from vn_audiolibro.preparacion import Aviso, Componente
+from vn_audiolibro.traduccion.gemini import URL_CLAVES
+from vn_audiolibro.traduccion.modelos import Motor
 from vn_audiolibro.voz.modelos import ModoLectura
 from vn_audiolibro.voz.piper import Hablante
 
@@ -30,6 +38,7 @@ def configuracion(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> AlmacenPer
 class OrquestadorFalso:
     def __init__(self) -> None:
         self.pausado = False
+        self.silenciado = False
         self.acciones: list[str] = []
 
     def pausar(self) -> None:
@@ -39,6 +48,14 @@ class OrquestadorFalso:
     def reanudar(self) -> None:
         self.pausado = False
         self.acciones.append("reanudar")
+
+    def silenciar(self) -> None:
+        self.silenciado = True
+        self.acciones.append("silenciar")
+
+    def quitar_silencio(self) -> None:
+        self.silenciado = False
+        self.acciones.append("quitar_silencio")
 
     def repetir(self) -> None:
         self.acciones.append("repetir")
@@ -72,7 +89,7 @@ class SesionFalsa:
         if SesionFalsa.fallo is not None:
             raise SesionFalsa.fallo
         self.al_linea(LineaJuego("一", "uno", desde_cache=True, leida=True))
-        self.al_linea(LineaJuego("二", "dos", desde_cache=False, leida=False))
+        self.al_linea(LineaJuego("二", "dos", desde_cache=False, leida=False, personaje="Rena"))
         return self.orquestador
 
     def detener(self) -> None:
@@ -104,6 +121,8 @@ def test_crear_y_listar(configuracion: AlmacenPerfiles, capsys: pytest.CaptureFi
     opciones = [
         "--oscuro",
         "--vertical",
+        "--detector",
+        "--gemini",
         "--hombre",
         "--velocidad",
         "1.2",
@@ -111,13 +130,21 @@ def test_crear_y_listar(configuracion: AlmacenPerfiles, capsys: pytest.CaptureFi
         "0.5",
         "--destino",
         "en",
+        "--zona-nombre",
+        "0.1,0.62,0.2,0.06",
+        "--con-nombre",
     ]
     assert cli.main([*argumentos, *opciones, "--sin-bajar-volumen"]) == 0
 
     (perfil,) = configuracion.listar()
     assert (perfil.nombre, perfil.ventana, perfil.idioma, perfil.destino) == ("Mi juego", "juego", "ja", "en")
     assert perfil.color == Color.OSCURO
+    assert perfil.busqueda is BusquedaTexto.DETECTOR
+    assert perfil.traductor is Motor.GEMINI
     assert perfil.zona.y == 0.7
+    assert perfil.zona_nombre is not None
+    assert perfil.zona_nombre.y == 0.62
+    assert not perfil.separar_personaje
     assert (perfil.voz.hablante, perfil.voz.velocidad) == (Hablante.HOMBRE, 1.2)
     assert (perfil.volumen.activo, perfil.volumen.nivel_juego) == (False, 0.5)
     assert perfil.lectura == AjustesLectura(ModoLectura.COLA, 2.0)
@@ -126,6 +153,10 @@ def test_crear_y_listar(configuracion: AlmacenPerfiles, capsys: pytest.CaptureFi
     otro = configuracion.buscar("Otro")
     assert otro.lectura == AjustesLectura(ModoLectura.ULTIMA, 0.5)
     assert otro.destino == "es"
+    assert otro.busqueda is BusquedaTexto.COLOR
+    assert otro.traductor is Motor.LOCAL
+    assert otro.zona_nombre is None
+    assert otro.separar_personaje
 
     assert cli.main(["juegos"]) == 0
     assert "Mi juego  (ventana «juego», ja → en" in capsys.readouterr().out
@@ -137,6 +168,72 @@ def test_crear_repetido_o_no_valido(capsys: pytest.CaptureFixture[str]) -> None:
     assert "Ya hay un juego" in capsys.readouterr().err
     assert cli.main(["crear", "Otro", "--ventana", "juego", "--velocidad", "5"]) == 1
     assert "velocidad" in capsys.readouterr().err
+    assert cli.main(["crear", "Otro", "--ventana", "otro", "--idioma", "en", "--destino", "en"]) == 1
+    assert "no se puede traducir al inglés" in capsys.readouterr().err
+    assert cli.main(["crear", "Otro", "--ventana", "otro", "--idioma", "en"]) == 0
+
+
+def test_crear_con_guion(configuracion: AlmacenPerfiles, capsys: pytest.CaptureFixture[str]) -> None:
+    assert cli.main(["crear", "Juego", "--ventana", "juego", "--guion", "/juegos/uno", "--desde-ingles"]) == 0
+    assert configuracion.buscar("Juego").guion == AjustesGuion("/juegos/uno", OrigenGuion.INGLES)
+
+    assert cli.main(["crear", "Otro", "--ventana", "otro", "--guion", "/juegos/dos"]) == 0
+    assert configuracion.buscar("Otro").guion == AjustesGuion("/juegos/dos", OrigenGuion.ORIGINAL)
+
+    assert cli.main(["crear", "Mal", "--ventana", "mal", "--desde-ingles"]) == 1
+    assert "--guion" in capsys.readouterr().err
+
+
+class PreparadorFalso:
+    def __init__(self, cortar: bool = False) -> None:
+        self._cortar = cortar
+
+    def traducir_todo(self, al_progreso: Callable[[int, int], None]) -> int:
+        al_progreso(1, 4)
+        if self._cortar:
+            raise KeyboardInterrupt
+        al_progreso(4, 4)
+        return 3
+
+
+def _traductor_guion(
+    monkeypatch: pytest.MonkeyPatch, preparador: PreparadorFalso | None = None, error: Exception | None = None
+) -> None:
+    @contextlib.contextmanager
+    def falso(perfil: Perfil, al_estado: Callable[[str], None]) -> Iterator[PreparadorFalso]:
+        al_estado("Arrancando")
+        if error is not None:
+            raise error
+        yield preparador or PreparadorFalso()
+
+    monkeypatch.setattr(cli, "traductor_guion", falso)
+
+
+def test_traducir_guion(
+    configuracion: AlmacenPerfiles, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    configuracion.guardar(Perfil("Juego", "juego", guion=AjustesGuion("/j")))
+    _traductor_guion(monkeypatch)
+
+    assert cli.main(["traducir-guion", "Juego"]) == 0
+
+    salida = capsys.readouterr()
+    assert "4 de 4 párrafos (100 %)" in salida.out
+    assert "3 párrafos traducidos" in salida.out
+    assert "Arrancando" in salida.err
+
+
+def test_traducir_guion_cortado_o_sin_guion(
+    configuracion: AlmacenPerfiles, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    configuracion.guardar(Perfil("Juego", "juego", guion=AjustesGuion("/j")))
+    _traductor_guion(monkeypatch, PreparadorFalso(cortar=True))
+    assert cli.main(["traducir-guion", "Juego"]) == 0
+    assert "Cortado" in capsys.readouterr().out
+
+    _traductor_guion(monkeypatch, error=GuionNoEncontradoError("sin guion"))
+    assert cli.main(["traducir-guion", "Juego"]) == 1
+    assert "sin guion" in capsys.readouterr().err
 
 
 def test_zona_mal_escrita(capsys: pytest.CaptureFixture[str]) -> None:
@@ -150,16 +247,24 @@ def test_jugar_muestra_las_lineas_y_atiende_las_ordenes(
 ) -> None:
     assert cli.main(["crear", "Juego", "--ventana", "juego"]) == 0
 
-    assert cli.main(["jugar", "juego"], entrada=["p\n", "p\n", "r\n", "s\n", "\n", "?\n", "q\n", "r\n"]) == 0
+    assert (
+        cli.main(
+            ["jugar", "juego"], entrada=["p\n", "p\n", "r\n", "s\n", "m\n", "m\n", "\n", "?\n", "q\n", "r\n"]
+        )
+        == 0
+    )
 
     (sesion,) = sesion_falsa.creadas
-    assert sesion.orquestador.acciones == ["pausar", "reanudar", "repetir", "saltar"]  # nada tras «q»
+    acciones = ["pausar", "reanudar", "repetir", "saltar", "silenciar", "quitar_silencio"]
+    assert sesion.orquestador.acciones == acciones  # nada tras «q»
     assert sesion.detenida
     salida = capsys.readouterr()
     assert "一\n→ uno\n" in salida.out
-    assert "二\n→ dos (no leída: llegó otra línea)" in salida.out
+    assert "二\n→ Rena: dos (no leída: llegó otra línea)" in salida.out
     assert "⏸ En pausa" in salida.out
     assert "▶ Reanudado" in salida.out
+    assert "🔇 Voz silenciada" in salida.out
+    assert "🔊 Voz activada" in salida.out
     assert salida.out.count("Controles") == 2  # al empezar y tras la orden desconocida
     assert "! Arrancando…" in salida.err
 
@@ -220,7 +325,7 @@ def test_cache_mostrar_vaciar_y_limitar(
 
     assert cli.main(["cache"]) == 0
     salida = capsys.readouterr().out
-    assert "Juego: 1 líneas" in salida
+    assert "Juego: 1 línea," in salida
     assert "(máximo 2048 MB)" in salida
 
     assert cli.main(["cache", "--limite", "500"]) == 0
@@ -231,7 +336,7 @@ def test_cache_mostrar_vaciar_y_limitar(
     assert "al menos 100 MB" in capsys.readouterr().err
 
     assert cli.main(["cache", "--vaciar", "juego"]) == 0
-    assert "Vaciada la caché de «Juego»: 1 líneas" in capsys.readouterr().out
+    assert "Vaciada la caché de «Juego»: 1 línea\n" in capsys.readouterr().out
     assert cli.main(["cache", "--vaciar-todo"]) == 0
     assert "Total: vacía" in capsys.readouterr().out
 
@@ -337,3 +442,63 @@ def test_en_windows_la_salida_es_utf8(
     monkeypatch.setattr(sys, "stderr", None)  # la interfaz empaquetada no tiene consola
     cli.salida_utf8()
     assert salida.encoding == codificacion
+
+
+@pytest.mark.parametrize("orden", [[], ["crear"], ["jugar"], ["cache"]])
+def test_ayuda_en_ingles_con_el_sistema_en_ingles(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], orden: list[str]
+) -> None:
+    monkeypatch.setattr(plataforma, "idiomas_sistema", lambda: ["en_US.UTF-8"])
+    with pytest.raises(SystemExit):
+        cli.main([*orden, "--help"])
+    ayuda = capsys.readouterr().out
+    # Sin el uso, que repite las opciones: ni las órdenes ni las opciones se traducen.
+    cuerpo = ayuda.split("\n\n", 1)[1]
+    sin_nombres = re.sub(
+        r"--?[\w-]+|\{[^}]*\}|\b(crear|jugar|juegos|preparar|cache|instalar-acceso)\b", "", cuerpo
+    )
+    assert not parece_espanol(sin_nombres), sin_nombres
+
+
+def test_idioma_elegido_en_la_app_manda_sobre_el_del_sistema(capsys: pytest.CaptureFixture[str]) -> None:
+    guardar_ajustes(AjustesApp(idioma="en"))
+    assert cli.main(["juegos"]) == 0
+    assert "No games yet" in capsys.readouterr().out
+
+
+# Clave de Gemini
+
+
+def test_gemini_guarda_la_clave_sin_mostrarla(capsys: pytest.CaptureFixture[str]) -> None:
+    from vn_audiolibro import claves
+
+    assert cli._gemini(borrar=False, pedir_clave=lambda _: "  clave-123 ") == 0
+
+    assert claves.leer() == "clave-123"
+    salida = capsys.readouterr().out
+    assert "clave-123" not in salida
+    assert "se envía a Google" in salida
+    assert URL_CLAVES in salida  # dónde crear la clave
+
+    assert cli.main(["gemini", "--borrar"]) == 0
+    assert claves.leer() is None
+
+
+def test_gemini_con_la_clave_vacia_no_guarda_nada(capsys: pytest.CaptureFixture[str]) -> None:
+    from vn_audiolibro import claves
+
+    assert cli._gemini(borrar=False, pedir_clave=lambda _: " ") == 1
+    assert claves.leer() is None
+    assert "vacía" in capsys.readouterr().err
+
+
+def test_gemini_sin_llavero(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    from vn_audiolibro import claves
+
+    def sin_llavero(clave: str) -> None:
+        raise claves.LlaveroNoDisponibleError("No se puede usar el llavero")
+
+    monkeypatch.setattr(claves, "guardar", sin_llavero)
+
+    assert cli._gemini(borrar=False, pedir_clave=lambda _: "clave") == 1
+    assert "llavero" in capsys.readouterr().err

@@ -1,6 +1,7 @@
 """Tests del orquestador con lector, traductor y voz falsos y la caché real en una carpeta temporal."""
 
 import threading
+import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
@@ -10,8 +11,11 @@ import pytest
 from vn_audiolibro.cache.modelos import Clave
 from vn_audiolibro.cache.sqlite import CacheSQLite
 from vn_audiolibro.captura.modelos import Imagen, ZonaEstable
+from vn_audiolibro.guion.buscador import BuscadorGuion, SeguidorGuion
+from vn_audiolibro.guion.modelos import Guion
+from vn_audiolibro.guion.previa import AjustesTraduccionGuion, PreparadorGuion
 from vn_audiolibro.ocr.lector import TextoLeido
-from vn_audiolibro.pipeline.orquestador import AjustesOrquestador, LineaJuego, Orquestador
+from vn_audiolibro.pipeline.orquestador import AjustesOrquestador, GuionJuego, LineaJuego, Orquestador
 from vn_audiolibro.traduccion.modelos import (
     Glosario,
     Peticion,
@@ -21,6 +25,9 @@ from vn_audiolibro.traduccion.modelos import (
 )
 from vn_audiolibro.voz.locutor import TextoPorPartes
 from vn_audiolibro.voz.modelos import ModoLectura
+
+from ..guion.sinteticos import guion as guion_sintetico
+from ..guion.sinteticos import pantalla
 
 ESPERA_S = 5.0
 PERFIL = "0" * 32
@@ -33,16 +40,28 @@ class LectorFalso:
         self.textos: dict[int, str] = {}
         self.leidas: list[str] = []
 
-    def zona(self, texto: str) -> ZonaEstable:
+    def zona(self, texto: str, nombre: str | None = None) -> ZonaEstable:
+        """Zona con ese texto y, si se indica, con la zona del nombre del personaje."""
+        return ZonaEstable(
+            imagen=self._imagen(texto),
+            y_inicio=0,
+            completa=True,
+            instante=0.0,
+            nombre=None if nombre is None else self._imagen(nombre),
+        )
+
+    def _imagen(self, texto: str) -> Imagen:
         imagen = np.zeros((4, 4, 3), dtype=np.uint8)
         self.textos[id(imagen)] = texto
-        return ZonaEstable(imagen=imagen, y_inicio=0, completa=True, instante=0.0)
+        return imagen
 
     def leer(self, imagen: Imagen) -> TextoLeido:
         texto = self.textos[id(imagen)]
         self.leidas.append(texto)
         if texto == "ilegible":
             raise RuntimeError("fallo del OCR")
+        if "||" in texto:  # opciones de un menú
+            return TextoLeido(tuple(texto.split("||")), menu=True)
         return TextoLeido((texto,) if texto else ())
 
 
@@ -65,13 +84,26 @@ class TraductorFalso:
 
 
 class VozFalsa:
+    """Las líneas «suenan» en cuanto se piden."""
+
     def __init__(self) -> None:
         self.dichas: list[str] = []
+        self.voces: list[str | None] = []
+        """Con qué voz se pidió cada línea (None: la del juego)."""
         self.calladas = 0
         self.saltadas = 0
 
-    def decir(self, clave: Clave, texto: str) -> None:
+    def decir(
+        self,
+        clave: Clave,
+        texto: str,
+        voz: str | None = None,
+        al_empezar: Callable[[], None] | None = None,
+    ) -> None:
         self.dichas.append(texto)
+        self.voces.append(voz)
+        if al_empezar is not None:
+            al_empezar()
 
     def callar(self) -> None:
         self.calladas += 1
@@ -89,29 +121,60 @@ class Montaje:
         puerta: threading.Event | None = None,
         modo: ModoLectura = ModoLectura.COLA,
         destino: str = "es",
+        guion: Guion | None = None,
+        por_partes: bool = False,
+        separar_personaje: bool = True,
+        voces: tuple[tuple[str, str], ...] = (),
+        voz: VozFalsa | None = None,
     ) -> None:
         self.lector = LectorFalso()
-        self.traductor: TraductorFalso | TraductorPorPartesFalso = TraductorFalso(puerta)
-        self.voz: VozFalsa = VozFalsa()
+        self.traductor: TraductorFalso | TraductorPorPartesFalso = (
+            TraductorPorPartesFalso(puerta) if por_partes else TraductorFalso(puerta)
+        )
+        self.voz: VozFalsa = voz or (VozPorPartesFalsa(cache) if por_partes else VozFalsa())
         self.cache = cache
         self.lineas: list[LineaJuego] = []
         self.errores: list[str] = []
+        self.personajes: list[tuple[str, str]] = []
+        self.subtitulos: list[str] = []
         glosario = Glosario.desde_dict({"櫻": "Sakura"})
+        idioma = "zh-Hant" if guion is None else "ja"
+        self.guion = None
+        if guion is not None:
+            preparador = PreparadorGuion(guion, AjustesTraduccionGuion(PERFIL, idioma), self.traductor, cache)
+            self.guion = GuionJuego(
+                SeguidorGuion(guion, BuscadorGuion(guion, idioma)), preparador, anticipo=2
+            )
         self.orquestador = Orquestador(
-            AjustesOrquestador(PERFIL, "zh-Hant", glosario, modo, destino=destino),
+            AjustesOrquestador(
+                PERFIL,
+                idioma,
+                glosario,
+                modo,
+                destino=destino,
+                separar_personaje=separar_personaje,
+                voces=voces,
+            ),
             self.lector,
             self.traductor,
             cache,
             self.voz,
             self.lineas.append,
             self.errores.append,
+            self.guion,
+            al_personaje=lambda original, traduccion: self.personajes.append((original, traduccion)),
+            al_subtitulo=self.subtitulos.append,
         )
 
     def llega(self, *textos: str) -> None:
         """Llegan zonas con esos textos y se espera a que se procesen."""
         for texto in textos:
-            self.orquestador.recibir_zona(self.lector.zona(texto))
-            assert self.orquestador.esperar(ESPERA_S)
+            self.llega_con_nombre(texto, None)
+
+    def llega_con_nombre(self, texto: str, nombre: str | None) -> None:
+        """Llega una zona con ese texto y esa zona del nombre, y se espera a que se procese."""
+        self.orquestador.recibir_zona(self.lector.zona(texto, nombre))
+        assert self.orquestador.esperar(ESPERA_S)
 
 
 @pytest.fixture
@@ -159,6 +222,91 @@ def test_pasa_el_contexto_y_el_glosario(montaje: Montaje) -> None:
     assert ultima.contexto[-1].traduccion == "es:四"
     assert ultima.glosario.presentes("櫻") == [("櫻", "Sakura")]
     assert ultima.idioma == "zh-Hant"
+
+
+def test_no_lee_el_nombre_del_personaje_y_lo_traduce_una_sola_vez(montaje: Montaje) -> None:
+    montaje.llega("小雨：我們走吧。", "小雨：好。", "她走了。")
+
+    assert [p.texto for p in montaje.traductor.peticiones] == ["我們走吧。", "小雨", "好。", "她走了。"]
+    assert montaje.voz.dichas == ["es:我們走吧。", "es:好。", "es:她走了。"]
+    assert [linea.personaje for linea in montaje.lineas] == ["es:小雨", "es:小雨", None]
+    assert montaje.lineas[0].original == "我們走吧。"
+    assert montaje.lineas[0].traduccion_con_personaje == "es:小雨: es:我們走吧。"
+    assert montaje.lineas[2].traduccion_con_personaje == "es:她走了。"
+    assert montaje.personajes == [("小雨", "es:小雨")]
+    # El nombre entra en el glosario de las líneas siguientes, para que salga siempre igual.
+    assert montaje.traductor.peticiones[-1].glosario.presentes("小雨") == [("小雨", "es:小雨")]
+
+
+def test_el_nombre_del_glosario_no_se_traduce(montaje: Montaje) -> None:
+    montaje.llega("【櫻】走吧。", "【櫻】好。")
+
+    assert [p.texto for p in montaje.traductor.peticiones] == ["走吧。", "好。"]  # el nombre, no
+    assert montaje.lineas[0].personaje == "Sakura"
+    assert montaje.personajes == [("櫻", "Sakura")]  # avisa de que ha hablado, una vez por partida
+
+
+def test_un_nombre_sin_letras_se_queda_como_esta(montaje: Montaje) -> None:
+    montaje.llega("？？？「誰？」")
+
+    assert [p.texto for p in montaje.traductor.peticiones] == ["「誰？」"]
+    assert montaje.lineas[0].personaje == "？？？"
+
+
+def test_si_el_nombre_no_se_puede_traducir_se_muestra_el_original(montaje: Montaje) -> None:
+    montaje.llega("fallo：一", "fallo：二")
+
+    assert [p.texto for p in montaje.traductor.peticiones] == ["一", "fallo", "二"]  # sin reintentos
+    assert [linea.personaje for linea in montaje.lineas] == ["fallo", "fallo"]
+    assert montaje.personajes == [("fallo", "fallo")]  # sin traducción, pero ha hablado
+
+
+def test_con_la_zona_del_nombre_lee_el_nombre_de_ella(montaje: Montaje) -> None:
+    montaje.llega_con_nombre("我們走吧。", "小雨")
+    montaje.llega_con_nombre("我們走吧。", "櫻")  # el mismo texto dicho por otro personaje
+    montaje.llega_con_nombre("林：好。", "")  # zona del nombre vacía: narración, sin buscar el formato
+
+    assert montaje.voz.dichas == ["es:我們走吧。", "es:我們走吧。", "es:林：好。"]
+    assert [linea.personaje for linea in montaje.lineas] == ["es:小雨", "Sakura", None]
+
+
+def test_cada_personaje_se_lee_con_su_voz(cache: CacheSQLite) -> None:
+    montaje = Montaje(cache, voces=(("小雨", "M"),))
+    try:
+        montaje.llega("她走了。", "林：好。", "小雨：我們走吧。")
+        montaje.orquestador.repetir()  # repite con la misma voz
+    finally:
+        montaje.orquestador.cerrar()
+
+    assert montaje.voz.dichas == ["es:她走了。", "es:好。", "es:我們走吧。", "es:我們走吧。"]
+    assert montaje.voz.voces == [None, None, "M", "M"]
+
+
+def test_por_partes_cada_personaje_se_lee_con_su_voz(cache: CacheSQLite) -> None:
+    montaje = Montaje(cache, por_partes=True, voces=(("小雨", "M"),))
+    try:
+        montaje.llega("小雨：我們走吧。")
+    finally:
+        montaje.orquestador.cerrar()
+
+    assert montaje.voz.voces == ["M"]
+
+
+def test_si_no_se_separa_el_personaje_se_lee_la_linea_entera(cache: CacheSQLite) -> None:
+    montaje = Montaje(cache, separar_personaje=False)
+    try:
+        montaje.llega("小雨：我們走吧。")
+    finally:
+        montaje.orquestador.cerrar()
+
+    assert montaje.voz.dichas == ["es:小雨：我們走吧。"]
+    assert montaje.lineas[0].personaje is None
+
+
+def test_el_texto_anadido_por_otro_personaje_se_lee_entero(montaje: Montaje) -> None:
+    montaje.llega("小雨：好。", "林：好。我們走吧。")
+
+    assert montaje.voz.dichas == ["es:好。", "es:好。我們走吧。"]
 
 
 def test_traduce_al_destino_y_lo_guarda_aparte_en_la_cache(cache: CacheSQLite) -> None:
@@ -228,6 +376,25 @@ def test_pausar_mientras_traduce_no_la_lee(cache: CacheSQLite) -> None:
     assert not montaje.lineas[0].leida
 
 
+def test_silenciada_sigue_traduciendo_sin_leer(montaje: Montaje) -> None:
+    orquestador = montaje.orquestador
+    orquestador.silenciar()
+    assert orquestador.silenciado
+    assert montaje.voz.calladas == 1  # corta lo que suena
+
+    montaje.llega("一")
+    orquestador.repetir()  # silenciada, tampoco repite
+    assert montaje.voz.dichas == []
+    assert montaje.lineas == [LineaJuego("一", "es:一", desde_cache=False, leida=False, silenciada=True)]
+    assert montaje.cache.consultar(Clave(PERFIL, "zh-Hant", "一")) is not None
+
+    orquestador.quitar_silencio()
+    assert not orquestador.silenciado
+    montaje.llega("二")
+    assert montaje.voz.dichas == ["es:二"]
+    assert not montaje.lineas[-1].silenciada
+
+
 def test_repetir_y_saltar(montaje: Montaje) -> None:
     montaje.orquestador.repetir()  # sin líneas todavía: nada
     montaje.llega("一", "二")
@@ -256,6 +423,62 @@ def test_tras_cerrar_ignora_las_zonas(montaje: Montaje) -> None:
     montaje.orquestador.cerrar()
     montaje.orquestador.recibir_zona(montaje.lector.zona("一"))
     assert montaje.lector.leidas == []
+
+
+# Menús de opciones
+
+
+def test_cada_opcion_se_traduce_aparte_y_se_leen_en_orden(montaje: Montaje) -> None:
+    montaje.llega("一", "返事||返す？")
+
+    peticiones = montaje.traductor.peticiones[1:]
+    assert [p.texto for p in peticiones] == ["返事", "返す？"]
+    assert all(p.contexto == () for p in peticiones)  # el menú no es parte del diálogo
+    assert montaje.voz.dichas[-1] == "Opción 1: es:返事. Opción 2: es:返す？."
+    menu = montaje.lineas[-1]
+    assert menu == LineaJuego(
+        "返事\n返す？", "Opciones:\n1. es:返事\n2. es:返す？", desde_cache=False, leida=True
+    )
+    assert montaje.cache.consultar(Clave(PERFIL, "zh-Hant", "返事")) is not None
+
+    montaje.llega("二")
+    assert [p.contexto[-1].original for p in montaje.traductor.peticiones[-1:]] == ["一"]
+
+
+def test_las_opciones_ya_traducidas_salen_de_la_cache(montaje: Montaje) -> None:
+    montaje.llega("はい", "はい||いいえ")
+
+    assert [p.texto for p in montaje.traductor.peticiones] == ["はい", "いいえ"]
+    assert not montaje.lineas[-1].desde_cache
+    montaje.llega("一", "はい||いいえ")
+    assert montaje.lineas[-1].desde_cache
+    montaje.orquestador.repetir()
+    assert montaje.voz.dichas[-1] == montaje.voz.dichas[-2] == "Opción 1: es:はい. Opción 2: es:いいえ."
+
+
+def test_la_voz_dice_las_opciones_en_el_idioma_de_la_traduccion(cache: CacheSQLite) -> None:
+    montaje = Montaje(cache, destino="en")
+    try:
+        montaje.llega("はい||いいえ")
+    finally:
+        montaje.orquestador.cerrar()
+    assert montaje.voz.dichas == ["Option 1: es:はい. Option 2: es:いいえ."]
+
+
+def test_si_falla_una_opcion_avisa_y_no_muestra_el_menu(montaje: Montaje) -> None:
+    montaje.llega("はい||fallo", "一")
+
+    assert montaje.errores == ["No se pudo traducir la línea: servidor caído"]
+    assert [linea.original for linea in montaje.lineas] == ["一"]
+
+
+def test_menu_con_la_voz_silenciada(montaje: Montaje) -> None:
+    montaje.orquestador.silenciar()
+    montaje.llega("はい||いいえ")
+
+    assert montaje.voz.dichas == []
+    assert montaje.lineas[0].silenciada
+    assert not montaje.lineas[0].leida
 
 
 # Traducción por partes (streaming)
@@ -303,9 +526,20 @@ class VozPorPartesFalsa(VozFalsa):
         self._cache = cache
         self._hilos: list[threading.Thread] = []
 
-    def decir_por_partes(self, clave: Clave, texto: TextoPorPartes) -> None:
+    def decir_por_partes(
+        self,
+        clave: Clave,
+        texto: TextoPorPartes,
+        voz: str | None = None,
+        al_empezar: Callable[[], None] | None = None,
+    ) -> None:
+        self.voces.append(voz)
+
         def leer() -> None:
-            self.partes.extend(texto.partes(lambda: True))
+            for i, parte in enumerate(texto.partes(lambda: True)):
+                if i == 0 and al_empezar is not None:
+                    al_empezar()  # empieza a sonar con la primera parte
+                self.partes.append(parte)
             self.en_cache_al_terminar.append(self._cache.consultar(clave) is not None)
 
         hilo = threading.Thread(target=leer)
@@ -332,6 +566,7 @@ def por_partes(
         montaje.voz,
         montaje.lineas.append,
         montaje.errores.append,
+        al_subtitulo=montaje.subtitulos.append,
     )
     return montaje
 
@@ -351,6 +586,20 @@ def test_por_partes_la_voz_empieza_con_la_primera_parte(cache: CacheSQLite) -> N
     assert (linea.traduccion, linea.leida) == ("es:一 es:二", True)
     assert linea.tiempos is not None
     assert linea.tiempos.hasta_voz_s is not None
+
+
+def test_por_partes_silenciada_no_empieza_a_leer(cache: CacheSQLite) -> None:
+    montaje = por_partes(cache)
+    montaje.orquestador.silenciar()
+    montaje.llega("一|二")
+    montaje.orquestador.cerrar()
+
+    voz = montaje.voz
+    assert isinstance(voz, VozPorPartesFalsa)
+    assert (voz.partes, voz.dichas) == ([], [])
+    (linea,) = montaje.lineas
+    assert (linea.traduccion, linea.leida, linea.silenciada) == ("es:一 es:二", False, True)
+    assert cache.consultar(Clave(PERFIL, "zh-Hant", "一|二")) is not None
 
 
 def test_por_partes_en_modo_ultima_si_llega_otra_linea_se_cancela_y_se_calla(cache: CacheSQLite) -> None:
@@ -455,3 +704,232 @@ def test_por_partes_en_cola_otra_linea_no_cancela_la_traduccion(cache: CacheSQLi
     assert voz.partes == ["es:一", "es:二", "es:三"]
     assert voz.calladas == 0
     assert [linea.original for linea in montaje.lineas] == ["一|二", "三"]
+
+
+# Con el guion del juego
+
+
+def _hasta(condicion: Callable[[], bool]) -> None:
+    limite = time.monotonic() + ESPERA_S
+    while not condicion():
+        assert time.monotonic() < limite, "no se cumplió a tiempo"
+        time.sleep(0.01)
+
+
+def _traducido(cache: CacheSQLite, g: Guion, indice: int) -> bool:
+    return cache.consultar(Clave(PERFIL, "ja", g.parrafos[indice].original)) is not None
+
+
+def test_con_guion_lee_el_parrafo_exacto(cache: CacheSQLite) -> None:
+    g = guion_sintetico()
+    montaje = Montaje(cache, guion=g)
+    try:
+        montaje.llega("セーブ" + pantalla(g, 0).replace("光", "米") + "ロード")
+    finally:
+        montaje.orquestador.cerrar()
+
+    original = g.parrafos[0].original
+    assert montaje.voz.dichas == [f"es:{original}"]
+    assert montaje.lineas[0].original == original
+
+
+def test_con_guion_el_dialogo_se_lee_entero_con_su_primer_fragmento(cache: CacheSQLite) -> None:
+    g = guion_sintetico()
+    montaje = Montaje(cache, guion=g)
+    try:
+        montaje.llega(pantalla(g, 0), pantalla(g, 1), pantalla(g, 2))
+    finally:
+        montaje.orquestador.cerrar()
+
+    assert [linea.original for linea in montaje.lineas] == [g.parrafos[0].original, g.parrafos[1].original]
+
+
+def test_con_guion_traduce_por_adelantado_los_siguientes(cache: CacheSQLite) -> None:
+    g = guion_sintetico()
+    montaje = Montaje(cache, guion=g, por_partes=True)
+    try:
+        montaje.llega(pantalla(g, 0))
+        _hasta(lambda: _traducido(cache, g, 1) and _traducido(cache, g, 2))
+        montaje.llega(pantalla(g, 1))
+    finally:
+        montaje.orquestador.cerrar()
+
+    assert not _traducido(cache, g, 3)  # solo los dos siguientes
+    assert montaje.lineas[1].desde_cache
+    assert montaje.lineas[1].original == g.parrafos[1].original
+
+
+def test_con_guion_si_falla_por_adelantado_sigue_jugando(cache: CacheSQLite) -> None:
+    g = guion_sintetico(
+        [[[("最初の場面の長い文章です。", "")]], [[("fallo", "")]], [[("最後の場面の長い文章です。", "")]]]
+    )
+    montaje = Montaje(cache, guion=g)
+    try:
+        montaje.llega(pantalla(g, 0))
+        _hasta(lambda: any(p.texto == "fallo" for p in montaje.traductor.peticiones))
+        montaje.llega(pantalla(g, 2))
+    finally:
+        montaje.orquestador.cerrar()
+
+    assert montaje.voz.dichas[-1] == "es:最後の場面の長い文章です。"
+
+
+def test_con_guion_lo_que_no_esta_en_el_guion_se_traduce_como_siempre(cache: CacheSQLite) -> None:
+    montaje = Montaje(cache, guion=guion_sintetico())
+    try:
+        montaje.llega("設定画面を開きます")
+    finally:
+        montaje.orquestador.cerrar()
+
+    assert montaje.voz.dichas == ["es:設定画面を開きます"]
+
+
+def test_con_guion_en_pausa_no_traduce_por_adelantado(cache: CacheSQLite) -> None:
+    g = guion_sintetico()
+    montaje = Montaje(cache, guion=g)
+    try:
+        montaje.orquestador.pausar()
+        montaje.orquestador.reanudar()
+        montaje.llega(pantalla(g, 0))
+        montaje.orquestador.pausar()
+        peticiones = len(montaje.traductor.peticiones)
+        time.sleep(0.1)
+        assert len(montaje.traductor.peticiones) <= peticiones + 1  # como mucho, la que ya estaba en marcha
+    finally:
+        montaje.orquestador.cerrar()
+
+
+def test_con_guion_un_error_inesperado_por_adelantado_no_se_repite(
+    cache: CacheSQLite, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    g = guion_sintetico()
+    montaje = Montaje(cache, guion=g)
+    assert montaje.guion is not None
+    fallos: list[int] = []
+
+    def pendiente(_parrafo: object) -> bool:
+        fallos.append(1)
+        raise RuntimeError("caché rota")
+
+    monkeypatch.setattr(montaje.guion.preparador, "pendiente", pendiente)
+    try:
+        montaje.llega(pantalla(g, 0))
+        time.sleep(0.1)
+    finally:
+        montaje.orquestador.cerrar()
+
+    assert len(fallos) == 1
+    assert montaje.voz.dichas == [f"es:{g.parrafos[0].original}"]
+
+
+# Subtítulos
+
+
+class VozManual(VozFalsa):
+    """Las líneas no empiezan a sonar hasta que se llama a `sonar`."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._por_sonar: list[Callable[[], None] | None] = []
+
+    def decir(
+        self,
+        clave: Clave,
+        texto: str,
+        voz: str | None = None,
+        al_empezar: Callable[[], None] | None = None,
+    ) -> None:
+        super().decir(clave, texto, voz)
+        self._por_sonar.append(al_empezar)
+
+    def decir_por_partes(
+        self,
+        clave: Clave,
+        texto: TextoPorPartes,
+        voz: str | None = None,
+        al_empezar: Callable[[], None] | None = None,
+    ) -> None:
+        self.voces.append(voz)
+        self._por_sonar.append(al_empezar)
+
+    def sonar(self) -> None:
+        al_empezar = self._por_sonar.pop(0)
+        assert al_empezar is not None
+        al_empezar()
+
+
+def test_subtitulos_con_la_linea_que_suena(montaje: Montaje) -> None:
+    montaje.llega("她走了。")
+    assert montaje.subtitulos == ["es:她走了。"]
+
+
+def test_subtitulos_en_cola_muestran_la_linea_que_suena_no_la_ultima_traducida(cache: CacheSQLite) -> None:
+    voz = VozManual()
+    montaje = Montaje(cache, voz=voz)
+    montaje.llega("一", "二")
+
+    assert montaje.subtitulos == []  # traducidas, pero aún no suena ninguna
+    voz.sonar()
+    assert montaje.subtitulos == ["es:一"]
+    voz.sonar()
+    assert montaje.subtitulos == ["es:一", "es:二"]
+    montaje.orquestador.cerrar()
+
+
+def test_subtitulos_con_la_voz_silenciada_en_cuanto_esta_traducida(montaje: Montaje) -> None:
+    montaje.orquestador.silenciar()
+    montaje.llega("一")
+    assert montaje.subtitulos == ["es:一"]
+
+
+def test_subtitulos_con_el_nombre_del_personaje(montaje: Montaje) -> None:
+    montaje.llega_con_nombre("你好", "櫻")  # en el glosario: se conoce desde el principio
+    montaje.llega_con_nombre("我們走吧。", "小雨")  # se traduce después de empezar a leer
+
+    assert montaje.subtitulos == ["Sakura: es:你好", "es:我們走吧。", "es:小雨: es:我們走吧。"]
+
+
+def test_subtitulos_de_un_menu(montaje: Montaje) -> None:
+    montaje.llega("一||二")
+    assert montaje.subtitulos == ["Opciones:\n1. es:一\n2. es:二"]
+
+
+def test_subtitulos_por_partes_aparecen_con_la_primera_y_crecen(cache: CacheSQLite) -> None:
+    puerta = threading.Event()
+    montaje = por_partes(cache, puerta)
+
+    montaje.orquestador.recibir_zona(montaje.lector.zona("一|二"))
+    _hasta(lambda: montaje.subtitulos == ["es:一"])  # suena la primera parte, falta la segunda
+    puerta.set()
+    assert montaje.orquestador.esperar(ESPERA_S)
+    montaje.orquestador.cerrar()
+    voz = montaje.voz
+    assert isinstance(voz, VozPorPartesFalsa)
+    voz.esperar()
+
+    assert montaje.subtitulos == ["es:一", "es:一 es:二"]
+
+
+def test_subtitulos_por_partes_que_no_valian_se_sustituyen_por_la_entera(cache: CacheSQLite) -> None:
+    montaje = por_partes(cache)
+    montaje.llega("mal|dos")
+    montaje.orquestador.cerrar()
+    voz = montaje.voz
+    assert isinstance(voz, VozPorPartesFalsa)
+    voz.esperar()
+
+    assert montaje.subtitulos[0].startswith("es:mal")
+    assert montaje.subtitulos[-1] == "es:bien"
+
+
+def test_subtitulos_por_partes_en_cola_no_tapan_la_linea_que_suena(cache: CacheSQLite) -> None:
+    voz = VozManual()
+    montaje = Montaje(cache, por_partes=True, voz=voz)
+    montaje.llega("一")
+    voz.sonar()
+    montaje.llega("二|三")  # se traduce por partes mientras «一» sigue sonando
+
+    assert montaje.subtitulos == ["es:一"]
+    voz.sonar()
+    assert montaje.subtitulos == ["es:一", "es:二 es:三"]
+    montaje.orquestador.cerrar()

@@ -15,6 +15,7 @@ from PySide6.QtCore import QObject, Signal
 from vn_audiolibro.perfiles.modelos import Perfil
 from vn_audiolibro.pipeline.orquestador import LineaJuego
 from vn_audiolibro.pipeline.sesion import Sesion
+from vn_audiolibro.textos import _
 
 _registro = logging.getLogger(__name__)
 
@@ -28,6 +29,10 @@ class Control(Protocol):
     def pausar(self) -> None: ...
 
     def reanudar(self) -> None: ...
+
+    def silenciar(self) -> None: ...
+
+    def quitar_silencio(self) -> None: ...
 
     def repetir(self) -> None: ...
 
@@ -43,8 +48,16 @@ class SesionJuego(Protocol):
 
 
 FabricaSesion = Callable[
-    [Perfil, Callable[[LineaJuego], None], Callable[[str], None], Callable[[str], None]], SesionJuego
+    [
+        Perfil,
+        Callable[[LineaJuego], None],
+        Callable[[str], None],
+        Callable[[str], None],
+        Callable[[str], None],
+    ],
+    SesionJuego,
 ]
+"""Crea la sesión de un juego con sus avisos: línea, error, estado y subtítulo."""
 
 
 def _sesion_real(
@@ -52,8 +65,9 @@ def _sesion_real(
     al_linea: Callable[[LineaJuego], None],
     al_error: Callable[[str], None],
     al_estado: Callable[[str], None],
+    al_subtitulo: Callable[[str], None],
 ) -> SesionJuego:
-    return Sesion(perfil, al_linea, al_error, al_estado)
+    return Sesion(perfil, al_linea, al_error, al_estado, al_subtitulo=al_subtitulo)
 
 
 class PuenteSesion(QObject):
@@ -61,6 +75,8 @@ class PuenteSesion(QObject):
 
     estado = Signal(str)
     linea = Signal(object)
+    subtitulo = Signal(str)
+    """Lo que tienen que mostrar los subtítulos: la línea que suena, a medida que se traduce."""
     error = Signal(str)
     iniciada = Signal()
     terminada = Signal()
@@ -71,6 +87,7 @@ class PuenteSesion(QObject):
         self._sesion: SesionJuego | None = None
         self._control: Control | None = None
         self._arrancando = False
+        self._silenciado = False
         self._cerrojo = threading.Lock()
         self._hilo: threading.Thread | None = None
 
@@ -82,12 +99,19 @@ class PuenteSesion(QObject):
     def pausado(self) -> bool:
         return self._control is not None and self._control.pausado
 
+    @property
+    def silenciado(self) -> bool:
+        """La voz está silenciada. Se mantiene entre partidas mientras la app siga abierta."""
+        return self._silenciado
+
     def iniciar(self, perfil: Perfil) -> None:
         """Arranca la partida en segundo plano. Avisa con `iniciada`, o con `error` y `terminada`."""
         if self._sesion is not None:
             return
         self.esperar()  # por si aún se está parando la anterior
-        sesion = self._fabrica(perfil, self.linea.emit, self.error.emit, self.estado.emit)
+        sesion = self._fabrica(
+            perfil, self.linea.emit, self.error.emit, self.estado.emit, self.subtitulo.emit
+        )
         with self._cerrojo:
             self._sesion, self._arrancando = sesion, True
         self._lanzar(lambda: self._arrancar(sesion))
@@ -114,6 +138,15 @@ class PuenteSesion(QObject):
                 self._control.reanudar()
             else:
                 self._control.pausar()
+
+    def silenciar(self, silenciar: bool) -> None:
+        """Silencia la voz (o le quita el silencio), en la partida en curso y en las siguientes."""
+        self._silenciado = silenciar
+        control = self._control
+        if control is not None and silenciar:
+            control.silenciar()
+        elif control is not None:
+            control.quitar_silencio()
 
     def repetir(self) -> None:
         if self._control is not None:
@@ -144,6 +177,8 @@ class PuenteSesion(QObject):
             cancelada = self._sesion is not sesion
             if not cancelada:
                 self._control = control
+                if self._silenciado:
+                    control.silenciar()
         if cancelada:
             self._parar(sesion)  # se pidió detener mientras arrancaba
         else:
@@ -154,5 +189,5 @@ class PuenteSesion(QObject):
             sesion.detener()
         except Exception as error:
             _registro.exception("Error al parar la partida")
-            self.error.emit(f"Error al parar: {error}")
+            self.error.emit(_("Error al parar: {error}").format(error=error))
         self.terminada.emit()

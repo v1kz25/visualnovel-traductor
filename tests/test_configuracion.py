@@ -60,3 +60,86 @@ def test_fichero_en_la_configuracion(monkeypatch: pytest.MonkeyPatch, tmp_path: 
 )
 def test_formato_tamano(bytes_: int, texto: str) -> None:
     assert formato_tamano(bytes_) == texto
+
+
+def test_guardar_y_cargar_el_idioma(tmp_path: Path) -> None:
+    ruta = tmp_path / "ajustes.json"
+    guardar_ajustes(AjustesApp(idioma="en"), ruta)
+    assert cargar_ajustes(ruta) == AjustesApp(idioma="en")
+
+
+def test_idioma_no_valido(tmp_path: Path) -> None:
+    ruta = tmp_path / "ajustes.json"
+    ruta.write_text('{"idioma": 3}', encoding="utf-8")
+    assert cargar_ajustes(ruta) == AjustesApp()
+
+
+@pytest.mark.usefixtures("en_ingles")
+def test_formato_tamano_en_ingles() -> None:
+    assert formato_tamano(int(1.5 * 1024**2)) == "1.5 MB"
+
+
+def test_guardar_y_cargar_el_aviso_de_versiones(tmp_path: Path) -> None:
+    ruta = tmp_path / "ajustes.json"
+    ajustes = AjustesApp(avisar_versiones=True, ultima_busqueda=1_800_000_000.5, version_avisada="0.3.0")
+    guardar_ajustes(ajustes, ruta)
+    assert cargar_ajustes(ruta) == ajustes
+
+
+@pytest.mark.parametrize(
+    "contenido",
+    [
+        '{"avisar_versiones": "sí"}',
+        '{"ultima_busqueda": true}',
+        '{"ultima_busqueda": "ayer"}',
+        '{"version_avisada": 3}',
+    ],
+)
+def test_aviso_de_versiones_no_valido(tmp_path: Path, contenido: str) -> None:
+    ruta = tmp_path / "ajustes.json"
+    ruta.write_text(contenido, encoding="utf-8")
+    assert cargar_ajustes(ruta) == AjustesApp()
+
+
+def test_hora_entera_se_lee_como_decimal(tmp_path: Path) -> None:
+    ruta = tmp_path / "ajustes.json"
+    ruta.write_text('{"ultima_busqueda": 1800000000}', encoding="utf-8")
+    assert cargar_ajustes(ruta).ultima_busqueda == 1_800_000_000.0
+
+
+def test_atajos_y_solo_subtitulos_por_defecto(tmp_path: Path) -> None:
+    ajustes = cargar_ajustes(tmp_path / "ajustes.json")
+    assert ajustes.atajos_activos
+    assert ajustes.atajos == {
+        "pausa": "Ctrl+Alt+P",
+        "repetir": "Ctrl+Alt+R",
+        "saltar": "Ctrl+Alt+S",
+        "subtitulos": "Ctrl+Alt+H",
+    }
+    assert not ajustes.solo_subtitulos
+
+
+def test_guardar_y_cargar_los_atajos(tmp_path: Path) -> None:
+    ruta = tmp_path / "ajustes.json"
+    atajos = {**AjustesApp().atajos, "pausa": "F9"}
+    ajustes = AjustesApp(atajos_activos=False, atajos=atajos, solo_subtitulos=True)
+    guardar_ajustes(ajustes, ruta)
+    assert cargar_ajustes(ruta) == ajustes
+
+
+def test_atajos_guardados_a_medias(tmp_path: Path) -> None:
+    ruta = tmp_path / "ajustes.json"
+    ruta.write_text('{"atajos": {"pausa": "F9", "volar": "F10"}}', encoding="utf-8")
+    atajos = cargar_ajustes(ruta).atajos
+    assert atajos["pausa"] == "F9"  # el guardado
+    assert atajos["saltar"] == "Ctrl+Alt+S"  # el que falta, por defecto
+    assert "volar" not in atajos
+
+
+@pytest.mark.parametrize(
+    "contenido", ['{"atajos": ["F9"]}', '{"atajos": {"pausa": 9}}', '{"atajos_activos": "sí"}']
+)
+def test_atajos_no_validos(tmp_path: Path, contenido: str) -> None:
+    ruta = tmp_path / "ajustes.json"
+    ruta.write_text(contenido, encoding="utf-8")
+    assert cargar_ajustes(ruta) == AjustesApp()

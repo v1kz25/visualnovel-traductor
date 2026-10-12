@@ -8,7 +8,8 @@ import pytest
 
 from vn_audiolibro.captura.mascara import TEXTO_OSCURO
 from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, ZonaRelativa
-from vn_audiolibro.ocr.preprocesado import Orientacion
+from vn_audiolibro.guion.modelos import OrigenGuion
+from vn_audiolibro.ocr.preprocesado import BusquedaTexto, Orientacion
 from vn_audiolibro.perfiles.almacen import (
     VERSION_FORMATO,
     AlmacenPerfiles,
@@ -18,14 +19,17 @@ from vn_audiolibro.perfiles.almacen import (
     directorio_perfiles,
 )
 from vn_audiolibro.perfiles.modelos import (
+    AjustesGuion,
     AjustesLectura,
+    AjustesSubtitulos,
     AjustesVolumen,
     AjustesVoz,
     Color,
     Perfil,
     PerfilInvalidoError,
+    PosicionSubtitulos,
 )
-from vn_audiolibro.traduccion.modelos import Glosario
+from vn_audiolibro.traduccion.modelos import Glosario, Motor
 from vn_audiolibro.voz.modelos import ModoLectura
 from vn_audiolibro.voz.piper import Hablante
 from vn_audiolibro.voz.volumen import Flujo, Juego
@@ -36,12 +40,19 @@ COMPLETO = Perfil(
     idioma="ja",
     destino="en",
     zona=ZonaRelativa(0.1, 0.7, 0.8, 0.25),
+    zona_nombre=ZonaRelativa(0.1, 0.62, 0.2, 0.06),
+    separar_personaje=False,
     color=Color.OSCURO,
     orientacion=Orientacion.VERTICAL,
+    busqueda=BusquedaTexto.DETECTOR,
     glosario=Glosario.desde_dict({"櫻": "Sakura", "先輩": "senpai"}),
+    traductor=Motor.GEMINI,
     voz=AjustesVoz(Hablante.HOMBRE, 1.25),
+    personajes=(("小雨", Hablante.MUJER), ("林", None)),
     lectura=AjustesLectura(ModoLectura.ULTIMA, 0.5),
     volumen=AjustesVolumen(activo=False, nivel_juego=0.5, otras=(("Firefox", 0.0),), excluir=("Discord",)),
+    subtitulos=AjustesSubtitulos(activo=True, posicion=PosicionSubtitulos.TAPAR, tamano=30, opacidad=0.5),
+    guion=AjustesGuion("/juegos/mi juego"),
 )
 
 
@@ -76,7 +87,9 @@ def test_cada_perfil_nuevo_tiene_su_id() -> None:
         ({"nombre": "x" * 81}, "80 caracteres"),
         ({"ventana": ""}, "ventana"),
         ({"idioma": "ko"}, "Idioma no admitido"),
-        ({"destino": "fr"}, "Idioma de traducción no admitido"),
+        ({"destino": "ru"}, "Idioma de traducción no admitido"),
+        ({"idioma": "en", "destino": "en"}, "no se puede traducir al inglés"),
+        ({"idioma": "en", "orientacion": Orientacion.VERTICAL}, "columnas verticales"),
         ({"id": "../../etc"}, "Identificador"),
     ],
 )
@@ -84,6 +97,44 @@ def test_perfil_no_valido(campos: dict[str, Any], mensaje: str) -> None:
     datos: dict[str, Any] = {"nombre": "Juego", "ventana": "juego", **campos}
     with pytest.raises(PerfilInvalidoError, match=mensaje):
         Perfil(**datos)
+
+
+def test_voces_de_los_personajes() -> None:
+    personajes = (("小雨", Hablante.HOMBRE), ("林", None), ("櫻", Hablante.MUJER))
+    perfil = Perfil("Juego", "juego", personajes=personajes)  # la voz del juego es de mujer
+
+    assert perfil.voces_personajes() == {"小雨": Hablante.HOMBRE}  # solo las que cambian algo
+    with pytest.raises(PerfilInvalidoError, match="sin repetirlo"):
+        Perfil("Juego", "juego", personajes=(("小雨", None), ("小雨", Hablante.HOMBRE)))
+
+
+def test_un_juego_en_ingles_se_traduce_al_espanol() -> None:
+    perfil = Perfil("Juego", "juego", idioma="en")
+    assert (perfil.destino, perfil.orientacion) == ("es", Orientacion.HORIZONTAL)
+    assert desde_dict(a_dict(perfil)) == perfil
+
+
+@pytest.mark.parametrize(
+    ("campos", "mensaje"),
+    [({"tamano": 5}, "tamaño de los subtítulos"), ({"opacidad": 1.5}, "opacidad")],
+)
+def test_subtitulos_no_validos(campos: dict[str, Any], mensaje: str) -> None:
+    with pytest.raises(PerfilInvalidoError, match=mensaje):
+        AjustesSubtitulos(**campos)
+
+
+def test_subtitulos_guardados_con_tipos_erroneos() -> None:
+    base = {"version": 1, "nombre": "J", "ventana": "j"}
+    with pytest.raises(PerfilInvalidoError, match="subtítulos"):
+        desde_dict({**base, "subtitulos": {"activo": "sí"}})
+
+
+def test_guion_no_valido() -> None:
+    with pytest.raises(PerfilInvalidoError, match="carpeta"):
+        AjustesGuion(" ")
+    with pytest.raises(PerfilInvalidoError, match="inglés"):
+        Perfil("Juego", "juego", destino="en", guion=AjustesGuion("/j", OrigenGuion.INGLES))
+    assert Perfil("Juego", "juego", guion=AjustesGuion("/j", OrigenGuion.INGLES)).guion is not None
 
 
 def test_velocidad_y_niveles_fuera_de_rango() -> None:
@@ -121,14 +172,31 @@ def test_ida_y_vuelta_por_json() -> None:
     assert datos["voz"] == {"hablante": "hombre", "velocidad": 1.25}
     assert datos["lectura"] == {"modo": "ultima", "pausa_s": 0.5}
     assert datos["destino"] == "en"
+    assert datos["busqueda"] == "detector"
+    assert datos["traductor"] == "gemini"
+    assert datos["subtitulos"] == {"activo": True, "posicion": "tapar", "tamano": 30, "opacidad": 0.5}
+    assert "clave" not in json.dumps(datos).lower()  # la clave nunca va en el fichero del juego
+    assert datos["guion"] == {"carpeta": "/juegos/mi juego", "origen": "original"}
+    sin_guion = a_dict(Perfil("J", "j"))
+    assert sin_guion["guion"] is None
+    assert desde_dict(sin_guion).guion is None
 
 
 def test_los_campos_que_faltan_toman_su_valor_por_defecto() -> None:
     perfil = desde_dict({"version": 1, "nombre": "Juego", "ventana": "juego"})
     assert perfil.destino == "es"  # los juegos de antes se traducían al español
     assert perfil.color == Color.CLARO
+    assert perfil.busqueda is BusquedaTexto.COLOR  # los juegos de antes buscaban por color
+    assert perfil.traductor is Motor.LOCAL
+    assert perfil.subtitulos == AjustesSubtitulos()  # desactivados
     assert perfil.glosario == Glosario()
     assert perfil.volumen == AjustesVolumen()
+    assert perfil.guion is None
+    assert perfil.zona_nombre is None
+    assert perfil.separar_personaje  # los juegos de antes también quitan el nombre de quien habla
+    assert perfil.personajes == ()
+    con_guion = desde_dict({"version": 1, "nombre": "J", "ventana": "j", "guion": {"carpeta": "/j"}})
+    assert con_guion.guion == AjustesGuion("/j", OrigenGuion.ORIGINAL)
 
 
 def test_ajustes_parciales() -> None:
@@ -153,6 +221,12 @@ def test_version_mas_nueva() -> None:
         {"zona": {"x": "0", "y": 0, "ancho": 1, "alto": 1}},
         {"zona": {"x": True, "y": 0, "ancho": 1, "alto": 1}},
         {"zona": {"x": 0}},
+        {"zona_nombre": {"x": 0}},
+        {"personajes": {"小雨": "niño"}},
+        {"personajes": {"小雨": 1}},
+        {"personajes": ["小雨"]},
+        {"personajes": {" ": None}},
+        {"separar_personaje": "no"},
         {"color": "verde"},
         {"orientacion": "diagonal"},
         {"glosario": {"櫻": 3}},
@@ -166,6 +240,9 @@ def test_version_mas_nueva() -> None:
         {"volumen": {"otras": {"Firefox": "alto"}}},
         {"volumen": {"excluir": [1]}},
         {"id": 5},
+        {"guion": {"carpeta": 3}},
+        {"guion": {"carpeta": "/j", "origen": "klingon"}},
+        {"guion": "/j"},
     ],
 )
 def test_datos_no_validos(cambio: dict[str, Any]) -> None:

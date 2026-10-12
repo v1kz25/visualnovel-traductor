@@ -5,31 +5,37 @@
     uv run vn-audiolibro juegos
     uv run vn-audiolibro crear "Mi juego" --ventana "mi juego" --zona 0.1,0.7,0.8,0.25 --idioma ja
     uv run vn-audiolibro jugar "Mi juego"
+    uv run vn-audiolibro traducir-guion "Mi juego"
     uv run vn-audiolibro cache [--vaciar "Mi juego" | --vaciar-todo | --limite MB | --sin-limite]
     uv run vn-audiolibro instalar-acceso
 
 Mientras se juega, se controla escribiendo en la terminal y pulsando Intro:
-`p` pausa o reanuda, `r` repite la última línea, `s` la calla y `q` sale.
+`p` pausa o reanuda, `r` repite la última línea, `s` la calla, `m` silencia la voz o se la
+devuelve (sin dejar de traducir) y `q` sale.
 """
 
 import argparse
+import getpass
 import io
 import logging
 import sys
+import time
 from collections.abc import Callable, Iterable
 from dataclasses import replace
 from importlib.metadata import version
 
-from vn_audiolibro import plataforma, preparacion
+from vn_audiolibro import claves, plataforma, preparacion, textos
 from vn_audiolibro.cache.sqlite import CacheSQLite
 from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, VentanaNoEncontradaError, ZonaRelativa
 from vn_audiolibro.configuracion import AjustesApp, cargar_ajustes, formato_tamano, guardar_ajustes
 from vn_audiolibro.descargas import DescargaFallidaError
-from vn_audiolibro.ocr.preprocesado import Orientacion
+from vn_audiolibro.guion.modelos import GuionNoEncontradoError, OrigenGuion
+from vn_audiolibro.ocr.preprocesado import BusquedaTexto, Orientacion
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles, PerfilDuplicadoError
 from vn_audiolibro.perfiles.modelos import (
     DESTINOS,
     IDIOMAS,
+    AjustesGuion,
     AjustesLectura,
     AjustesVolumen,
     AjustesVoz,
@@ -38,12 +44,16 @@ from vn_audiolibro.perfiles.modelos import (
     PerfilInvalidoError,
 )
 from vn_audiolibro.pipeline.orquestador import LineaJuego, Orquestador
-from vn_audiolibro.pipeline.sesion import Sesion
-from vn_audiolibro.traduccion.modelos import TraduccionFallidaError
+from vn_audiolibro.pipeline.sesion import Sesion, traductor_guion
+from vn_audiolibro.textos import N_, _, ngettext
+from vn_audiolibro.traduccion.gemini import avisos_privacidad
+from vn_audiolibro.traduccion.modelos import Motor, TraduccionFallidaError
 from vn_audiolibro.voz.modelos import ModoLectura, VozFallidaError
 from vn_audiolibro.voz.piper import Hablante
 
-AYUDA_CONTROLES = "Controles (escribe y pulsa Intro): p pausa/reanuda · r repite · s calla · q sale"
+AYUDA_CONTROLES = N_(
+    "Controles (escribe y pulsa Intro): p pausa/reanuda · r repite · s calla · m silencia la voz · q sale"
+)
 
 
 def _zona(texto: str) -> ZonaRelativa:
@@ -51,55 +61,122 @@ def _zona(texto: str) -> ZonaRelativa:
         x, y, ancho, alto = (float(v) for v in texto.split(","))
         return ZonaRelativa(x=x, y=y, ancho=ancho, alto=alto)
     except ValueError as error:
-        raise argparse.ArgumentTypeError(f"zona no válida (x,y,ancho,alto entre 0 y 1): {texto}") from error
+        raise argparse.ArgumentTypeError(
+            _("zona no válida (x,y,ancho,alto entre 0 y 1): {zona}").format(zona=texto)
+        ) from error
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog=nombre_orden(), description=__doc__.splitlines()[0])
+    descripcion = _("Audiolibro en tiempo real para novelas visuales en chino y japonés.")
+    parser = argparse.ArgumentParser(prog=nombre_orden(), description=descripcion)
     parser.add_argument("--version", action="version", version=f"%(prog)s {version('vn-audiolibro')}")
     # Oculta: la usa la CI para comprobar el ejecutable empaquetado.
     parser.add_argument("--autocomprobacion", action="store_true", help=argparse.SUPPRESS)
     ordenes = parser.add_subparsers(dest="orden")
-    ordenes.add_parser("preparar", help="comprueba el sistema y descarga lo que falte para usar la app")
-    ordenes.add_parser("juegos", help="lista los juegos configurados")
+    ordenes.add_parser("preparar", help=_("comprueba el sistema y descarga lo que falte para usar la app"))
+    ordenes.add_parser("juegos", help=_("lista los juegos configurados"))
 
-    crear = ordenes.add_parser("crear", help="configura un juego nuevo")
-    crear.add_argument("nombre")
-    crear.add_argument("--ventana", required=True, help="texto del título de la ventana del juego")
-    crear.add_argument("--zona", type=_zona, default=TODA_LA_VENTANA, help="x,y,ancho,alto entre 0 y 1")
-    crear.add_argument("--idioma", choices=IDIOMAS, default=IDIOMAS[0], help="idioma del juego")
+    crear = ordenes.add_parser("crear", help=_("configura un juego nuevo"))
+    crear.add_argument("nombre", metavar=_("nombre"), help=_("cómo se llamará el juego en la lista"))
     crear.add_argument(
-        "--destino", choices=DESTINOS, default=DESTINOS[0], help="idioma de la traducción y de la voz"
+        "--ventana", required=True, metavar=_("TÍTULO"), help=_("texto del título de la ventana del juego")
     )
-    crear.add_argument("--oscuro", action="store_true", help="el texto es oscuro sobre fondo claro")
-    crear.add_argument("--vertical", action="store_true", help="el texto va en columnas verticales")
-    crear.add_argument("--hombre", action="store_true", help="voz de hombre (por defecto, de mujer)")
-    crear.add_argument("--velocidad", type=float, default=1.0, help="velocidad de la voz (1 = normal)")
-    crear.add_argument("--nivel", type=float, default=AjustesVolumen().nivel_juego, help="volumen del juego")
-    crear.add_argument("--sin-bajar-volumen", action="store_true", help="no bajar el juego mientras habla")
+    crear.add_argument(
+        "--zona", type=_zona, default=TODA_LA_VENTANA, metavar=_("ZONA"), help=_("x,y,ancho,alto entre 0 y 1")
+    )
+    crear.add_argument(
+        "--zona-nombre",
+        type=_zona,
+        metavar=_("ZONA"),
+        help=_("zona donde el juego escribe quién habla (x,y,ancho,alto): ese nombre no se lee"),
+    )
+    crear.add_argument(
+        "--con-nombre",
+        action="store_true",
+        help=_("leer también el nombre de quien habla al principio de la línea («Nombre：texto»)"),
+    )
+    crear.add_argument("--idioma", choices=IDIOMAS, default=IDIOMAS[0], help=_("idioma del juego"))
+    crear.add_argument(
+        "--destino", choices=DESTINOS, default=DESTINOS[0], help=_("idioma de la traducción y de la voz")
+    )
+    crear.add_argument("--oscuro", action="store_true", help=_("el texto es oscuro sobre fondo claro"))
+    crear.add_argument("--vertical", action="store_true", help=_("el texto va en columnas verticales"))
+    crear.add_argument(
+        "--detector",
+        action="store_true",
+        help=_("buscar el texto con el detector: para el texto escrito sobre la imagen, sin caja de texto"),
+    )
+    crear.add_argument("--hombre", action="store_true", help=_("voz de hombre (por defecto, de mujer)"))
+    crear.add_argument(
+        "--velocidad",
+        type=float,
+        default=1.0,
+        metavar=_("VELOCIDAD"),
+        help=_("velocidad de la voz (1 = normal)"),
+    )
+    crear.add_argument(
+        "--nivel",
+        type=float,
+        default=AjustesVolumen().nivel_juego,
+        metavar=_("NIVEL"),
+        help=_("volumen del juego"),
+    )
+    crear.add_argument("--sin-bajar-volumen", action="store_true", help=_("no bajar el juego mientras habla"))
     crear.add_argument(
         "--saltar-a-la-ultima",
         action="store_true",
-        help="al avanzar deprisa, cortar la línea que suena y leer solo la última (por defecto, en cola)",
+        help=_("al avanzar deprisa, cortar la línea que suena y leer solo la última (por defecto, en cola)"),
     )
     crear.add_argument(
-        "--pausa", type=float, default=AjustesLectura().pausa_s, help="segundos de silencio entre líneas"
+        "--pausa",
+        type=float,
+        default=AjustesLectura().pausa_s,
+        metavar=_("SEGUNDOS"),
+        help=_("segundos de silencio entre líneas"),
+    )
+    crear.add_argument(
+        "--gemini",
+        action="store_true",
+        help=_("traducir con Gemini en la nube (opcional; antes, guarda tu clave con la orden «gemini»)"),
+    )
+    crear.add_argument(
+        "--guion",
+        metavar=_("CARPETA"),
+        help=_("carpeta del juego: el texto se saca de su guion y el OCR solo sirve para seguirlo"),
+    )
+    crear.add_argument(
+        "--desde-ingles",
+        action="store_true",
+        help=_("traducir desde la traducción oficial al inglés que trae el guion"),
     )
 
-    cache = ordenes.add_parser("cache", help="muestra lo que ocupa la caché; permite vaciarla o limitarla")
+    cache = ordenes.add_parser("cache", help=_("muestra lo que ocupa la caché; permite vaciarla o limitarla"))
     accion = cache.add_mutually_exclusive_group()
-    accion.add_argument("--vaciar", metavar="JUEGO", help="vacía la caché de un juego")
-    accion.add_argument("--vaciar-todo", action="store_true", help="vacía la caché de todos los juegos")
-    accion.add_argument("--limite", type=int, metavar="MB", help="tamaño máximo de la caché")
-    accion.add_argument("--sin-limite", action="store_true", help="no limitar el tamaño de la caché")
+    accion.add_argument("--vaciar", metavar=_("JUEGO"), help=_("vacía la caché de un juego"))
+    accion.add_argument("--vaciar-todo", action="store_true", help=_("vacía la caché de todos los juegos"))
+    accion.add_argument("--limite", type=int, metavar="MB", help=_("tamaño máximo de la caché"))
+    accion.add_argument("--sin-limite", action="store_true", help=_("no limitar el tamaño de la caché"))
 
     ordenes.add_parser(
-        "instalar-acceso", help="añade vn-audiolibro al menú de aplicaciones (en Windows, al menú Inicio)"
+        "instalar-acceso", help=_("añade vn-audiolibro al menú de aplicaciones (en Windows, al menú Inicio)")
     )
 
-    jugar = ordenes.add_parser("jugar", help="juega con un juego configurado")
-    jugar.add_argument("juego", help="nombre del juego")
-    jugar.add_argument("--tiempos", action="store_true", help="muestra cuánto tarda cada etapa de cada línea")
+    gemini = ordenes.add_parser(
+        "gemini", help=_("guarda en el llavero del sistema tu clave de API de Gemini (la pide sin mostrarla)")
+    )
+    gemini.add_argument("--borrar", action="store_true", help=_("borra la clave guardada"))
+
+    traducir = ordenes.add_parser(
+        "traducir-guion",
+        help=_("traduce por adelantado el guion de un juego (se puede cortar con Ctrl+C y seguir otro día)"),
+    )
+    traducir.add_argument("juego", metavar=_("juego"), help=_("nombre del juego"))
+
+    jugar = ordenes.add_parser("jugar", help=_("juega con un juego configurado"))
+    jugar.add_argument("juego", metavar=_("juego"), help=_("nombre del juego"))
+    jugar.add_argument(
+        "--tiempos", action="store_true", help=_("muestra cuánto tarda cada etapa de cada línea")
+    )
     return parser
 
 
@@ -128,40 +205,76 @@ def main(argv: list[str] | None = None, entrada: Iterable[str] = sys.stdin) -> i
     """Punto de entrada de la terminal."""
     salida_utf8()
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
+    textos.activar(textos.elegir(cargar_ajustes().idioma, plataforma.idiomas_sistema()))
     args = _parser().parse_args(argv)
     if args.autocomprobacion:
         from vn_audiolibro.autocomprobacion import autocomprobar
 
         return autocomprobar()
-    almacen = AlmacenPerfiles()
     try:
-        if args.orden == "crear":
-            return _crear(almacen, args)
-        if args.orden == "jugar":
-            return _jugar(almacen.buscar(args.juego), entrada, args.tiempos)
-        if args.orden == "preparar":
-            return _preparar()
-        if args.orden == "juegos":
-            return _perfiles(almacen)
-        if args.orden == "cache":
-            return _cache(almacen, args)
-        if args.orden == "instalar-acceso":
-            return _instalar_acceso()
+        resultado = _orden(AlmacenPerfiles(), args, entrada)
     except (KeyError, ValueError, PerfilInvalidoError, PerfilDuplicadoError) as error:
         print(error.args[0] if error.args else error, file=sys.stderr)
         return 1
+    if resultado is not None:
+        return resultado
     from vn_audiolibro.ui.app import ejecutar  # Qt solo se carga si se abre la interfaz
 
     return ejecutar()
 
 
+def _orden(almacen: AlmacenPerfiles, args: argparse.Namespace, entrada: Iterable[str]) -> int | None:
+    """Ejecuta la orden pedida; None si no se ha pedido ninguna (se abre la interfaz)."""
+    ordenes: dict[str, Callable[[], int]] = {
+        "crear": lambda: _crear(almacen, args),
+        "jugar": lambda: _jugar(almacen.buscar(args.juego), entrada, args.tiempos),
+        "traducir-guion": lambda: _traducir_guion(almacen.buscar(args.juego)),
+        "preparar": _preparar,
+        "juegos": lambda: _perfiles(almacen),
+        "cache": lambda: _cache(almacen, args),
+        "gemini": lambda: _gemini(args.borrar),
+        "instalar-acceso": _instalar_acceso,
+    }
+    orden = ordenes.get(args.orden)
+    return orden() if orden is not None else None
+
+
 def _perfiles(almacen: AlmacenPerfiles) -> int:
     perfiles = almacen.listar()
     if not perfiles:
-        print(f'No hay juegos. Configura uno con: {nombre_orden()} crear "Mi juego" --ventana "título"')
+        orden = _('{orden} crear "Mi juego" --ventana "título"').format(orden=nombre_orden())
+        print(_("No hay juegos. Configura uno con: {orden}").format(orden=orden))
     for perfil in perfiles:
-        idiomas = f"{perfil.idioma} → {perfil.destino}"
-        print(f"{perfil.nombre}  (ventana «{perfil.ventana}», {idiomas}, id {perfil.id})")
+        print(
+            _("{nombre}  (ventana «{ventana}», {idioma} → {destino}, id {id})").format(
+                nombre=perfil.nombre,
+                ventana=perfil.ventana,
+                idioma=perfil.idioma,
+                destino=perfil.destino,
+                id=perfil.id,
+            )
+        )
+    return 0
+
+
+def _gemini(borrar: bool, pedir_clave: Callable[[str], str] = getpass.getpass) -> int:
+    """Guarda o borra la clave de Gemini. Se pide sin mostrarla para que no quede en el historial."""
+    try:
+        if borrar:
+            claves.borrar()
+            print(_("Clave de Gemini borrada del llavero."))
+            return 0
+        for aviso in avisos_privacidad():
+            print(aviso)
+        clave = pedir_clave(_("Clave de API de Gemini: ")).strip()
+        if not clave:
+            print(_("No se ha guardado nada: la clave está vacía."), file=sys.stderr)
+            return 1
+        claves.guardar(clave)
+    except claves.LlaveroNoDisponibleError as error:
+        print(error, file=sys.stderr)
+        return 1
+    print(_("Clave guardada en el llavero del sistema. Elige Gemini como traductor en el editor del juego."))
     return 0
 
 
@@ -173,21 +286,25 @@ def _instalar_acceso() -> int:
     except (AccesoNoDisponibleError, plataforma.PlataformaNoCompatibleError) as error:
         print(error, file=sys.stderr)
         return 1
-    print(f"Acceso directo creado en {ruta}")
+    print(_("Acceso directo creado en {ruta}").format(ruta=ruta))
     return 0
 
 
 def _preparar() -> int:
     for aviso in preparacion.comprobar_sistema():
-        print(("⚠ " if aviso.grave else "Aviso: ") + aviso.texto)
+        print(("⚠ " if aviso.grave else _("Aviso: ")) + aviso.texto)
     faltan = preparacion.pendientes()
     if not faltan:
-        print("Todos los componentes están descargados.")
+        print(_("Todos los componentes están descargados."))
         return 0
-    print(preparacion.AVISO_COPYRIGHT)
+    print(_(preparacion.AVISO_COPYRIGHT))
     for componente in faltan:
         print(
-            f"Descargando {componente.nombre} ({formato_tamano(componente.tamano)}, {componente.licencia})…"
+            _("Descargando {componente} ({tamano}, {licencia})…").format(
+                componente=componente.nombre,
+                tamano=formato_tamano(componente.tamano),
+                licencia=componente.licencia,
+            )
         )
         try:
             componente.instalar(_progreso_terminal, None)
@@ -195,7 +312,7 @@ def _preparar() -> int:
             print(f"\n{error}", file=sys.stderr)
             return 1
         print()
-    print("Todo listo.")
+    print(_("Todo listo."))
     return 0
 
 
@@ -207,15 +324,26 @@ def _progreso_terminal(hecho: int, total: int | None) -> None:
 def _cache(almacen: AlmacenPerfiles, args: argparse.Namespace) -> int:
     ajustes = cargar_ajustes()
     if args.limite is not None or args.sin_limite:
-        ajustes = AjustesApp(limite_cache_mb=None if args.sin_limite else args.limite)
+        ajustes = replace(ajustes, limite_cache_mb=None if args.sin_limite else args.limite)
         guardar_ajustes(ajustes)
     cache = CacheSQLite(limite_bytes=ajustes.limite_cache_bytes)
     try:
         if args.vaciar:
             perfil = almacen.buscar(args.vaciar)
-            print(f"Vaciada la caché de «{perfil.nombre}»: {cache.invalidar(perfil.id)} líneas")
+            lineas = cache.invalidar(perfil.id)
+            texto = ngettext(
+                "Vaciada la caché de «{nombre}»: {n} línea",
+                "Vaciada la caché de «{nombre}»: {n} líneas",
+                lineas,
+            )
+            print(texto.format(nombre=perfil.nombre, n=lineas))
         elif args.vaciar_todo:
-            print(f"Vaciada la caché: {cache.vaciar()} líneas")
+            lineas = cache.vaciar()
+            print(
+                ngettext("Vaciada la caché: {n} línea", "Vaciada la caché: {n} líneas", lineas).format(
+                    n=lineas
+                )
+            )
         cache.recortar()
         _mostrar_cache(almacen, cache, ajustes)
     finally:
@@ -227,11 +355,15 @@ def _mostrar_cache(almacen: AlmacenPerfiles, cache: CacheSQLite, ajustes: Ajuste
     nombres = {perfil.id: perfil.nombre for perfil in almacen.listar()}
     resumen = cache.resumen()
     for juego in resumen:
-        nombre = nombres.get(juego.perfil, "(juego borrado)")
-        print(f"{nombre}: {juego.entradas} líneas, {formato_tamano(juego.bytes)}")
-    total = formato_tamano(sum(juego.bytes for juego in resumen)) if resumen else "vacía"
-    limite = "sin límite" if ajustes.limite_cache_mb is None else f"máximo {ajustes.limite_cache_mb} MB"
-    print(f"Total: {total} ({limite})")
+        nombre = nombres.get(juego.perfil, _("(juego borrado)"))
+        texto = ngettext("{nombre}: {n} línea, {tamano}", "{nombre}: {n} líneas, {tamano}", juego.entradas)
+        print(texto.format(nombre=nombre, n=juego.entradas, tamano=formato_tamano(juego.bytes)))
+    total = formato_tamano(sum(juego.bytes for juego in resumen)) if resumen else _("vacía")
+    if ajustes.limite_cache_mb is None:
+        limite = _("sin límite")
+    else:
+        limite = _("máximo {limite} MB").format(limite=ajustes.limite_cache_mb)
+    print(_("Total: {total} ({limite})").format(total=total, limite=limite))
 
 
 def _crear(almacen: AlmacenPerfiles, args: argparse.Namespace) -> int:
@@ -241,26 +373,68 @@ def _crear(almacen: AlmacenPerfiles, args: argparse.Namespace) -> int:
         idioma=args.idioma,
         destino=args.destino,
         zona=args.zona,
+        zona_nombre=args.zona_nombre,
+        separar_personaje=not args.con_nombre,
         color=Color.OSCURO if args.oscuro else Color.CLARO,
         orientacion=Orientacion.VERTICAL if args.vertical else Orientacion.HORIZONTAL,
+        traductor=Motor.GEMINI if args.gemini else Motor.LOCAL,
+        busqueda=BusquedaTexto.DETECTOR if args.detector else BusquedaTexto.COLOR,
         voz=AjustesVoz(Hablante.HOMBRE if args.hombre else Hablante.MUJER, args.velocidad),
         lectura=AjustesLectura(
             ModoLectura.ULTIMA if args.saltar_a_la_ultima else ModoLectura.COLA, args.pausa
         ),
         volumen=replace(AjustesVolumen(), activo=not args.sin_bajar_volumen, nivel_juego=args.nivel),
+        guion=_ajustes_guion(args),
     )
     ruta = almacen.guardar(perfil)
-    print(f"Juego «{perfil.nombre}» guardado en {ruta}")
+    print(_("Juego «{nombre}» guardado en {ruta}").format(nombre=perfil.nombre, ruta=ruta))
+    return 0
+
+
+def _ajustes_guion(args: argparse.Namespace) -> AjustesGuion | None:
+    if args.guion is None:
+        if args.desde_ingles:
+            raise ValueError(_("--desde-ingles necesita --guion"))
+        return None
+    origen = OrigenGuion.INGLES if args.desde_ingles else OrigenGuion.ORIGINAL
+    return AjustesGuion(args.guion, origen)
+
+
+def _traducir_guion(perfil: Perfil) -> int:
+    inicio = time.monotonic()
+
+    def progreso(hechos: int, total: int) -> None:
+        texto = _("{hechos} de {total} párrafos ({porcentaje} %) · {minutos:.0f} min").format(
+            hechos=hechos,
+            total=total,
+            porcentaje=100 * hechos // total,
+            minutos=(time.monotonic() - inicio) / 60,
+        )
+        print(f"\r  {texto}", end="", flush=True)
+
+    try:
+        with traductor_guion(perfil, _avisar) as preparador:
+            print(_("Traduciendo el guion. Ctrl+C para cortar: lo traducido se conserva."), flush=True)
+            traducidos = preparador.traducir_todo(progreso)
+    except (GuionNoEncontradoError, DescargaFallidaError, TraduccionFallidaError) as error:
+        print(f"\n{error}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print("\n" + _("Cortado. La próxima vez seguirá por donde lo ha dejado."))
+        return 0
+    texto = ngettext("Listo: {n} párrafo traducido.", "Listo: {n} párrafos traducidos.", traducidos)
+    print("\n" + texto.format(n=traducidos))
     return 0
 
 
 def _mostrar(linea: LineaJuego, tiempos: bool = False) -> None:
-    marcas = "" if linea.leida else " (no leída: llegó otra línea)"
-    print(f"\n{linea.original}\n→ {linea.traduccion}{marcas}", flush=True)
+    marcas = "" if linea.leida or linea.silenciada else _(" (no leída: llegó otra línea)")
+    print(f"\n{linea.original}\n→ {linea.traduccion_con_personaje}{marcas}", flush=True)
     if tiempos and linea.tiempos is not None:
         t = linea.tiempos
-        voz = "no se leyó" if t.hasta_voz_s is None else f"{t.hasta_voz_s:.2f} s"
-        print(f"  OCR {t.ocr_s:.2f} s · traducción {t.traduccion_s:.2f} s · hasta la voz {voz}", flush=True)
+        voz = _("no se leyó") if t.hasta_voz_s is None else f"{t.hasta_voz_s:.2f} s"
+        texto = _("  OCR {ocr:.2f} s · traducción {traduccion:.2f} s · hasta la voz {voz}")
+        print(texto.format(ocr=t.ocr_s, traduccion=t.traduccion_s, voz=voz), flush=True)
 
 
 def _avisar(mensaje: str) -> None:
@@ -271,7 +445,7 @@ def _jugar(perfil: Perfil, entrada: Iterable[str], tiempos: bool = False) -> int
     sesion = Sesion(perfil, lambda linea: _mostrar(linea, tiempos), _avisar, al_estado=_avisar)
     try:
         orquestador = sesion.iniciar()
-        print(AYUDA_CONTROLES, flush=True)
+        print(_(AYUDA_CONTROLES), flush=True)
         _controlar(orquestador, entrada)
     except (VentanaNoEncontradaError, DescargaFallidaError, TraduccionFallidaError, VozFallidaError) as error:
         print(error, file=sys.stderr)
@@ -289,6 +463,7 @@ def _controlar(orquestador: Orquestador, entrada: Iterable[str]) -> None:
         "p": lambda: _pausar_o_reanudar(orquestador),
         "r": orquestador.repetir,
         "s": orquestador.saltar,
+        "m": lambda: _silenciar_o_no(orquestador),
     }
     for linea in entrada:
         orden = linea.strip().lower()[:1]
@@ -298,13 +473,22 @@ def _controlar(orquestador: Orquestador, entrada: Iterable[str]) -> None:
         if accion is not None:
             accion()
         elif orden:
-            print(AYUDA_CONTROLES, flush=True)
+            print(_(AYUDA_CONTROLES), flush=True)
 
 
 def _pausar_o_reanudar(orquestador: Orquestador) -> None:
     if orquestador.pausado:
         orquestador.reanudar()
-        print("▶ Reanudado", flush=True)
+        print(_("▶ Reanudado"), flush=True)
     else:
         orquestador.pausar()
-        print("⏸ En pausa (p para seguir)", flush=True)
+        print(_("⏸ En pausa (p para seguir)"), flush=True)
+
+
+def _silenciar_o_no(orquestador: Orquestador) -> None:
+    if orquestador.silenciado:
+        orquestador.quitar_silencio()
+        print(_("🔊 Voz activada"), flush=True)
+    else:
+        orquestador.silenciar()
+        print(_("🔇 Voz silenciada: se sigue traduciendo (m para oírla)"), flush=True)

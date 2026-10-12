@@ -1,6 +1,7 @@
 """Limpieza del texto reconocido antes de traducirlo y cachearlo."""
 
 import re
+import unicodedata
 from functools import cache
 
 import opencc
@@ -11,6 +12,9 @@ CONVERSIONES_OPENCC = {"zh-Hant": "s2tw", "zh-Hans": "t2s"}
 Para el tradicional se usa el estándar de Taiwán, no el genérico `s2t`: este cambia formas
 correctas por otras arcaicas (才是 → 纔是, 著 → 着).
 """
+
+IDIOMAS_CON_ESPACIOS = frozenset({"en"})
+"""Idiomas que separan las palabras con espacios: sus líneas no se parten en glifos sueltos."""
 
 RAYA = "——"
 PUNTOS_SUSPENSIVOS = "……"
@@ -25,6 +29,11 @@ _ANCHO_COMPLETO = str.maketrans(",:;?!()", "，：；？！（）")
 """El OCR confunde la puntuación de ancho completo con la ASCII; en chino y japonés es la primera."""
 
 
+def separa_palabras(idioma: str) -> bool:
+    """Si el idioma separa las palabras con espacios (inglés), al contrario que el chino y el japonés."""
+    return idioma in IDIOMAS_CON_ESPACIOS
+
+
 @cache
 def _conversor(configuracion: str) -> opencc.OpenCC:
     return opencc.OpenCC(configuracion)
@@ -35,7 +44,13 @@ def normalizar(texto: str, idioma: str) -> str:
 
     Los espacios sobran: el chino y el japonés no los usan y el OCR los inventa entre
     caracteres separados.
+
+    En los idiomas con espacios (inglés) solo se juntan los espacios repetidos y se pasa a NFKC,
+    que devuelve a ASCII la puntuación de ancho completo que a veces lee el reconocedor. Los
+    guiones (`well-known`) y la puntuación se dejan como están.
     """
+    if separa_palabras(idioma):
+        return _ESPACIOS.sub(" ", unicodedata.normalize("NFKC", texto)).strip()
     texto = _ESPACIOS.sub("", texto)
     texto = _RAYAS.sub(RAYA, texto)
     if idioma.startswith("zh"):

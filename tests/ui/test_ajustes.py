@@ -30,6 +30,7 @@ PERFIL = Perfil(
     "Juego",
     "juego",
     glosario=Glosario.desde_dict({"櫻": "Sakura"}),
+    personajes=(("櫻", None),),
     volumen=AjustesVolumen(nivel_juego=0.5, otras=(("Firefox", 0.0), ("Spotify", 0.4)), excluir=("Discord",)),
 )
 
@@ -192,6 +193,40 @@ def test_glosario_quitar_termino(
     assert almacen.cargar(PERFIL.id).glosario == Glosario()
 
 
+def voz_de(dialogo: AjustesJuego, i: int) -> QComboBox:
+    voz = dialogo.tabla_personajes.cellWidget(i, 2)
+    assert isinstance(voz, QComboBox)
+    return voz
+
+
+def test_voces_de_los_personajes(dialogo: AjustesJuego, almacen: AlmacenPerfiles, cache: CacheFalsa) -> None:
+    tabla = dialogo.tabla_personajes
+    assert tabla.rowCount() == 1
+    assert [tabla.item(0, c).text() for c in (0, 1)] == ["櫻", "Sakura"]  # con su nombre traducido
+    assert voz_de(dialogo, 0).currentText() == "La del juego"
+
+    voz_de(dialogo, 0).setCurrentIndex(voz_de(dialogo, 0).findData(Hablante.HOMBRE.value))
+    dialogo.anadir_personaje("", None)
+    tabla.item(1, 0).setText("小雨")
+    dialogo.anadir_personaje("", None)  # fila a medias: no cuenta
+    dialogo.guardar()
+
+    assert almacen.cargar(PERFIL.id).personajes == (("櫻", Hablante.HOMBRE), ("小雨", None))
+    assert cache.llamadas == []  # el audio guardado sabe con qué voz se sintetizó
+
+
+def test_personaje_repetido_no_se_guarda(dialogo: AjustesJuego, almacen: AlmacenPerfiles) -> None:
+    dialogo.anadir_personaje("櫻", Hablante.MUJER)
+    dialogo.guardar()
+
+    assert "sin repetirlo" in dialogo.error.text()
+    assert almacen.cargar(PERFIL.id) == PERFIL
+    dialogo.tabla_personajes.setCurrentCell(1, 0)
+    dialogo._quitar_fila(dialogo.tabla_personajes)
+    dialogo.guardar()
+    assert dialogo.result() == QDialog.DialogCode.Accepted
+
+
 def test_escuchar_la_voz(qtbot: QtBot, dialogo: AjustesJuego, probadas: list[tuple[AjustesVoz, str]]) -> None:
     dialogo.velocidad.setValue(150)
     with qtbot.waitSignal(dialogo.prueba_terminada, timeout=ESPERA_MS):
@@ -211,7 +246,7 @@ def test_juego_en_ingles_prueba_la_voz_inglesa_y_pide_el_glosario_en_ingles(
     with qtbot.waitSignal(dialogo.prueba_terminada, timeout=ESPERA_MS):
         dialogo.probar()
     assert probadas == ["en"]
-    assert any("traducción en inglés" in etiqueta.text() for etiqueta in dialogo.findChildren(QLabel))
+    assert any("(Inglés)" in etiqueta.text() for etiqueta in dialogo.findChildren(QLabel))
 
 
 def test_escuchar_la_voz_con_error(qtbot: QtBot, almacen: AlmacenPerfiles) -> None:
@@ -305,3 +340,21 @@ def test_listar_aplicaciones_sin_servidor(monkeypatch: pytest.MonkeyPatch) -> No
 
     monkeypatch.setattr(modulo, "cliente_audio", falla)
     assert listar_aplicaciones() == []
+
+
+def test_subtitulos(dialogo: AjustesJuego, almacen: AlmacenPerfiles) -> None:
+    from vn_audiolibro.perfiles.modelos import AjustesSubtitulos, PosicionSubtitulos
+
+    assert not dialogo.subtitulos.isChecked()  # desactivados por defecto
+    assert not dialogo.posicion.isEnabled()
+
+    dialogo.subtitulos.setChecked(True)
+    dialogo.tamano.setValue(30)
+    dialogo.opacidad.setValue(40)
+    assert dialogo.texto_opacidad.text() == "40 %"
+    dialogo.posicion.setCurrentIndex(dialogo.posicion.findData(PosicionSubtitulos.TAPAR.value))
+    assert not dialogo.opacidad.isEnabled()  # al tapar, el fondo es opaco
+    dialogo.guardar()
+
+    guardado = almacen.cargar(PERFIL.id).subtitulos
+    assert guardado == AjustesSubtitulos(True, PosicionSubtitulos.TAPAR, 30, 0.4)

@@ -242,6 +242,52 @@ def test_el_audio_de_la_cache_es_el_sintetizado(cache: CacheSQLite) -> None:
     assert float(np.sqrt(np.mean(pcm.astype(np.float64) ** 2))) == pytest.approx(8000 / np.sqrt(2), rel=0.1)
 
 
+# Voces de los personajes
+
+
+def test_cada_personaje_con_su_voz_y_su_audio_guardado(cache: CacheSQLite) -> None:
+    del_juego, hombre, reproductor = SintetizadorFalso(), SintetizadorFalso(), ReproductorFalso()
+    locutor = Locutor(del_juego, reproductor, cache, pausa_s=0, voces={"M": hombre})
+    cache.guardar_traduccion(clave("a"), "hola", "hy-mt2")
+
+    locutor.decir(clave("a"), "hola", voz="M")
+    locutor.decir(clave("b"), "adiós")
+    locutor.decir(clave("c"), "qué", voz="no existe")  # voz desconocida: la del juego
+    assert locutor.esperar(ESPERA_S)
+    entrada = cache.consultar(clave("a"))
+    assert entrada is not None
+    assert entrada.voz == "M"
+
+    locutor.decir(clave("a"), "hola", voz="M")  # ya guardado con esa voz: no se sintetiza
+    locutor.decir(clave("a"), "hola")  # guardado con otra voz: se sintetiza con la del juego
+    assert locutor.esperar(ESPERA_S)
+    locutor.cerrar()
+
+    assert hombre.textos == ["hola"]
+    assert del_juego.textos == ["adiós", "qué", "hola"]
+    entrada = cache.consultar(clave("a"))
+    assert entrada is not None
+    assert entrada.voz is None
+
+
+def test_por_partes_con_la_voz_del_personaje(cache: CacheSQLite) -> None:
+    del_juego, hombre, reproductor = SintetizadorFalso(), SintetizadorFalso(), ReproductorFalso()
+    locutor = Locutor(del_juego, reproductor, cache, voces={"M": hombre})
+    cache.guardar_traduccion(clave("a"), "hola", "hy-mt2")
+    texto = TextoPorPartes()
+
+    locutor.decir_por_partes(clave("a"), texto, voz="M")
+    texto.anadir("hola")
+    texto.terminar()
+    assert locutor.esperar(ESPERA_S)
+    locutor.cerrar()
+
+    assert (hombre.textos, del_juego.textos) == (["hola"], [])
+    entrada = cache.consultar(clave("a"))
+    assert entrada is not None
+    assert entrada.voz == "M"
+
+
 # Volumen del juego
 
 
@@ -503,3 +549,54 @@ def test_en_modo_ultima_no_hay_pausa() -> None:
     assert locutor.esperar(ESPERA_S)  # no espera la pausa larga
     locutor.cerrar()
     assert len(reproductor.salidas) == 2
+
+
+# Aviso de que una línea empieza a sonar (para los subtítulos)
+
+
+def test_avisa_cuando_empieza_a_sonar_cada_linea() -> None:
+    sintetizador, reproductor = SintetizadorFalso(), ReproductorFalso()
+    locutor = iniciar(sintetizador, reproductor)
+    avisos: list[str] = []
+
+    locutor.decir(clave("a"), "uno", al_empezar=lambda: avisos.append("a"))
+    texto = TextoPorPartes()
+    locutor.decir_por_partes(clave("b"), texto, al_empezar=lambda: avisos.append("b"))
+    texto.anadir("dos")
+    texto.terminar()
+    assert locutor.esperar(ESPERA_S)
+    locutor.cerrar()
+
+    assert avisos == ["a", "b"]
+
+
+def test_no_avisa_de_una_linea_descartada_sin_sonar() -> None:
+    puerta = threading.Event()
+    sintetizador, reproductor = SintetizadorFalso(), ReproductorFalso(puerta=puerta)
+    locutor = iniciar(sintetizador, reproductor, modo=ModoLectura.ULTIMA)
+    avisos: list[str] = []
+
+    locutor.decir(clave("a"), "a", al_empezar=lambda: avisos.append("a"))
+    assert reproductor.abriendo.wait(ESPERA_S)
+    locutor.decir(clave("b"), "bb", al_empezar=lambda: avisos.append("b"))
+    puerta.set()
+    assert locutor.esperar(ESPERA_S)
+    locutor.cerrar()
+
+    assert avisos == ["b"]
+
+
+def test_un_fallo_en_el_aviso_no_corta_la_linea(caplog: pytest.LogCaptureFixture) -> None:
+    sintetizador, reproductor = SintetizadorFalso(), ReproductorFalso()
+    locutor = iniciar(sintetizador, reproductor)
+
+    def fallar() -> None:
+        raise RuntimeError("subtítulos rotos")
+
+    locutor.decir(clave("a"), "sigue", al_empezar=fallar)
+    assert locutor.esperar(ESPERA_S)
+    locutor.cerrar()
+
+    assert "Falló el aviso" in caplog.text
+    assert reproductor.salidas[0].valores == [len("sigue")]
+    assert reproductor.salidas[0].terminada

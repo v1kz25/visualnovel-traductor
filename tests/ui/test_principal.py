@@ -1,5 +1,6 @@
 """Tests de la ventana principal con perfiles en una carpeta temporal y una sesión falsa."""
 
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -9,8 +10,9 @@ from PySide6.QtWidgets import QDialog, QMessageBox
 from pytestqt.qtbot import QtBot
 
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
-from vn_audiolibro.perfiles.modelos import Perfil
+from vn_audiolibro.perfiles.modelos import AjustesGuion, Perfil
 from vn_audiolibro.pipeline.orquestador import LineaJuego
+from vn_audiolibro.traduccion.modelos import Glosario
 from vn_audiolibro.ui.principal import MAX_LINEAS, VentanaPrincipal
 from vn_audiolibro.ui.puente import PuenteSesion
 
@@ -100,11 +102,19 @@ def test_marcas_de_las_lineas_e_historial_limitado(qtbot: QtBot, ventana: Ventan
     jugar(qtbot, ventana)
     ventana.puente.linea.emit(LineaJuego("二", "<dos>", desde_cache=True, leida=False))
     assert textos(ventana)[-2:] == ["二", "<dos> (no leída)"]  # el texto no se interpreta como HTML
+    ventana.puente.linea.emit(LineaJuego("三", "tres", desde_cache=False, leida=True, personaje="Rena"))
+    assert textos(ventana)[-2:] == ["三", "Rena: tres"]  # quién habla, delante de la traducción
 
     for i in range(MAX_LINEAS + 5):
         ventana.puente.linea.emit(LineaJuego(f"原{i}", f"t{i}", desde_cache=False, leida=True))
     assert len(textos(ventana)) == 2 * MAX_LINEAS
     assert textos(ventana)[-1] == f"t{MAX_LINEAS + 4}"
+
+
+def test_un_menu_se_muestra_con_una_opcion_por_linea(qtbot: QtBot, ventana: VentanaPrincipal) -> None:
+    jugar(qtbot, ventana)
+    ventana.puente.linea.emit(LineaJuego("はい\nいいえ", "Opciones:\n1. Sí\n2. <No>", False, True))
+    assert textos(ventana)[-5:] == ["はい", "いいえ", "Opciones:", "1. Sí", "2. <No>"]
 
 
 def test_controles(qtbot: QtBot, ventana: VentanaPrincipal, fabrica: Fabrica) -> None:
@@ -118,6 +128,18 @@ def test_controles(qtbot: QtBot, ventana: VentanaPrincipal, fabrica: Fabrica) ->
     assert fabrica.sesiones[0].control.acciones == ["pausar", "reanudar", "repetir", "saltar"]
 
 
+def test_silenciar_voz(qtbot: QtBot, ventana: VentanaPrincipal, fabrica: Fabrica) -> None:
+    jugar(qtbot, ventana)
+    ventana.silenciar.click()
+    assert ventana.puente.silenciado
+    ventana.puente.linea.emit(LineaJuego("二", "dos", desde_cache=False, leida=False, silenciada=True))
+    assert textos(ventana)[-1] == "dos"  # sin «(no leída)»: con la voz silenciada se lee aquí
+
+    ventana.silenciar.click()
+    assert not ventana.puente.silenciado
+    assert fabrica.sesiones[0].control.acciones == ["silenciar", "quitar_silencio"]
+
+
 def test_detener(qtbot: QtBot, ventana: VentanaPrincipal, fabrica: Fabrica) -> None:
     jugar(qtbot, ventana)
     with qtbot.waitSignal(ventana.puente.terminada, timeout=ESPERA_MS):
@@ -126,6 +148,21 @@ def test_detener(qtbot: QtBot, ventana: VentanaPrincipal, fabrica: Fabrica) -> N
     assert fabrica.sesiones[0].detenida.is_set()
     assert "Partida terminada" in ventana.estado.text()
     assert ventana.boton_jugar.isEnabled()
+
+
+def test_al_terminar_relee_el_juego_con_los_nombres_aprendidos(
+    qtbot: QtBot, ventana: VentanaPrincipal, almacen: AlmacenPerfiles
+) -> None:
+    jugar(qtbot, ventana)
+    alfa = almacen.buscar("Alfa")
+    almacen.guardar(replace(alfa, glosario=Glosario.desde_dict({"小雨": "Xiaoyu"})))  # lo hace la sesión
+    with qtbot.waitSignal(ventana.puente.terminada, timeout=ESPERA_MS):
+        ventana.boton_detener.click()
+
+    elegido = ventana.perfil_elegido()
+    assert elegido is not None
+    assert elegido.id == alfa.id
+    assert dict(elegido.glosario.terminos) == {"小雨": "Xiaoyu"}
 
 
 def test_error_al_jugar(qtbot: QtBot, almacen: AlmacenPerfiles) -> None:
@@ -264,3 +301,120 @@ def test_ver_la_cache(qtbot: QtBot, almacen: AlmacenPerfiles, fabrica: Fabrica) 
     assert not ventana.boton_cache.isEnabled()
     ventana.ver_cache()  # mientras se juega, no se abre
     assert len(abiertas) == 1
+
+
+class SubtitulosFalsos:
+    def __init__(self) -> None:
+        self.textos: list[str] = []
+        self.cerrados = False
+
+    def mostrar(self, texto: str) -> None:
+        self.textos.append(texto)
+
+    def alternar(self) -> None:
+        pass
+
+    def cerrar(self) -> None:
+        self.cerrados = True
+
+
+def test_subtitulos_durante_la_partida(qtbot: QtBot, almacen: AlmacenPerfiles, fabrica: Fabrica) -> None:
+    abiertos: list[tuple[str, SubtitulosFalsos]] = []
+
+    def abrir(perfil: Perfil) -> SubtitulosFalsos:
+        abiertos.append((perfil.nombre, SubtitulosFalsos()))
+        return abiertos[-1][1]
+
+    ventana = VentanaPrincipal(almacen, PuenteSesion(fabrica), subtitulos=abrir)  # type: ignore[arg-type]
+    qtbot.addWidget(ventana)
+    jugar(qtbot, ventana)
+
+    ((nombre, subtitulos),) = abiertos
+    assert nombre == "Alfa"
+    assert subtitulos.textos == ["uno"]
+    with qtbot.waitSignal(ventana.puente.terminada, timeout=ESPERA_MS):
+        ventana.detener()
+    assert subtitulos.cerrados
+
+
+def test_subtitulos_se_cierran_al_cerrar_la_app(
+    qtbot: QtBot, almacen: AlmacenPerfiles, fabrica: Fabrica
+) -> None:
+    subtitulos = SubtitulosFalsos()
+    ventana = VentanaPrincipal(almacen, PuenteSesion(fabrica), subtitulos=lambda _: subtitulos)  # type: ignore[arg-type,return-value]
+    qtbot.addWidget(ventana)
+    jugar(qtbot, ventana)
+
+    ventana.close()
+
+    assert subtitulos.cerrados
+
+
+def test_el_historial_sigue_la_ultima_linea(qtbot: QtBot, ventana: VentanaPrincipal) -> None:
+    ventana.resize(1200, 300)
+    ventana.show()
+    qtbot.waitExposed(ventana)
+    jugar(qtbot, ventana)
+    barra = ventana.historial.verticalScrollBar()
+    larga = "una frase larga que ocupa varias filas del historial " * 6
+
+    def al_final() -> None:
+        assert barra.value() == barra.maximum()
+
+    def emitir(i: int) -> None:
+        ventana.puente.linea.emit(LineaJuego(f"原{i}", f"{i} {larga}", desde_cache=False, leida=True))
+
+    for i in range(30):
+        emitir(i)
+        qtbot.waitUntil(al_final, timeout=ESPERA_MS)
+    assert barra.maximum() > 0
+
+    ventana.resize(ventana.minimumSizeHint().width(), 300)  # más filas por línea: sigue abajo
+    qtbot.waitUntil(al_final, timeout=ESPERA_MS)
+
+    ventana.hide()  # minimizada o tapada por el juego mientras llegan líneas
+    for i in range(5):
+        emitir(100 + i)
+    ventana.show()
+    qtbot.waitUntil(al_final, timeout=ESPERA_MS)
+
+    barra.setValue(0)  # el usuario sube a releer: se respeta mientras no llegue otra línea
+    qtbot.wait(50)
+    assert barra.value() == 0
+    emitir(200)
+    qtbot.waitUntil(al_final, timeout=ESPERA_MS)
+
+
+def test_traducir_el_guion_solo_en_juegos_con_guion(
+    qtbot: QtBot, almacen: AlmacenPerfiles, fabrica: Fabrica, cache: CacheFalsa
+) -> None:
+    con_guion = Perfil("Con guion", "guion", guion=AjustesGuion("/juegos/guion"))
+    almacen.guardar(con_guion)
+    abiertos: list[Perfil] = []
+
+    class DialogoFalso:
+        def __init__(self, perfil: Perfil) -> None:
+            abiertos.append(perfil)
+
+        def exec(self) -> int:
+            return 0
+
+    ventana = VentanaPrincipal(
+        almacen,
+        PuenteSesion(fabrica),
+        lambda: cache,  # type: ignore[arg-type,return-value]
+        abrir_traduccion_guion=lambda _padre, perfil: DialogoFalso(perfil),  # type: ignore[arg-type,return-value]
+    )
+    qtbot.addWidget(ventana)
+    ventana.recargar_perfiles(elegir=almacen.buscar("Alfa").id)
+    assert not ventana.boton_guion.isEnabled()
+    ventana.traducir_guion()
+    assert abiertos == []
+
+    ventana.recargar_perfiles(elegir=con_guion.id)
+    assert ventana.boton_guion.isEnabled()
+    ventana.boton_guion.click()
+    assert abiertos == [con_guion]
+
+    jugar(qtbot, ventana)
+    assert not ventana.boton_guion.isEnabled()

@@ -24,6 +24,7 @@ except (ImportError, OSError):  # falta libpulse: la app funciona igual, pero si
 
 from vn_audiolibro.procesos import descendientes, listar_procesos
 from vn_audiolibro.rutas import directorio_estado
+from vn_audiolibro.textos import _
 from vn_audiolibro.voz.modelos import VozFallidaError
 from vn_audiolibro.voz.reproductor import NOMBRE_CLIENTE
 
@@ -83,11 +84,13 @@ class ClientePulse:
 
     def __init__(self) -> None:
         if pulsectl is None:
-            raise VozFallidaError("Falta libpulse: no se puede controlar el volumen")
+            raise VozFallidaError(_("Falta libpulse: no se puede controlar el volumen"))
         try:
             self._pulse = pulsectl.Pulse(f"{NOMBRE_CLIENTE}-volumen")
         except pulsectl.PulseError as error:
-            raise VozFallidaError(f"No se pudo conectar con el servidor de sonido: {error}") from error
+            raise VozFallidaError(
+                _("No se pudo conectar con el servidor de sonido: {error}").format(error=error)
+            ) from error
         self._cerrojo = threading.Lock()
 
     def flujos(self) -> list[Flujo]:
@@ -166,7 +169,7 @@ class Seleccion:
     excluir: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
-        for nivel in (self.nivel_juego, *(nivel for _, nivel in self.otras)):
+        for nivel in (self.nivel_juego, *(nivel for _app, nivel in self.otras)):
             _comprobar_nivel(nivel)
 
     @classmethod

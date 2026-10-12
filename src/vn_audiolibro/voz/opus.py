@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
+from vn_audiolibro.textos import _
 from vn_audiolibro.voz.modelos import Fragmento, Muestras, VozFallidaError
 
 FRECUENCIA_OPUS = 24000
@@ -39,6 +40,8 @@ def decodificar(ruta: Path) -> Fragmento:
     try:
         datos, frecuencia = sf.read(ruta, dtype="int16", always_2d=True)
     except sf.SoundFileError as error:
-        raise VozFallidaError(f"Audio ilegible en {ruta.name}: {error}") from error
+        raise VozFallidaError(
+            _("Audio ilegible en {fichero}: {error}").format(fichero=ruta.name, error=error)
+        ) from error
     pcm: Muestras = np.ascontiguousarray(datos[:, 0])
     return Fragmento(pcm, int(frecuencia))

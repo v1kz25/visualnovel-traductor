@@ -1,4 +1,4 @@
-"""Ajustes de un juego: voz y lectura, volumen del juego y de otras aplicaciones, y glosario."""
+"""Ajustes de un juego: voz y lectura, voces de los personajes, volumen, glosario y subtítulos."""
 
 import logging
 import threading
@@ -31,15 +31,20 @@ from vn_audiolibro.cache.sqlite import CacheSQLite
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
 from vn_audiolibro.perfiles.modelos import (
     PAUSA_MAX_S,
+    TAMANO_MAX,
+    TAMANO_MIN,
     VELOCIDAD_MAX,
     VELOCIDAD_MIN,
     AjustesLectura,
+    AjustesSubtitulos,
     AjustesVolumen,
     AjustesVoz,
     Perfil,
     PerfilInvalidoError,
+    PosicionSubtitulos,
 )
 from vn_audiolibro.plataforma import cliente_audio, reproductor
+from vn_audiolibro.textos import N_, _, decimal
 from vn_audiolibro.traduccion.modelos import Glosario
 from vn_audiolibro.ui.editor import NOMBRES_DESTINOS
 from vn_audiolibro.voz.modelos import ModoLectura
@@ -51,10 +56,32 @@ _registro = logging.getLogger(__name__)
 FRASES_PRUEBA = {
     "es": "Hola. Así sonará la traducción mientras juegas. ¿Qué te parece?",
     "en": "Hello. This is how the translation will sound while you play. What do you think?",
+    "fr": "Bonjour. Voici comment sonnera la traduction pendant que tu joues. Qu'en penses-tu ?",
+    "pt": "Olá. É assim que a tradução vai soar enquanto você joga. O que acha?",
+    "de": "Hallo. So klingt die Übersetzung, während du spielst. Was meinst du?",
+    "it": "Ciao. Ecco come suonerà la traduzione mentre giochi. Che ne pensi?",
 }
 """Frase de prueba de la voz en cada idioma de destino."""
 BAJAR, SILENCIAR, NO_TOCAR = "bajar", "silenciar", "no tocar"
-ACCIONES = {BAJAR: "Bajar a", SILENCIAR: "Silenciar", NO_TOCAR: "No tocar nunca"}
+ACCIONES = {BAJAR: N_("Bajar a"), SILENCIAR: N_("Silenciar"), NO_TOCAR: N_("No tocar nunca")}
+"""Se traducen al mostrarlas, con `_()`."""
+
+POSICIONES = {
+    PosicionSubtitulos.ENCIMA: N_("Encima de la caja de texto"),
+    PosicionSubtitulos.DEBAJO: N_("Debajo de la caja de texto"),
+    PosicionSubtitulos.TAPAR: N_("Tapando la caja de texto (solo se ve la traducción)"),
+}
+AYUDA_SUBTITULOS = N_(
+    "La traducción aparece sobre el juego mientras es la ventana activa; los clics siguen llegando "
+    "al juego. Si no se ve con el juego en pantalla completa, ponlo en modo ventana o ventana sin bordes."
+)
+
+AYUDA_PERSONAJES = N_(
+    "Los personajes aparecen aquí la primera vez que hablan mientras juegas. Elige con qué voz se "
+    "leen sus líneas; los demás y la narración se leen con la voz del juego."
+)
+LA_DEL_JUEGO = ""
+"""Valor del desplegable de la voz de un personaje que habla con la del juego."""
 
 AbrirCache = Callable[[], CacheSQLite]
 ProbarVoz = Callable[[AjustesVoz, str], None]
@@ -62,7 +89,7 @@ ListarAplicaciones = Callable[[], list[str]]
 
 
 def _veces(velocidad: float) -> str:
-    return f"{velocidad:.2f}×".replace(".", ",")
+    return f"{decimal(velocidad, 2)}×"
 
 
 def probar_voz(ajustes: AjustesVoz, destino: str) -> None:
@@ -94,7 +121,7 @@ def listar_aplicaciones() -> list[str]:
 
 
 class AjustesJuego(QDialog):
-    """Cambia la voz, la lectura, el volumen y el glosario de un juego."""
+    """Cambia la voz, la lectura, las voces de los personajes, el volumen y el glosario de un juego."""
 
     prueba_terminada = Signal(str)
     """Mensaje de error de la voz de prueba, o vacío si ha sonado bien."""
@@ -109,7 +136,7 @@ class AjustesJuego(QDialog):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle(f"Ajustes de «{perfil.nombre}»")
+        self.setWindowTitle(_("Ajustes de «{nombre}»").format(nombre=perfil.nombre))
         self.resize(620, 520)
         self._almacen = almacen
         self._perfil = perfil
@@ -119,9 +146,11 @@ class AjustesJuego(QDialog):
         self.guardado: Perfil | None = None
 
         pestanas = QTabWidget()
-        pestanas.addTab(self._pestana_voz(), "Voz y lectura")
-        pestanas.addTab(self._pestana_volumen(), "Volumen")
-        pestanas.addTab(self._pestana_glosario(), "Glosario")
+        pestanas.addTab(self._pestana_voz(), _("Voz y lectura"))
+        pestanas.addTab(self._pestana_personajes(), _("Personajes"))
+        pestanas.addTab(self._pestana_volumen(), _("Volumen"))
+        pestanas.addTab(self._pestana_glosario(), _("Glosario"))
+        pestanas.addTab(self._pestana_subtitulos(), _("Subtítulos"))
         self.error = QLabel()
         self.error.setStyleSheet("color: #c0392b")
         self.error.setWordWrap(True)
@@ -139,19 +168,19 @@ class AjustesJuego(QDialog):
 
     def _pestana_voz(self) -> QWidget:
         self.hablante = QComboBox()
-        self.hablante.addItem("Mujer", Hablante.MUJER.value)
-        self.hablante.addItem("Hombre", Hablante.HOMBRE.value)
+        self.hablante.addItem(_("Mujer"), Hablante.MUJER.value)
+        self.hablante.addItem(_("Hombre"), Hablante.HOMBRE.value)
         self.velocidad = QSlider(Qt.Orientation.Horizontal)
         self.velocidad.setRange(round(VELOCIDAD_MIN * 100), round(VELOCIDAD_MAX * 100))
         self.velocidad.setSingleStep(5)
         self.texto_velocidad = QLabel()
         self.velocidad.valueChanged.connect(lambda v: self.texto_velocidad.setText(_veces(v / 100)))
-        self.boton_probar = QPushButton("Escuchar")
+        self.boton_probar = QPushButton(_("Escuchar"))
         self.boton_probar.clicked.connect(self.probar)
         self.prueba_terminada.connect(self._al_terminar_prueba)
         self.modo = QComboBox()
-        self.modo.addItem("En cola: leer todas las líneas en orden", ModoLectura.COLA.value)
-        self.modo.addItem("Saltar a la última: cortar al avanzar", ModoLectura.ULTIMA.value)
+        self.modo.addItem(_("En cola: leer todas las líneas en orden"), ModoLectura.COLA.value)
+        self.modo.addItem(_("Saltar a la última: cortar al avanzar"), ModoLectura.ULTIMA.value)
         self.pausa = QDoubleSpinBox()
         self.pausa.setRange(0, PAUSA_MAX_S)
         self.pausa.setSingleStep(0.5)
@@ -166,11 +195,111 @@ class AjustesJuego(QDialog):
         fila_voz.addWidget(self.boton_probar)
         pestana = QWidget()
         formulario = QFormLayout(pestana)
-        formulario.addRow("Voz", fila_voz)
-        formulario.addRow("Velocidad", fila_velocidad)
-        formulario.addRow("Al avanzar deprisa", self.modo)
-        formulario.addRow("Pausa entre líneas", self.pausa)
+        formulario.addRow(_("Voz"), fila_voz)
+        formulario.addRow(_("Velocidad"), fila_velocidad)
+        formulario.addRow(_("Al avanzar deprisa"), self.modo)
+        formulario.addRow(_("Pausa entre líneas"), self.pausa)
         return pestana
+
+    # Personajes
+
+    def _pestana_personajes(self) -> QWidget:
+        self.tabla_personajes = QTableWidget(0, 3)
+        self.tabla_personajes.setHorizontalHeaderLabels(
+            [_("Personaje en el juego"), _("Nombre traducido"), _("Voz")]
+        )
+        self.tabla_personajes.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.tabla_personajes.verticalHeader().setVisible(False)
+        boton_anadir = QPushButton(_("Añadir personaje"))
+        boton_anadir.clicked.connect(lambda: self.anadir_personaje("", None))
+        boton_quitar = QPushButton(_("Quitar el elegido"))
+        boton_quitar.clicked.connect(lambda: self._quitar_fila(self.tabla_personajes))
+        ayuda = QLabel(_(AYUDA_PERSONAJES))
+        ayuda.setWordWrap(True)
+        fila = QHBoxLayout()
+        fila.addWidget(boton_anadir)
+        fila.addWidget(boton_quitar)
+        fila.addStretch()
+        pestana = QWidget()
+        columna = QVBoxLayout(pestana)
+        columna.addWidget(ayuda)
+        columna.addWidget(self.tabla_personajes, 1)
+        columna.addLayout(fila)
+        return pestana
+
+    def anadir_personaje(self, nombre: str, hablante: Hablante | None) -> None:
+        """Añade una fila con el personaje, su nombre traducido (del glosario) y su voz."""
+        fila = self.tabla_personajes.rowCount()
+        self.tabla_personajes.insertRow(fila)
+        elemento = QTableWidgetItem(nombre)
+        self.tabla_personajes.setItem(fila, 0, elemento)
+        traducido = QTableWidgetItem(dict(self._perfil.glosario.terminos).get(nombre, ""))
+        traducido.setFlags(traducido.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        self.tabla_personajes.setItem(fila, 1, traducido)
+        voz = QComboBox()
+        voz.addItem(_("La del juego"), LA_DEL_JUEGO)
+        voz.addItem(_("Mujer"), Hablante.MUJER.value)
+        voz.addItem(_("Hombre"), Hablante.HOMBRE.value)
+        voz.setCurrentIndex(voz.findData(LA_DEL_JUEGO if hablante is None else hablante.value))
+        self.tabla_personajes.setCellWidget(fila, 2, voz)
+        if not nombre:
+            self.tabla_personajes.editItem(elemento)
+
+    def _personajes(self) -> tuple[tuple[str, Hablante | None], ...]:
+        personajes = []
+        for fila in range(self.tabla_personajes.rowCount()):
+            elemento, voz = self.tabla_personajes.item(fila, 0), self.tabla_personajes.cellWidget(fila, 2)
+            if elemento is None or not elemento.text().strip() or not isinstance(voz, QComboBox):
+                continue
+            valor = voz.currentData()
+            personajes.append((elemento.text().strip(), None if valor == LA_DEL_JUEGO else Hablante(valor)))
+        return tuple(personajes)
+
+    # Subtítulos
+
+    def _pestana_subtitulos(self) -> QWidget:
+        self.subtitulos = QCheckBox(_("Mostrar la traducción encima del juego"))
+        self.posicion = QComboBox()
+        for posicion, texto in POSICIONES.items():
+            self.posicion.addItem(_(texto), posicion.value)
+        self.tamano = QSpinBox()
+        self.tamano.setRange(TAMANO_MIN, TAMANO_MAX)
+        self.tamano.setSuffix(" pt")
+        self.opacidad = QSlider(Qt.Orientation.Horizontal)
+        self.opacidad.setRange(0, 100)
+        self.texto_opacidad = QLabel()
+        self.opacidad.valueChanged.connect(lambda v: self.texto_opacidad.setText(f"{v} %"))
+        self.subtitulos.toggled.connect(lambda _: self._actualizar_subtitulos())
+        self.posicion.currentIndexChanged.connect(lambda _: self._actualizar_subtitulos())
+        ayuda = QLabel(_(AYUDA_SUBTITULOS))
+        ayuda.setWordWrap(True)
+
+        fila_opacidad = QHBoxLayout()
+        fila_opacidad.addWidget(self.opacidad, 1)
+        fila_opacidad.addWidget(self.texto_opacidad)
+        pestana = QWidget()
+        formulario = QFormLayout(pestana)
+        formulario.addRow(self.subtitulos)
+        formulario.addRow(_("Posición"), self.posicion)
+        formulario.addRow(_("Tamaño de la letra"), self.tamano)
+        formulario.addRow(_("Opacidad del fondo"), fila_opacidad)
+        formulario.addRow(ayuda)
+        return pestana
+
+    def _actualizar_subtitulos(self) -> None:
+        activo = self.subtitulos.isChecked()
+        for control in (self.posicion, self.tamano):
+            control.setEnabled(activo)
+        tapar = self.posicion.currentData() == PosicionSubtitulos.TAPAR.value
+        self.opacidad.setEnabled(activo and not tapar)  # al tapar, el fondo es opaco
+
+    def _subtitulos(self) -> AjustesSubtitulos:
+        return AjustesSubtitulos(
+            activo=self.subtitulos.isChecked(),
+            posicion=PosicionSubtitulos(self.posicion.currentData()),
+            tamano=self.tamano.value(),
+            opacidad=self.opacidad.value() / 100,
+        )
 
     def probar(self) -> None:
         """Lee la frase de prueba en segundo plano con la voz y la velocidad elegidas."""
@@ -183,7 +312,7 @@ class AjustesJuego(QDialog):
                 self.prueba_terminada.emit("")
             except Exception as error:
                 _registro.exception("No se pudo probar la voz")
-                self.prueba_terminada.emit(f"No se pudo probar la voz: {error}")
+                self.prueba_terminada.emit(_("No se pudo probar la voz: {error}").format(error=error))
 
         threading.Thread(target=sonar, name="voz-prueba", daemon=True).start()
 
@@ -200,14 +329,14 @@ class AjustesJuego(QDialog):
     # Volumen
 
     def _pestana_volumen(self) -> QWidget:
-        self.bajar = QCheckBox("Bajar el volumen del juego mientras habla la voz")
+        self.bajar = QCheckBox(_("Bajar el volumen del juego mientras habla la voz"))
         self.nivel = QSlider(Qt.Orientation.Horizontal)
         self.nivel.setRange(0, 100)
         self.texto_nivel = QLabel()
         self.nivel.valueChanged.connect(lambda v: self.texto_nivel.setText(f"{v} %"))
         self.bajar.toggled.connect(self.nivel.setEnabled)
         self.tabla_apps = QTableWidget(0, 3)
-        self.tabla_apps.setHorizontalHeaderLabels(["Aplicación", "Qué hacer", "Nivel"])
+        self.tabla_apps.setHorizontalHeaderLabels([_("Aplicación"), _("Qué hacer"), _("Nivel")])
         cabecera = self.tabla_apps.horizontalHeader()
         cabecera.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         for indice in (1, 2):
@@ -216,16 +345,16 @@ class AjustesJuego(QDialog):
         self.nueva_app = QComboBox()
         self.nueva_app.setEditable(True)
         if (editor := self.nueva_app.lineEdit()) is not None:
-            editor.setPlaceholderText("Nombre de la aplicación (p. ej. Firefox)")
-        boton_buscar = QPushButton("Ver las que suenan")
+            editor.setPlaceholderText(_("Nombre de la aplicación (p. ej. Firefox)"))
+        boton_buscar = QPushButton(_("Ver las que suenan"))
         boton_buscar.clicked.connect(self.buscar_aplicaciones)
-        boton_anadir = QPushButton("Añadir")
+        boton_anadir = QPushButton(_("Añadir"))
         boton_anadir.clicked.connect(lambda: self.anadir_aplicacion(self.nueva_app.currentText()))
-        boton_quitar = QPushButton("Quitar la elegida")
+        boton_quitar = QPushButton(_("Quitar la elegida"))
         boton_quitar.clicked.connect(lambda: self._quitar_fila(self.tabla_apps))
 
         fila_nivel = QHBoxLayout()
-        fila_nivel.addWidget(QLabel("Volumen del juego"))
+        fila_nivel.addWidget(QLabel(_("Volumen del juego")))
         fila_nivel.addWidget(self.nivel, 1)
         fila_nivel.addWidget(self.texto_nivel)
         fila_nueva = QHBoxLayout()
@@ -236,7 +365,7 @@ class AjustesJuego(QDialog):
         columna = QVBoxLayout(pestana)
         columna.addWidget(self.bajar)
         columna.addLayout(fila_nivel)
-        columna.addWidget(QLabel("<b>Otras aplicaciones</b> (un vídeo, música…)"))
+        columna.addWidget(QLabel(_("<b>Otras aplicaciones</b> (un vídeo, música…)")))
         columna.addWidget(self.tabla_apps, 1)
         columna.addLayout(fila_nueva)
         columna.addWidget(boton_quitar, 0, Qt.AlignmentFlag.AlignLeft)
@@ -262,7 +391,7 @@ class AjustesJuego(QDialog):
         self.tabla_apps.setItem(fila, 0, elemento)
         acciones = QComboBox()
         for clave, texto in ACCIONES.items():
-            acciones.addItem(texto, clave)
+            acciones.addItem(_(texto), clave)
         acciones.setCurrentIndex(acciones.findData(accion))
         porcentaje = QSpinBox()
         porcentaje.setRange(0, 100)
@@ -298,16 +427,18 @@ class AjustesJuego(QDialog):
 
     def _pestana_glosario(self) -> QWidget:
         self.tabla_glosario = QTableWidget(0, 2)
-        self.tabla_glosario.setHorizontalHeaderLabels(["Término en el juego", "Traducción"])
+        self.tabla_glosario.setHorizontalHeaderLabels([_("Término en el juego"), _("Traducción")])
         self.tabla_glosario.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.tabla_glosario.verticalHeader().setVisible(False)
-        boton_anadir = QPushButton("Añadir término")
+        boton_anadir = QPushButton(_("Añadir término"))
         boton_anadir.clicked.connect(lambda: self.anadir_termino("", ""))
-        boton_quitar = QPushButton("Quitar el elegido")
+        boton_quitar = QPushButton(_("Quitar el elegido"))
         boton_quitar.clicked.connect(lambda: self._quitar_fila(self.tabla_glosario))
         ayuda = QLabel(
-            "Nombres propios y términos que siempre se traducen igual, p. ej. 櫻 → Sakura. "
-            f"Escribe la traducción en {NOMBRES_DESTINOS[self._perfil.destino]}."
+            _(
+                "Nombres propios y términos que siempre se traducen igual, p. ej. 櫻 → Sakura. "
+                "Escribe la traducción en el idioma al que se traduce el juego ({idioma})."
+            ).format(idioma=_(NOMBRES_DESTINOS[self._perfil.destino]))
         )
         ayuda.setWordWrap(True)
         fila = QHBoxLayout()
@@ -362,6 +493,14 @@ class AjustesJuego(QDialog):
             self.anadir_aplicacion(nombre, NO_TOCAR)
         for termino, traduccion in perfil.glosario.terminos:
             self.anadir_termino(termino, traduccion)
+        for nombre, hablante in perfil.personajes:
+            self.anadir_personaje(nombre, hablante)
+        self.subtitulos.setChecked(perfil.subtitulos.activo)
+        self.posicion.setCurrentIndex(self.posicion.findData(perfil.subtitulos.posicion.value))
+        self.tamano.setValue(perfil.subtitulos.tamano)
+        self.opacidad.setValue(round(perfil.subtitulos.opacidad * 100))
+        self.texto_opacidad.setText(f"{self.opacidad.value()} %")
+        self._actualizar_subtitulos()
 
     def guardar(self) -> None:
         """Guarda los ajustes y limpia de la caché lo que ya no vale con ellos."""
@@ -370,9 +509,11 @@ class AjustesJuego(QDialog):
             nuevo = replace(
                 self._perfil,
                 voz=self._voz(),
+                personajes=self._personajes(),
                 lectura=lectura,
                 volumen=self._volumen(),
                 glosario=self._glosario(),
+                subtitulos=self._subtitulos(),
             )
             self._almacen.guardar(nuevo)
         except (PerfilInvalidoError, ValueError) as error:
@@ -400,8 +541,10 @@ class AjustesJuego(QDialog):
     def _preguntar_retraducir(self) -> bool:
         respuesta = QMessageBox.question(
             self,
-            "Glosario cambiado",
-            "Las líneas ya traducidas no usan el glosario nuevo.\n\n"
-            "¿Borrar sus traducciones guardadas para que se vuelvan a traducir al jugar?",
+            _("Glosario cambiado"),
+            _(
+                "Las líneas ya traducidas no usan el glosario nuevo.\n\n"
+                "¿Borrar sus traducciones guardadas para que se vuelvan a traducir al jugar?"
+            ),
         )
         return respuesta == QMessageBox.StandardButton.Yes

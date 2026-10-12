@@ -57,6 +57,8 @@ class Entrada:
     creada: float
     usada: float
     """Última vez que se consultó, en segundos desde la época (para borrar lo más antiguo)."""
+    voz: str | None = None
+    """Con qué voz se sintetizó el audio: None si con la del juego, o la de un personaje."""
 
 
 @dataclass(frozen=True)

@@ -14,6 +14,7 @@ from pathlib import Path
 
 from vn_audiolibro.plataforma import sin_ventana
 from vn_audiolibro.rutas import APP, directorio_datos
+from vn_audiolibro.textos import _
 
 _SCRIPT_LNK = """
 $ErrorActionPreference = 'Stop'
@@ -21,7 +22,7 @@ $acceso = (New-Object -ComObject WScript.Shell).CreateShortcut($env:VN_ACCESO)
 $acceso.TargetPath = $env:VN_EJECUTABLE
 $acceso.WorkingDirectory = Split-Path -Parent $env:VN_EJECUTABLE
 $acceso.IconLocation = "$env:VN_EJECUTABLE,0"
-$acceso.Description = 'Audiolibro en español para novelas visuales'
+$acceso.Description = $env:VN_DESCRIPCION
 $acceso.Save()
 """
 """Crea el .lnk con el objeto COM de Windows. Las rutas llegan por variables de entorno para no
@@ -45,8 +46,8 @@ def contenido_desktop(python: str, icono: Path) -> str:
         "[Desktop Entry]\n"
         "Type=Application\n"
         f"Name={APP}\n"
-        "GenericName=Audiolibro para novelas visuales\n"
-        "Comment=Traduce novelas visuales en chino y japonés y las lee en voz alta en español\n"
+        f"GenericName={_('Audiolibro para novelas visuales')}\n"
+        f"Comment={_('Traduce novelas visuales en chino y japonés y las lee en voz alta')}\n"
         f'Exec="{python}" -m vn_audiolibro\n'
         f"Icon={icono}\n"
         "Categories=Game;Utility;\n"
@@ -94,7 +95,12 @@ def crear_lnk(acceso: Path, ejecutable: Path) -> None:
     """Crea el .lnk con PowerShell, sin abrir ninguna ventana."""
     raiz = Path(os.environ.get("SYSTEMROOT") or r"C:\Windows")
     powershell = raiz / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe"
-    entorno = {**os.environ, "VN_ACCESO": str(acceso), "VN_EJECUTABLE": str(ejecutable)}
+    entorno = {
+        **os.environ,
+        "VN_ACCESO": str(acceso),
+        "VN_EJECUTABLE": str(ejecutable),
+        "VN_DESCRIPCION": _("Audiolibro para novelas visuales"),
+    }
     try:
         subprocess.run(  # noqa: S603 - ruta y script fijos; los datos van por el entorno
             [str(powershell), "-NoProfile", "-NonInteractive", "-Command", _SCRIPT_LNK],
@@ -106,9 +112,13 @@ def crear_lnk(acceso: Path, ejecutable: Path) -> None:
         )
     except subprocess.CalledProcessError as error:
         detalle = error.stderr.decode(errors="replace").strip() if error.stderr else error
-        raise AccesoNoDisponibleError(f"No se pudo crear el acceso directo: {detalle}") from error
+        raise AccesoNoDisponibleError(
+            _("No se pudo crear el acceso directo: {error}").format(error=detalle)
+        ) from error
     except (OSError, subprocess.SubprocessError) as error:
-        raise AccesoNoDisponibleError(f"No se pudo crear el acceso directo: {error}") from error
+        raise AccesoNoDisponibleError(
+            _("No se pudo crear el acceso directo: {error}").format(error=error)
+        ) from error
 
 
 def instalar_acceso_windows(
@@ -118,7 +128,9 @@ def instalar_acceso_windows(
     ejecutable = ejecutable or ejecutable_empaquetado()
     if ejecutable is None:
         raise AccesoNoDisponibleError(
-            f"El acceso directo del menú Inicio solo se puede crear desde la versión empaquetada ({APP}.exe)."
+            _(
+                "El acceso directo del menú Inicio solo se puede crear desde la versión empaquetada ({exe})."
+            ).format(exe=f"{APP}.exe")
         )
     acceso = acceso_menu_inicio(programas)
     acceso.parent.mkdir(parents=True, exist_ok=True)

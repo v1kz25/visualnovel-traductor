@@ -15,6 +15,7 @@ from vn_audiolibro.captura.modelos import (
     buscar_por_titulo,
 )
 from vn_audiolibro.procesos import pids_propios
+from vn_audiolibro.textos import _
 
 
 class GestorVentanasX11:
@@ -50,8 +51,15 @@ class GestorVentanasX11:
             tamano = ventana.get_geometry()
             origen = ventana.translate_coords(self._raiz, 0, 0)
         except XError as error:
-            raise VentanaNoEncontradaError(f"La ventana {id_ventana:#x} ya no existe") from error
+            raise VentanaNoEncontradaError(
+                _("La ventana {id_ventana:#x} ya no existe").format(id_ventana=id_ventana)
+            ) from error
         return Rectangulo(x=-origen.x, y=-origen.y, ancho=tamano.width, alto=tamano.height)
+
+    def activa(self) -> int | None:
+        """Ventana que tiene el foco según el gestor de ventanas (EWMH), o None si no se sabe."""
+        valor = self._propiedad(self._raiz, "_NET_ACTIVE_WINDOW")
+        return int(valor[0]) if isinstance(valor, list) and valor and valor[0] else None
 
     def _leer(self, id_ventana: int) -> Ventana:
         ventana = self._pantalla.create_resource_object("window", id_ventana)
@@ -100,7 +108,7 @@ class CapturadorVentanaX11:
     ) -> None:
         self._pantalla = pantalla or display.Display()
         if not self._pantalla.has_extension("Composite"):
-            raise RuntimeError("El servidor X no tiene la extensión Composite")
+            raise RuntimeError(_("El servidor X no tiene la extensión Composite"))
         self._alternativo = alternativo
         self._redirigidas: set[int] = set()
 

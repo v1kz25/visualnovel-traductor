@@ -6,6 +6,20 @@ si el jugador avanza deprisa, las intermedias se descartan sin leerlas.
 
 Si el traductor traduce por partes, la voz empieza con la primera frase mientras se traduce el
 resto, y una traducción que ya no hace falta (llega otra línea, se pausa) se cancela.
+
+Con el guion del juego, el texto del OCR solo sirve para encontrar en él los párrafos nuevos, que
+se traducen y leen con su texto exacto. Mientras no llega otra zona, se traducen por adelantado
+los párrafos siguientes.
+
+El nombre del personaje que habla (de su propia zona o del principio de la línea) no se lee: se
+traduce una sola vez, se añade al glosario y acompaña a la línea al mostrarla. Si el personaje tiene
+otra voz, su línea se lee con ella.
+
+Las opciones de un menú se traducen cada una por separado y se leen en orden («Opción 1: …»).
+
+Los subtítulos muestran la línea que suena: aparecen cuando empieza a leerse, con la primera
+parte si se traduce por partes, y crecen con las demás. Una línea que no se lee (voz silenciada o
+llega tarde) se muestra en cuanto está traducida.
 """
 
 import logging
@@ -14,11 +28,16 @@ import time
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Protocol
 
 from vn_audiolibro.cache.modelos import Clave, Entrada
 from vn_audiolibro.captura.modelos import Imagen, ZonaEstable
+from vn_audiolibro.guion.buscador import SeguidorGuion
+from vn_audiolibro.guion.previa import PreparadorGuion
 from vn_audiolibro.ocr.lector import TextoLeido
+from vn_audiolibro.ocr.personaje import separar_personaje
+from vn_audiolibro.textos import _
 from vn_audiolibro.traduccion.local import LINEAS_CONTEXTO
 from vn_audiolibro.traduccion.modelos import (
     Glosario,
@@ -51,9 +70,21 @@ class CacheTraducciones(Protocol):
 class Voz(Protocol):
     """Lo que el orquestador necesita del locutor."""
 
-    def decir(self, clave: Clave, texto: str) -> None: ...
+    def decir(
+        self,
+        clave: Clave,
+        texto: str,
+        voz: str | None = None,
+        al_empezar: Callable[[], None] | None = None,
+    ) -> None: ...
 
-    def decir_por_partes(self, clave: Clave, texto: TextoPorPartes) -> None: ...
+    def decir_por_partes(
+        self,
+        clave: Clave,
+        texto: TextoPorPartes,
+        voz: str | None = None,
+        al_empezar: Callable[[], None] | None = None,
+    ) -> None: ...
 
     def saltar(self) -> None: ...
 
@@ -88,8 +119,85 @@ class LineaJuego:
     traduccion: str
     desde_cache: bool
     leida: bool
-    """False si llegó otra línea mientras se traducía: se guarda, pero no se lee."""
+    """False si llegó otra línea mientras se traducía (se guarda, pero no se lee) o si la voz está
+    silenciada."""
     tiempos: Tiempos | None = field(default=None, compare=False)
+    silenciada: bool = False
+    """True si no se leyó porque la voz estaba silenciada: se muestra como una línea normal."""
+    personaje: str | None = None
+    """Quién habla, ya traducido; None en la narración o si el juego no lo muestra."""
+
+    @property
+    def traduccion_con_personaje(self) -> str:
+        """La traducción precedida de quién habla («Nombre: traducción»), para mostrarla."""
+        return con_personaje(self.traduccion, self.personaje)
+
+
+def con_personaje(traduccion: str, personaje: str | None) -> str:
+    """La traducción precedida de quién habla, si se sabe."""
+    if personaje is None:
+        return traduccion
+    return _("{personaje}: {traduccion}").format(personaje=personaje, traduccion=traduccion)
+
+
+class _EnPantalla:
+    """Lo que los subtítulos muestran de una línea; el texto crece con cada parte de la traducción."""
+
+    def __init__(self, texto: str = "", personaje: str | None = None) -> None:
+        self.texto = texto
+        self.personaje = personaje
+
+
+class _Subtitulos:
+    """Decide qué línea se ve en los subtítulos y avisa cada vez que cambia lo que se ve.
+
+    Le llegan avisos del hilo del orquestador y del de la voz: avisa con el cerrojo tomado para
+    que no se crucen.
+    """
+
+    def __init__(self, avisar: Callable[[str], None]) -> None:
+        self._avisar = avisar
+        self._cerrojo = threading.Lock()
+        self._actual: _EnPantalla | None = None
+        self._mostrado = ""
+
+    def suena(self, linea: _EnPantalla) -> None:
+        """La línea empieza a sonar: pasa a verse."""
+        with self._cerrojo:
+            self._actual = linea
+            self._mostrar(linea)
+
+    def anadir(self, linea: _EnPantalla, parte: str) -> None:
+        """Llega otra parte de la traducción de la línea."""
+        with self._cerrojo:
+            linea.texto = f"{linea.texto} {parte}".strip()
+            if self._actual is linea:
+                self._mostrar(linea)
+
+    def completar(self, linea: _EnPantalla, texto: str, personaje: str | None, mostrar: bool) -> None:
+        """La línea ya está traducida entera; con `mostrar`, se ve aunque no suene."""
+        with self._cerrojo:
+            linea.texto, linea.personaje = texto, personaje
+            if mostrar:
+                self._actual = linea
+            if self._actual is linea:
+                self._mostrar(linea)
+
+    def _mostrar(self, linea: _EnPantalla) -> None:
+        texto = con_personaje(linea.texto, linea.personaje) if linea.texto else ""
+        if texto and texto != self._mostrado:
+            self._mostrado = texto
+            self._avisar(texto)
+
+
+@dataclass(frozen=True)
+class GuionJuego:
+    """El guion del juego mientras se juega: dónde va el jugador y cómo se traduce cada párrafo."""
+
+    seguidor: SeguidorGuion
+    preparador: PreparadorGuion
+    anticipo: int = 5
+    """Párrafos siguientes que se traducen por adelantado."""
 
 
 @dataclass(frozen=True)
@@ -104,6 +212,42 @@ class AjustesOrquestador:
     max_en_espera: int = MAX_EN_ESPERA
     destino: str = "es"
     """Idioma al que se traduce."""
+    separar_personaje: bool = True
+    """Si se quita de la línea el nombre de quien habla (`Nombre：texto`, `【Nombre】texto`…)."""
+    voces: tuple[tuple[str, str], ...] = ()
+    """Voz de los personajes que no hablan con la del juego: nombre en el juego -> voz del locutor."""
+
+
+LARGO_MAX_PERSONAJE = 40
+"""Una «traducción» de un nombre más larga que esto es que el traductor se ha ido por las ramas."""
+
+OPCION_DICHA = {
+    "es": "Opción {numero}: {opcion}",
+    "en": "Option {numero}: {opcion}",
+    "fr": "Option {numero} : {opcion}",
+    "pt": "Opção {numero}: {opcion}",
+    "de": "Option {numero}: {opcion}",
+    "it": "Opzione {numero}: {opcion}",
+}
+"""Cómo lee la voz cada opción de un menú, en el idioma de la traducción (no en el de la app)."""
+
+_SOBRA_EN_PERSONAJE = " \t\n.,:;!?¡¿\"'«»“”。：「」【】[]"
+
+
+def _tiene_letras(nombre: str) -> bool:
+    return any(caracter.isalnum() for caracter in nombre)
+
+
+def _con_punto(texto: str) -> str:
+    """El texto con un punto al final si no acaba ya en un signo, para leer seguidas las opciones."""
+    texto = texto.strip()
+    return texto if not texto or texto[-1] in ".!?…»\"'" else texto + "."
+
+
+def _limpiar_personaje(traduccion: str) -> str | None:
+    """El nombre traducido sin puntuación alrededor, o None si no parece un nombre."""
+    limpio = traduccion.strip(_SOBRA_EN_PERSONAJE)
+    return limpio if 0 < len(limpio) <= LARGO_MAX_PERSONAJE and "\n" not in limpio else None
 
 
 class Orquestador:
@@ -123,21 +267,39 @@ class Orquestador:
         voz: Voz,
         al_linea: Callable[[LineaJuego], None] = lambda _: None,
         al_error: Callable[[str], None] = lambda _: None,
+        guion: GuionJuego | None = None,
+        al_personaje: Callable[[str, str], None] = lambda _original, _traduccion: None,
+        al_subtitulo: Callable[[str], None] = lambda _: None,
     ) -> None:
+        """`al_personaje` avisa la primera vez que habla cada personaje en la partida, con su nombre
+        en el juego y su traducción (la misma si no se ha podido traducir), para guardarlo.
+
+        `al_subtitulo` avisa, desde el hilo del orquestador o el de la voz, de lo que tienen que
+        mostrar los subtítulos cada vez que cambia."""
         self._ajustes = ajustes
+        self._glosario = ajustes.glosario
+        self._personajes: dict[str, str] = dict(ajustes.glosario.terminos)
+        self._vistos: set[str] = set()
+        self._voces = dict(ajustes.voces)
+        self._al_personaje = al_personaje
+        self._guion = guion
+        self._anticipar = False
         self._lector = lector
         self._traductor = traductor
         self._cache = cache
         self._voz = voz
         self._al_linea = al_linea
         self._al_error = al_error
+        self._subtitulos = _Subtitulos(al_subtitulo)
         self._condicion = threading.Condition()
         self._pendientes: deque[ZonaEstable] = deque(maxlen=max(1, ajustes.max_en_espera))
         self._ocupado = False
         self._pausado = False
+        self._silenciado = False
         self._cerrado = False
-        self._ultimo_texto = ""
-        self._ultima: tuple[Clave, str] | None = None
+        self._ultimo_texto: tuple[str | None, str] = (None, "")
+        self._ultimo_dialogo: tuple[str | None, str] = (None, "")
+        self._ultima: tuple[Clave, str, str | None, Callable[[], None]] | None = None
         self._contexto: deque[LineaPrevia] = deque(maxlen=LINEAS_CONTEXTO)
         self._hilo = threading.Thread(target=self._bucle, name="orquestador", daemon=True)
         self._hilo.start()
@@ -146,6 +308,11 @@ class Orquestador:
     def pausado(self) -> bool:
         with self._condicion:
             return self._pausado
+
+    @property
+    def silenciado(self) -> bool:
+        with self._condicion:
+            return self._silenciado
 
     def recibir_zona(self, zona: ZonaEstable) -> None:
         """Nueva zona estable (se llama desde el hilo de la captura)."""
@@ -167,11 +334,22 @@ class Orquestador:
     def reanudar(self) -> None:
         with self._condicion:
             self._pausado = False
+            self._condicion.notify_all()
+
+    def silenciar(self) -> None:
+        """Calla la voz, pero sigue traduciendo y avisando de cada línea hasta `quitar_silencio`."""
+        with self._condicion:
+            self._silenciado = True
+        self._voz.callar()
+
+    def quitar_silencio(self) -> None:
+        with self._condicion:
+            self._silenciado = False
 
     def repetir(self) -> None:
-        """Vuelve a leer la última línea."""
+        """Vuelve a leer la última línea (salvo con la voz silenciada)."""
         with self._condicion:
-            ultima = self._ultima
+            ultima = None if self._silenciado else self._ultima
         if ultima is not None:
             self._voz.decir(*ultima)
 
@@ -195,18 +373,22 @@ class Orquestador:
     def _bucle(self) -> None:
         while True:
             with self._condicion:
-                self._condicion.wait_for(lambda: bool(self._pendientes) or self._cerrado)
+                self._condicion.wait_for(
+                    lambda: bool(self._pendientes) or self._cerrado or self._toca_anticipar()
+                )
                 if self._cerrado:
                     return
-                zona = self._pendientes.popleft()
-                self._ocupado = True
+                zona = self._pendientes.popleft() if self._pendientes else None
+                self._ocupado = zona is not None
             try:
                 if zona is not None:
                     self._procesar(zona)
+                else:
+                    self._anticipar_siguiente()
             except Exception as error:
                 # El hilo tiene que seguir vivo para la zona siguiente.
                 _registro.exception("No se pudo procesar la zona de texto")
-                self._al_error(f"Error al procesar la línea: {error}")
+                self._al_error(_("Error al procesar la línea: {error}").format(error=error))
             finally:
                 with self._condicion:
                     self._ocupado = False
@@ -214,33 +396,168 @@ class Orquestador:
 
     def _procesar(self, zona: ZonaEstable) -> None:
         inicio = time.monotonic()
-        texto = self._lector.leer(zona.imagen).texto
+        leido = self._lector.leer(zona.imagen)
+        texto = leido.texto
+        nombre = self._lector.leer(zona.nombre).texto or None if zona.nombre is not None else None
         ocr_s = time.monotonic() - inicio
-        if not texto or texto == self._ultimo_texto:
+        if not texto or (nombre, texto) == self._ultimo_texto:
             return  # sin texto, o la misma línea redibujada
-        anterior, self._ultimo_texto = self._ultimo_texto, texto
-        if anterior and texto.startswith(anterior):
+        self._ultimo_texto = (nombre, texto)
+        if leido.menu:
+            self._leer_menu(leido.lineas, zona, inicio, ocr_s)
+            return
+        if self._guion is not None and (parrafos := self._guion.seguidor.nuevos(texto)) is not None:
+            preparador = self._guion.preparador
+            for parrafo in parrafos:
+                if preparador.hay_que_leer(parrafo):
+                    self._leer(preparador.clave(parrafo), preparador.peticion(parrafo), zona, inicio, ocr_s)
+            with self._condicion:
+                self._anticipar = True
+            return
+        ajustes = self._ajustes
+        if nombre is None and zona.nombre is None and ajustes.separar_personaje:
+            nombre, texto = separar_personaje(texto, ajustes.idioma)
+        (quien, anterior), self._ultimo_dialogo = self._ultimo_dialogo, (nombre, texto)
+        if anterior and quien == nombre and texto.startswith(anterior) and texto != anterior:
             # El juego ha añadido texto a la línea anterior, que ya se leyó: solo va lo nuevo.
             texto = texto[len(anterior) :].strip()
-        clave = Clave(self._ajustes.perfil, self._ajustes.idioma, texto, self._ajustes.destino)
+        clave = Clave(ajustes.perfil, ajustes.idioma, texto, ajustes.destino)
+        peticion = Peticion(texto, ajustes.idioma, tuple(self._contexto), self._glosario, ajustes.destino)
+        self._leer(clave, peticion, zona, inicio, ocr_s, nombre)
 
+    def _personaje(self, nombre: str | None) -> str | None:
+        """El nombre traducido: del glosario o, la primera vez que sale, del traductor."""
+        if nombre is None:
+            return None
+        traduccion = self._personajes.get(nombre)
+        if traduccion is None:
+            # Si no se puede traducir, se queda el original, sin reintentarlo en cada línea.
+            traduccion = self._personajes[nombre] = self._traducir_personaje(nombre)
+        if nombre not in self._vistos and _tiene_letras(nombre):
+            self._vistos.add(nombre)
+            self._al_personaje(nombre, traduccion)
+        return traduccion
+
+    def _traducir_personaje(self, nombre: str) -> str:
+        """Traduce un nombre y lo añade al glosario; si no se puede, devuelve el original."""
+        if not _tiene_letras(nombre):
+            return nombre  # «？？？» y parecidos se quedan como están
+        ajustes = self._ajustes
+        try:
+            nueva = self._traductor.traducir(
+                Peticion(nombre, ajustes.idioma, (), self._glosario, ajustes.destino)
+            )
+        except TraduccionFallidaError as error:
+            _registro.warning("No se pudo traducir el nombre «%s»: %s", nombre, error)
+            return nombre
+        traduccion = _limpiar_personaje(nueva.texto) or nombre
+        if traduccion != nombre:
+            self._glosario = self._glosario.unir(Glosario(((nombre, traduccion),)))
+        return traduccion
+
+    def _leer(
+        self,
+        clave: Clave,
+        peticion: Peticion,
+        zona: ZonaEstable,
+        inicio: float,
+        ocr_s: float,
+        nombre: str | None = None,
+    ) -> None:
+        """Traduce la línea (o la saca de la caché), la lee y avisa de ella.
+
+        El nombre de quien habla se traduce después de empezar a leer, para no retrasar la voz.
+        """
+        texto = clave.texto
+        voz_personaje = self._voces.get(nombre) if nombre is not None else None
+        # Mientras se traduce, el nombre solo se muestra si ya se conoce su traducción.
+        pantalla = _EnPantalla(personaje=self._personajes.get(nombre) if nombre is not None else None)
         entrada = self._cache.consultar(clave)
-        resultado = _Resultado(entrada.traduccion, True, None) if entrada else self._traducir(clave, texto)
+        resultado = (
+            _Resultado(entrada.traduccion, True, None)
+            if entrada
+            else self._traducir(clave, peticion, voz_personaje, pantalla)
+        )
         if resultado is None:
             return
         traduccion_s = time.monotonic() - inicio - ocr_s
+        # Antes de leerla: cuando empiece a sonar ya tiene que estar el texto entero.
+        self._subtitulos.completar(pantalla, resultado.texto, pantalla.personaje, mostrar=False)
 
         self._contexto.append(LineaPrevia(texto, resultado.texto))
         with self._condicion:
             # Si ya espera otra línea o se ha pausado, esta llega tarde: se guarda pero no se lee.
-            leer = resultado.voz is None and not self._llega_tarde_sin_cerrojo()
-            self._ultima = (clave, resultado.texto)
+            silenciada = self._silenciado
+            leer = resultado.voz is None and not silenciada and not self._llega_tarde_sin_cerrojo()
+            suena = partial(self._subtitulos.suena, pantalla)
+            self._ultima = (clave, resultado.texto, voz_personaje, suena)
         voz = resultado.voz
         if leer:
-            self._voz.decir(clave, resultado.texto)
+            self._voz.decir(clave, resultado.texto, voz_personaje, suena)
             voz = time.monotonic()
         tiempos = Tiempos(ocr_s, traduccion_s, None if voz is None else voz - zona.instante)
-        self._al_linea(LineaJuego(texto, resultado.texto, resultado.desde_cache, voz is not None, tiempos))
+        leida = voz is not None
+        personaje = self._personaje(nombre)
+        self._subtitulos.completar(pantalla, resultado.texto, personaje, mostrar=not leida)
+        linea = LineaJuego(
+            texto, resultado.texto, resultado.desde_cache, leida, tiempos, silenciada and not leida, personaje
+        )
+        self._al_linea(linea)
+
+    def _leer_menu(self, opciones: tuple[str, ...], zona: ZonaEstable, inicio: float, ocr_s: float) -> None:
+        """Traduce cada opción por separado (o la saca de la caché), las lee en orden y avisa del menú.
+
+        Las opciones no entran en el contexto del traductor: no son parte del diálogo.
+        """
+        ajustes = self._ajustes
+        traducciones: list[str] = []
+        desde_cache = True
+        for opcion in opciones:
+            clave = Clave(ajustes.perfil, ajustes.idioma, opcion, ajustes.destino)
+            entrada = self._cache.consultar(clave)
+            desde_cache = desde_cache and entrada is not None
+            traduccion = entrada.traduccion if entrada else self._traducir_opcion(clave)
+            if traduccion is None:
+                return
+            traducciones.append(traduccion)
+        traduccion_s = time.monotonic() - inicio - ocr_s
+        clave = Clave(ajustes.perfil, ajustes.idioma, "\n".join(opciones), ajustes.destino)
+        plantilla = OPCION_DICHA.get(ajustes.destino, OPCION_DICHA["es"])
+        dicho = " ".join(
+            plantilla.format(numero=numero, opcion=_con_punto(traduccion))
+            for numero, traduccion in enumerate(traducciones, 1)
+        )
+        mostrada = "\n".join(
+            [_("Opciones:")]
+            + [
+                _("{numero}. {opcion}").format(numero=numero, opcion=traduccion)
+                for numero, traduccion in enumerate(traducciones, 1)
+            ]
+        )
+        suena = partial(self._subtitulos.suena, _EnPantalla(mostrada))
+        with self._condicion:
+            silenciada = self._silenciado
+            leida = not silenciada and not self._llega_tarde_sin_cerrojo()
+            self._ultima = (clave, dicho, None, suena)
+        if leida:
+            self._voz.decir(clave, dicho, None, suena)
+        else:
+            suena()
+        tiempos = Tiempos(ocr_s, traduccion_s, time.monotonic() - zona.instante if leida else None)
+        self._al_linea(LineaJuego(clave.texto, mostrada, desde_cache, leida, tiempos, silenciada))
+
+    def _traducir_opcion(self, clave: Clave) -> str | None:
+        """Traduce una opción entera, sin contexto, y la guarda en la caché; None si falla."""
+        ajustes = self._ajustes
+        peticion = Peticion(clave.texto, ajustes.idioma, (), self._glosario, ajustes.destino)
+        try:
+            nueva = self._traductor.traducir(peticion)
+        except TraduccionFallidaError as error:
+            _registro.warning("No se pudo traducir la opción «%s»: %s", clave.texto, error)
+            self._al_error(_("No se pudo traducir la línea: {error}").format(error=error))
+            return None
+        self._cache.guardar_traduccion(clave, nueva.texto, nueva.modelo)
+        return nueva.texto
 
     def _llega_tarde_sin_cerrojo(self) -> bool:
         if self._pausado or self._cerrado:
@@ -252,31 +569,81 @@ class Orquestador:
         with self._condicion:
             return self._llega_tarde_sin_cerrojo()
 
-    def _traducir(self, clave: Clave, texto: str) -> _Resultado | None:
-        ajustes = self._ajustes
-        peticion = Peticion(texto, ajustes.idioma, tuple(self._contexto), ajustes.glosario, ajustes.destino)
+    def _toca_anticipar(self) -> bool:
+        """Si hay que traducir por adelantado (se llama con el cerrojo tomado)."""
+        return self._anticipar and not self._pausado and not self._cerrado
+
+    def _anticipar_siguiente(self) -> None:
+        """Traduce el primer párrafo siguiente que falte; si ya están todos, deja de anticipar.
+
+        Se cancela en cuanto llega otra zona, para no hacerla esperar.
+        """
+        guion = self._guion
+        try:
+            seguir = guion is not None and self._traducir_por_adelantado(guion)
+        except Exception:
+            # Hasta la próxima zona: si no, se repetiría el mismo fallo sin parar.
+            _registro.exception("Falló la traducción por adelantado")
+            seguir = False
+        if not seguir:
+            with self._condicion:
+                self._anticipar = False
+
+    def _traducir_por_adelantado(self, guion: GuionJuego) -> bool:
+        """Traduce el primer párrafo siguiente que falte. False si no queda ninguno o falla."""
+        preparador = guion.preparador
+        siguientes = guion.seguidor.siguientes(guion.anticipo)
+        siguiente = next((parrafo for parrafo in siguientes if preparador.pendiente(parrafo)), None)
+        if siguiente is None:
+            return False
+        try:
+            preparador.traducir(siguiente, self._llega_otra)
+        except TraduccionFallidaError as error:
+            _registro.warning("No se pudo traducir por adelantado: %s", error)
+            return False
+        return True
+
+    def _llega_otra(self) -> bool:
+        with self._condicion:
+            return bool(self._pendientes) or self._pausado or self._cerrado
+
+    def _traducir(
+        self, clave: Clave, peticion: Peticion, voz: str | None, pantalla: _EnPantalla
+    ) -> _Resultado | None:
+        texto = clave.texto
         try:
             if isinstance(self._traductor, TraductorPorPartes):
-                return self._traducir_por_partes(clave, peticion, self._traductor)
+                return self._traducir_por_partes(clave, peticion, self._traductor, voz, pantalla)
             nueva = self._traductor.traducir(peticion)
         except TraduccionFallidaError as error:
             _registro.warning("No se pudo traducir «%s»: %s", texto, error)
-            self._al_error(f"No se pudo traducir la línea: {error}")
+            self._al_error(_("No se pudo traducir la línea: {error}").format(error=error))
             return None
         self._cache.guardar_traduccion(clave, nueva.texto, nueva.modelo)
         return _Resultado(nueva.texto, False, None)
 
     def _traducir_por_partes(
-        self, clave: Clave, peticion: Peticion, traductor: TraductorPorPartes
+        self,
+        clave: Clave,
+        peticion: Peticion,
+        traductor: TraductorPorPartes,
+        voz: str | None,
+        pantalla: _EnPantalla,
     ) -> _Resultado | None:
+        """Traduce y, si la voz no está silenciada, empieza a leer con la primera parte.
+
+        Los subtítulos de la línea crecen con cada parte; si al final lo entregado no valía, se
+        sustituyen por la traducción entera al completar la línea.
+        """
         partes = TextoPorPartes()
-        voz: float | None = None
+        empezo: float | None = None
 
         def al_parte(parte: str) -> None:
-            nonlocal voz
-            if voz is None:
-                self._voz.decir_por_partes(clave, partes)
-                voz = time.monotonic()
+            nonlocal empezo
+            self._subtitulos.anadir(pantalla, parte)
+            if empezo is None and not self.silenciado:
+                self._voz.decir_por_partes(clave, partes, voz, partial(self._subtitulos.suena, pantalla))
+                empezo = time.monotonic()
             partes.anadir(parte)
 
         try:
@@ -289,7 +656,7 @@ class Orquestador:
             partes.terminar()
 
         if resultado is None or not resultado.por_partes:
-            if voz is not None:
+            if empezo is not None:
                 self._voz.callar()  # cancelada, o lo leído no valía y se leerá la traducción entera
             return None if resultado is None else _Resultado(resultado.traduccion.texto, False, None)
-        return _Resultado(resultado.traduccion.texto, False, voz)
+        return _Resultado(resultado.traduccion.texto, False, empezo)

@@ -26,6 +26,7 @@ from vn_audiolibro.captura.modelos import (
     buscar_por_titulo,
 )
 from vn_audiolibro.procesos import pids_propios
+from vn_audiolibro.textos import _
 
 PW_CLIENTONLY = 0x1
 PW_RENDERFULLCONTENT = 0x2
@@ -77,6 +78,7 @@ _prototipo(_user32.GetWindowTextLengthW, (_HWND,), _INT)
 _prototipo(_user32.GetWindowTextW, (_HWND, wintypes.LPWSTR, _INT), _INT)
 _prototipo(_user32.GetWindowThreadProcessId, (_HWND, ctypes.POINTER(wintypes.DWORD)), wintypes.DWORD)
 _prototipo(_user32.GetClientRect, (_HWND, ctypes.POINTER(wintypes.RECT)), _BOOL)
+_prototipo(_user32.GetForegroundWindow, (), _HWND)
 _prototipo(_user32.ClientToScreen, (_HWND, ctypes.POINTER(wintypes.POINT)), _BOOL)
 _prototipo(_user32.PrintWindow, (_HWND, _HDC, _UINT), _BOOL)
 _prototipo(_user32.GetDC, (_HWND,), _HDC)
@@ -106,9 +108,13 @@ def _consciente_del_dpi() -> None:
 def _tamano_cliente(id_ventana: int) -> tuple[int, int]:
     rect = wintypes.RECT()
     if not _user32.IsWindow(id_ventana) or not _user32.GetClientRect(id_ventana, ctypes.byref(rect)):
-        raise VentanaNoEncontradaError(f"La ventana {id_ventana:#x} ya no existe")
+        raise VentanaNoEncontradaError(
+            _("La ventana {id_ventana:#x} ya no existe").format(id_ventana=id_ventana)
+        )
     if _user32.IsIconic(id_ventana) or rect.right <= 0 or rect.bottom <= 0:
-        raise VentanaMinimizadaError(f"La ventana {id_ventana:#x} está minimizada")
+        raise VentanaMinimizadaError(
+            _("La ventana {id_ventana:#x} está minimizada").format(id_ventana=id_ventana)
+        )
     return rect.right, rect.bottom
 
 
@@ -152,8 +158,18 @@ class GestorVentanasWin32:
         ancho, alto = _tamano_cliente(id_ventana)
         origen = wintypes.POINT(0, 0)
         if not _user32.ClientToScreen(id_ventana, ctypes.byref(origen)):
-            raise VentanaNoEncontradaError(f"La ventana {id_ventana:#x} ya no existe")
+            raise VentanaNoEncontradaError(
+                _("La ventana {id_ventana:#x} ya no existe").format(id_ventana=id_ventana)
+            )
         return Rectangulo(x=origen.x, y=origen.y, ancho=ancho, alto=alto)
+
+    def activa(self) -> int | None:
+        """Ventana que está en primer plano, o None si no hay ninguna."""
+        return _activa()
+
+
+def _activa() -> int | None:
+    return _user32.GetForegroundWindow() or None
 
 
 def _titulo(id_ventana: int) -> str:
@@ -201,7 +217,11 @@ class CapturadorVentanaWin32:
         recorte = None if bgra is None else bgra[zona.y :, zona.x :, :3]
         if recorte is None or recorte.size == 0 or not recorte.any():
             if self._alternativo is None:
-                raise VentanaNoEncontradaError(f"Windows no da el contenido de la ventana {id_ventana:#x}")
+                raise VentanaNoEncontradaError(
+                    _("Windows no da el contenido de la ventana {id_ventana:#x}").format(
+                        id_ventana=id_ventana
+                    )
+                )
             return self._alternativo.capturar(id_ventana, zona)
         rgb: Imagen = np.ascontiguousarray(recorte[:, :, ::-1])
         return rgb

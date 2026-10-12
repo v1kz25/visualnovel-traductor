@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from vn_audiolibro.rutas import directorio_datos
+from vn_audiolibro.textos import _
 
 TAM_BLOQUE = 1 << 20
 
@@ -63,14 +64,14 @@ def descargar_https(
 ) -> None:
     """Descarga una URL HTTPS en `destino`, bloque a bloque."""
     if not url.startswith("https://"):
-        raise DescargaFallidaError(f"Solo se descarga por HTTPS: {url}")
+        raise DescargaFallidaError(_("Solo se descarga por HTTPS: {url}").format(url=url))
     with urllib.request.urlopen(url, timeout=60) as respuesta, destino.open("wb") as fichero:  # noqa: S310
         longitud = respuesta.headers.get("Content-Length")
         total = int(longitud) if longitud and longitud.isdigit() else None
         hecho = 0
         while bloque := respuesta.read(TAM_BLOQUE):
             if cancelado is not None and cancelado():
-                raise DescargaCanceladaError(f"Descarga cancelada: {destino.name}")
+                raise DescargaCanceladaError(_("Descarga cancelada: {fichero}").format(fichero=destino.name))
             fichero.write(bloque)
             hecho += len(bloque)
             if progreso is not None:
@@ -101,11 +102,15 @@ def asegurar_descarga(
         obtenido = sha256_fichero(temporal)
         if obtenido != descarga.sha256:
             raise DescargaFallidaError(
-                f"SHA-256 inesperado en {descarga.fichero}: {obtenido} (se esperaba {descarga.sha256})"
+                _("SHA-256 inesperado en {fichero}: {obtenido} (se esperaba {esperado})").format(
+                    fichero=descarga.fichero, obtenido=obtenido, esperado=descarga.sha256
+                )
             )
         temporal.replace(ruta)
     except OSError as error:
-        raise DescargaFallidaError(f"No se pudo descargar {descarga.fichero}: {error}") from error
+        raise DescargaFallidaError(
+            _("No se pudo descargar {fichero}: {error}").format(fichero=descarga.fichero, error=error)
+        ) from error
     finally:
         temporal.unlink(missing_ok=True)
     return ruta
@@ -123,7 +128,9 @@ def extraer_tar(archivo: Path, destino: Path) -> Path:
         with tarfile.open(archivo, "r:gz") as tar:
             tar.extractall(destino, filter="data")
     except (tarfile.TarError, OSError) as error:
-        raise DescargaFallidaError(f"No se pudo extraer {archivo.name}: {error}") from error
+        raise DescargaFallidaError(
+            _("No se pudo extraer {fichero}: {error}").format(fichero=archivo.name, error=error)
+        ) from error
     return destino
 
 
@@ -140,9 +147,13 @@ def extraer_zip(archivo: Path, destino: Path) -> Path:
             for nombre in zip_.namelist():
                 if not (raiz / nombre).resolve().is_relative_to(raiz):
                     raise DescargaFallidaError(
-                        f"No se pudo extraer {archivo.name}: {nombre} sale del destino"
+                        _("No se pudo extraer {fichero}: {entrada} sale del destino").format(
+                            fichero=archivo.name, entrada=nombre
+                        )
                     )
             zip_.extractall(destino)  # noqa: S202 - rutas comprobadas arriba
     except (zipfile.BadZipFile, OSError) as error:
-        raise DescargaFallidaError(f"No se pudo extraer {archivo.name}: {error}") from error
+        raise DescargaFallidaError(
+            _("No se pudo extraer {fichero}: {error}").format(fichero=archivo.name, error=error)
+        ) from error
     return destino

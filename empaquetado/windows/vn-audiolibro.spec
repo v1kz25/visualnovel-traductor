@@ -12,20 +12,21 @@ AQUI = Path(SPECPATH)  # noqa: F821 - lo define PyInstaller
 ICONO = os.environ["VN_ICONO"]
 
 datos = [
-    *collect_data_files("vn_audiolibro"),  # el icono
+    *collect_data_files("vn_audiolibro"),  # el icono y los catálogos de idiomas
     # Solo la configuración: los modelos de OCR se descargan en el primer arranque.
     *collect_data_files("rapidocr", excludes=["**/*.onnx"]),
     # Solo los datos de espeak-ng, con los que Piper convierte el texto en fonemas.
     *collect_data_files("piper", includes=["espeak-ng-data/**"]),
     *collect_data_files("opencc"),
     *copy_metadata("vn-audiolibro"),  # para --version
+    *copy_metadata("keyring"),  # keyring busca sus backends en sus metadatos
 ]
 
 analisis = Analysis(  # noqa: F821
     [str(AQUI / "entrada.py")],
     datas=datos,
     # Las implementaciones de cada sistema se importan al pedirlas (plataforma.py).
-    hiddenimports=[*collect_submodules("vn_audiolibro"), "piper.espeakbridge"],
+    hiddenimports=[*collect_submodules("vn_audiolibro"), "piper.espeakbridge", "keyring.backends.Windows"],
     excludes=["tkinter", "pytest", "vn_audiolibro.captura.x11", "Xlib", "pulsectl"],
     noarchive=False,
 )

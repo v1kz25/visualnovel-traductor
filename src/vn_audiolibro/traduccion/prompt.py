@@ -6,7 +6,14 @@ de sistema: todo va en el mensaje del usuario.
 
 from collections.abc import Sequence
 
-DESTINOS = {"es": "Spanish", "en": "English"}
+DESTINOS = {
+    "es": "Spanish",
+    "en": "English",
+    "fr": "French",
+    "pt": "Portuguese",
+    "de": "German",
+    "it": "Italian",
+}
 """Nombre en inglés de cada idioma de destino, como lo espera la plantilla."""
 
 POR_DEFECTO = (

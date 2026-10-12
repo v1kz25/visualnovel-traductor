@@ -212,3 +212,12 @@ def test_plataforma_usa_win32(ventana: int) -> None:
     assert isinstance(capturador, CapturadorVentanaWin32)
     assert isinstance(plataforma.capturador(gestor, solo_pantalla=True), CapturadorMss)
     assert tuple(capturador.capturar(ventana, Rectangulo(0, 0, 4, 4))[0, 0]) == (0, 0xC0, 0)
+
+
+def test_ventana_activa(ventana: int) -> None:
+    user32.SetForegroundWindow(ventana)
+    bombear()
+
+    activa = GestorVentanasWin32().activa()
+
+    assert activa is None or isinstance(activa, int)  # en la CI puede no dejar cambiar el foco

@@ -6,17 +6,23 @@ from enum import StrEnum
 
 from vn_audiolibro.captura.mascara import TEXTO_CLARO, TEXTO_OSCURO, ColorTexto
 from vn_audiolibro.captura.modelos import TODA_LA_VENTANA, ZonaRelativa
-from vn_audiolibro.ocr.preprocesado import Orientacion
-from vn_audiolibro.traduccion.modelos import Glosario
+from vn_audiolibro.guion.modelos import OrigenGuion
+from vn_audiolibro.ocr.preprocesado import BusquedaTexto, Orientacion
+from vn_audiolibro.textos import _
+from vn_audiolibro.traduccion.modelos import Glosario, Motor
 from vn_audiolibro.voz.modelos import PAUSA_ENTRE_LINEAS_S, ModoLectura
 from vn_audiolibro.voz.piper import HABLANTE_POR_DEFECTO, Hablante
 from vn_audiolibro.voz.volumen import NIVEL_POR_DEFECTO, Juego, Seleccion
 
-IDIOMAS = ("zh-Hant", "zh-Hans", "ja")
-"""Idiomas de origen admitidos: chino tradicional, chino simplificado y japonés."""
+IDIOMAS = ("zh-Hant", "zh-Hans", "ja", "en")
+"""Idiomas de origen admitidos: chino tradicional, chino simplificado, japonés e inglés."""
 
-DESTINOS = ("es", "en")
-"""Idiomas a los que se traduce y en los que se lee: español (por defecto) e inglés."""
+INGLES = "en"
+"""Un juego en inglés no se traduce al inglés y su texto va en horizontal."""
+
+DESTINOS = ("es", "en", "fr", "pt", "de", "it")
+"""Idiomas a los que se traduce y en los que se lee: español (por defecto), inglés, francés,
+portugués, alemán e italiano."""
 
 LARGO_MAX_NOMBRE = 80
 VELOCIDAD_MIN, VELOCIDAD_MAX = 0.5, 2.0
@@ -40,7 +46,9 @@ class Color(StrEnum):
 
 def _nivel_valido(nivel: float, que: str) -> None:
     if not 0 <= nivel <= 1:
-        raise PerfilInvalidoError(f"El nivel de {que} tiene que estar entre 0 y 1: {nivel}")
+        raise PerfilInvalidoError(
+            _("El nivel de {que} tiene que estar entre 0 y 1: {nivel}").format(que=que, nivel=nivel)
+        )
 
 
 @dataclass(frozen=True)
@@ -54,7 +62,9 @@ class AjustesVoz:
     def __post_init__(self) -> None:
         if not VELOCIDAD_MIN <= self.velocidad <= VELOCIDAD_MAX:
             raise PerfilInvalidoError(
-                f"La velocidad tiene que estar entre {VELOCIDAD_MIN} y {VELOCIDAD_MAX}: {self.velocidad}"
+                _("La velocidad tiene que estar entre {minima} y {maxima}: {velocidad}").format(
+                    minima=VELOCIDAD_MIN, maxima=VELOCIDAD_MAX, velocidad=self.velocidad
+                )
             )
 
 
@@ -71,7 +81,9 @@ class AjustesLectura:
 
     def __post_init__(self) -> None:
         if not 0 <= self.pausa_s <= PAUSA_MAX_S:
-            raise PerfilInvalidoError(f"La pausa entre líneas tiene que estar entre 0 y {PAUSA_MAX_S} s")
+            raise PerfilInvalidoError(
+                _("La pausa entre líneas tiene que estar entre 0 y {maximo} s").format(maximo=PAUSA_MAX_S)
+            )
 
 
 @dataclass(frozen=True)
@@ -86,7 +98,7 @@ class AjustesVolumen:
     """Aplicaciones que no se tocan nunca, aunque parezcan del juego."""
 
     def __post_init__(self) -> None:
-        _nivel_valido(self.nivel_juego, "juego")
+        _nivel_valido(self.nivel_juego, _("juego"))
         for nombre, nivel in self.otras:
             _nivel_valido(nivel, nombre)
 
@@ -95,6 +107,54 @@ class AjustesVolumen:
         if not self.activo:
             return None
         return Seleccion.de_nombres(juego, self.nivel_juego, dict(self.otras), self.excluir)
+
+
+class PosicionSubtitulos(StrEnum):
+    """Dónde van los subtítulos respecto a la zona de texto del juego."""
+
+    ENCIMA = "encima"
+    """Justo encima de la zona de texto, sin taparla."""
+    DEBAJO = "debajo"
+    """Justo debajo de la zona de texto (encima si no cabe dentro del juego)."""
+    TAPAR = "tapar"
+    """Sobre la zona de texto, con fondo opaco: se ve la traducción en lugar del original."""
+
+
+TAMANO_MIN, TAMANO_MAX = 10, 72
+
+
+@dataclass(frozen=True)
+class AjustesSubtitulos:
+    """Subtítulos con la traducción encima del juego (desactivados por defecto)."""
+
+    activo: bool = False
+    posicion: PosicionSubtitulos = PosicionSubtitulos.ENCIMA
+    tamano: int = 22
+    """Tamaño de la letra en puntos."""
+    opacidad: float = 0.75
+    """Opacidad del fondo (0, transparente; 1, opaco). Al tapar el texto, el fondo es opaco."""
+
+    def __post_init__(self) -> None:
+        if not TAMANO_MIN <= self.tamano <= TAMANO_MAX:
+            raise PerfilInvalidoError(
+                _("El tamaño de los subtítulos tiene que estar entre {minimo} y {maximo}").format(
+                    minimo=TAMANO_MIN, maximo=TAMANO_MAX
+                )
+            )
+        _nivel_valido(self.opacidad, _("opacidad"))
+
+
+@dataclass(frozen=True)
+class AjustesGuion:
+    """Guion del juego como fuente del texto (ver `vn_audiolibro.guion`)."""
+
+    carpeta: str
+    """Carpeta del juego (o la de los ficheros del guion)."""
+    origen: OrigenGuion = OrigenGuion.ORIGINAL
+
+    def __post_init__(self) -> None:
+        if not self.carpeta.strip():
+            raise PerfilInvalidoError(_("Falta la carpeta del juego para leer su guion"))
 
 
 def nuevo_id() -> str:
@@ -117,26 +177,69 @@ class Perfil:
     destino: str = DESTINOS[0]
     """Idioma de la traducción y de la voz. El glosario del juego va en este idioma."""
     zona: ZonaRelativa = TODA_LA_VENTANA
+    zona_nombre: ZonaRelativa | None = None
+    """Zona donde el juego escribe quién habla, si la tiene: ese texto no se lee en voz alta."""
+    separar_personaje: bool = True
+    """Sin zona del nombre, si se quita el de quien habla del principio de la línea (`Nombre：texto`)."""
     color: Color = Color.CLARO
     orientacion: Orientacion = Orientacion.HORIZONTAL
+    busqueda: BusquedaTexto = BusquedaTexto.COLOR
+    """Cómo se busca el texto en la zona: por color (caja de texto lisa) o con el detector."""
     glosario: Glosario = field(default_factory=Glosario)
+    traductor: Motor = Motor.LOCAL
+    """Traductor del juego: el local (por defecto) o Gemini, con la clave del usuario."""
     voz: AjustesVoz = field(default_factory=AjustesVoz)
+    personajes: tuple[tuple[str, Hablante | None], ...] = ()
+    """Personajes que han hablado al jugar (nombre en el juego) y su voz; None: la del juego."""
     lectura: AjustesLectura = field(default_factory=AjustesLectura)
     volumen: AjustesVolumen = field(default_factory=AjustesVolumen)
+    subtitulos: AjustesSubtitulos = field(default_factory=AjustesSubtitulos)
+    guion: AjustesGuion | None = None
+    """Si está, el texto sale del guion del juego y el OCR solo sirve para saber por dónde va."""
     id: str = field(default_factory=nuevo_id)
 
     def __post_init__(self) -> None:
         if not self.nombre.strip():
-            raise PerfilInvalidoError("El juego necesita un nombre")
+            raise PerfilInvalidoError(_("El juego necesita un nombre"))
         if len(self.nombre) > LARGO_MAX_NOMBRE:
-            raise PerfilInvalidoError(f"El nombre no puede pasar de {LARGO_MAX_NOMBRE} caracteres")
+            raise PerfilInvalidoError(
+                _("El nombre no puede pasar de {maximo} caracteres").format(maximo=LARGO_MAX_NOMBRE)
+            )
         if not self.ventana.strip():
-            raise PerfilInvalidoError("Falta el título de la ventana del juego")
+            raise PerfilInvalidoError(_("Falta el título de la ventana del juego"))
         if self.idioma not in IDIOMAS:
-            raise PerfilInvalidoError(f"Idioma no admitido: {self.idioma} (admitidos: {', '.join(IDIOMAS)})")
+            raise PerfilInvalidoError(
+                _("Idioma no admitido: {idioma} (admitidos: {admitidos})").format(
+                    idioma=self.idioma, admitidos=", ".join(IDIOMAS)
+                )
+            )
         if self.destino not in DESTINOS:
             raise PerfilInvalidoError(
-                f"Idioma de traducción no admitido: {self.destino} (admitidos: {', '.join(DESTINOS)})"
+                _("Idioma de traducción no admitido: {destino} (admitidos: {admitidos})").format(
+                    destino=self.destino, admitidos=", ".join(DESTINOS)
+                )
+            )
+        if self.idioma == INGLES and self.destino == INGLES:
+            raise PerfilInvalidoError(_("Un juego en inglés no se puede traducir al inglés"))
+        if self.idioma == INGLES and self.orientacion is Orientacion.VERTICAL:
+            raise PerfilInvalidoError(_("El texto en inglés no puede ir en columnas verticales"))
+        self._validar_personajes()
+        if self.guion is not None and self.guion.origen is OrigenGuion.INGLES and self.destino == "en":
+            raise PerfilInvalidoError(
+                _("Si se traduce desde el inglés del guion, no se puede traducir al inglés")
             )
         if len(self.id) != 32 or any(c not in "0123456789abcdef" for c in self.id):
-            raise PerfilInvalidoError(f"Identificador de juego no válido: {self.id}")
+            raise PerfilInvalidoError(_("Identificador de juego no válido: {id}").format(id=self.id))
+
+    def _validar_personajes(self) -> None:
+        nombres = [nombre for nombre, _hablante in self.personajes]
+        if any(not nombre.strip() for nombre in nombres) or len(set(nombres)) != len(nombres):
+            raise PerfilInvalidoError(_("Cada personaje necesita un nombre, sin repetirlo"))
+
+    def voces_personajes(self) -> dict[str, Hablante]:
+        """Personajes que no hablan con la voz del juego, con la suya."""
+        return {
+            nombre: hablante
+            for nombre, hablante in self.personajes
+            if hablante is not None and hablante is not self.voz.hablante
+        }

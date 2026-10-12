@@ -4,6 +4,7 @@ import contextlib
 import threading
 import time
 from collections.abc import Callable
+from dataclasses import replace
 
 from vn_audiolibro.captura.capturador import Capturador, FuenteGeometria
 from vn_audiolibro.captura.detector import DetectorTexto
@@ -15,6 +16,9 @@ class BucleCaptura:
 
     Se ejecuta en un hilo propio. El tamaño de la ventana se relee en cada vuelta: la zona es
     proporcional, así que sigue valiendo si el usuario la mueve o la redimensiona.
+
+    Con `zona_nombre`, cada vez que el texto queda estable se captura también la zona del nombre
+    del personaje y va en la misma `ZonaEstable`.
     """
 
     def __init__(
@@ -26,9 +30,11 @@ class BucleCaptura:
         capturador: Capturador,
         detector: DetectorTexto | None = None,
         intervalo_s: float = 0.1,
+        zona_nombre: ZonaRelativa | None = None,
     ) -> None:
         self._id_ventana = id_ventana
         self._zona = zona
+        self._zona_nombre = zona_nombre
         self._al_detectar = al_detectar
         self._ventanas = ventanas
         self._capturador = capturador
@@ -43,6 +49,9 @@ class BucleCaptura:
         zona = self._zona.en_pixeles(ventana.ancho, ventana.alto)
         imagen = self._capturador.capturar(self._id_ventana, zona)
         evento = self._detector.procesar(imagen, time.monotonic() if instante is None else instante)
+        if evento is not None and self._zona_nombre is not None:
+            nombre = self._zona_nombre.en_pixeles(ventana.ancho, ventana.alto)
+            evento = replace(evento, nombre=self._capturador.capturar(self._id_ventana, nombre))
         if evento is not None:
             self._al_detectar(evento)
         return evento

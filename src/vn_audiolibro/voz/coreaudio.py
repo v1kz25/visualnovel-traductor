@@ -18,6 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Protocol
 
 from vn_audiolibro.procesos import Proceso, listar_procesos
+from vn_audiolibro.textos import _
 from vn_audiolibro.voz.modelos import VozFallidaError
 from vn_audiolibro.voz.reproductor import NOMBRE_CLIENTE
 from vn_audiolibro.voz.volumen import Flujo, Volumen
@@ -84,7 +85,9 @@ class ClienteCoreAudio:
             self.flujos()
         except Exception as error:
             self._hilo_com.shutdown()
-            raise VozFallidaError(f"No se pudo acceder al audio de Windows: {error}") from None
+            raise VozFallidaError(
+                _("No se pudo acceder al audio de Windows: {error}").format(error=error)
+            ) from None
 
     def flujos(self) -> list[Flujo]:
         return self._en_hilo(self._flujos)

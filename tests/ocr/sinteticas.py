@@ -15,6 +15,14 @@ from vn_audiolibro.captura.modelos import Imagen
 CARPETAS_FUENTES = (Path("/usr/share/fonts/opentype/noto"), Path("/usr/share/fonts/noto-cjk"))
 FAMILIAS = {"zh-Hant": "Noto Sans CJK TC", "zh-Hans": "Noto Sans CJK SC", "ja": "Noto Sans CJK JP"}
 
+CARPETA_TRUETYPE = Path("/usr/share/fonts/truetype")
+FUENTES_LATINAS = {
+    "DejaVu Sans": "dejavu/DejaVuSans.ttf",  # fonts-dejavu-core
+    "Liberation Serif": "liberation/LiberationSerif-Regular.ttf",  # fonts-liberation
+    "Liberation Sans": "liberation/LiberationSans-Regular.ttf",
+}
+"""Fuentes latinas libres para el texto en inglés, relativas a `CARPETA_TRUETYPE`."""
+
 
 def falta(motivo: str) -> NoReturn:
     """Salta el test por falta de un recurso, salvo en la CI, donde tiene que estar."""
@@ -68,6 +76,27 @@ def _fondo(ancho: int, alto: int, estilo: Estilo) -> Image.Image:
     return Image.fromarray(np.repeat(filas, alto, axis=0).astype(np.uint8))
 
 
+def latina(nombre: str, tamano: int) -> ImageFont.FreeTypeFont:
+    """Fuente latina libre; salta el test si no está instalada."""
+    ruta = CARPETA_TRUETYPE / FUENTES_LATINAS[nombre]
+    if not ruta.is_file():
+        falta(f"falta la fuente {nombre} ({ruta})")
+    return ImageFont.truetype(str(ruta), tamano)
+
+
+def texto_latino(lineas: list[str], cara: ImageFont.FreeTypeFont, estilo: Estilo | None = None) -> Imagen:
+    """Líneas de texto latino escritas de seguido, con el espaciado propio de la fuente."""
+    estilo = estilo or Estilo()
+    tamano = round(cara.size)
+    salto = round(tamano * estilo.interlineado)
+    ancho = 30 + max(round(cara.getlength(linea)) for linea in lineas)
+    imagen = _fondo(ancho, 20 + salto * len(lineas), estilo)
+    dibujo = ImageDraw.Draw(imagen)
+    for n, linea in enumerate(lineas):
+        dibujo.text((15, 10 + n * salto), linea, font=cara, fill=estilo.color)
+    return np.asarray(imagen).copy()
+
+
 def horizontal(lineas: list[str], cara: ImageFont.FreeTypeFont, estilo: Estilo) -> Imagen:
     """Líneas de texto horizontal, un carácter cada `paso` tamaños de fuente."""
     paso = round(estilo.tamano * estilo.paso)
@@ -93,6 +122,48 @@ def vertical(columnas: list[str], cara: ImageFont.FreeTypeFont, estilo: Estilo) 
         x = ancho - 10 - estilo.tamano - n * salto
         for i, caracter in enumerate(columna):
             dibujo.text((x, 10 + i * paso), caracter, font=cara, fill=estilo.color)
+    return np.asarray(imagen).copy()
+
+
+def sobre_imagen(lineas: list[str], cara: ImageFont.FreeTypeFont, tamano: int = 30) -> Imagen:
+    """Texto blanco con borde negro escrito sobre una imagen con zonas claras grandes (nubes).
+
+    Es como escriben el texto los juegos sin caja de texto: la máscara por color atrapa también
+    las nubes y descarta las filas de texto por pequeñas.
+    """
+    salto = round(tamano * 2.3)
+    ancho = 40 + tamano * max(len(linea) for linea in lineas)
+    imagen = Image.new("RGB", (ancho, 40 + salto * len(lineas)), (60, 90, 150))
+    dibujo = ImageDraw.Draw(imagen)
+    dibujo.ellipse((-80, 40, ancho // 2 - 60, imagen.height + 150), fill=(245, 245, 250))
+    dibujo.ellipse((ancho // 2 + 60, -60, ancho + 60, salto * 2), fill=(235, 235, 240))
+    for n, linea in enumerate(lineas):
+        posicion = (20, 20 + n * salto)
+        dibujo.text(posicion, linea, font=cara, fill=(255, 255, 255), stroke_width=3, stroke_fill=(0, 0, 0))
+    return np.asarray(imagen).copy()
+
+
+def menu(
+    opciones: list[str], cara: ImageFont.FreeTypeFont, cartel: str = "", rotulo: str = "", tamano: int = 30
+) -> Imagen:
+    """Menú de opciones como los de las VN: botones grises centrados, uno debajo de otro, con el
+    texto centrado en cada uno, sobre un fondo con un cartel en vertical a la izquierda y un rótulo
+    horizontal en una esquina (texto del fondo que no es ninguna opción)."""
+    ancho, alto = 960, 540
+    imagen = _fondo(ancho, alto, Estilo(fondo=(70, 110, 160), degradado=(200, 210, 225)))
+    dibujo = ImageDraw.Draw(imagen)
+    if cartel:
+        dibujo.rectangle((10, 150, 20 + tamano, 170 + tamano * len(cartel)), fill=(230, 230, 230))
+        for i, caracter in enumerate(cartel):
+            dibujo.text((15, 160 + i * tamano), caracter, font=cara, fill=(30, 30, 30))
+    if rotulo:
+        dibujo.text((ancho - 30 - tamano * len(rotulo), 20), rotulo, font=cara, fill=(20, 20, 20))
+    salto = alto // (len(opciones) + 1)
+    for n, opcion in enumerate(opciones, 1):
+        centro = n * salto
+        dibujo.rectangle((ancho // 4, centro - tamano, 3 * ancho // 4, centro + tamano), fill=(90, 90, 100))
+        x = (ancho - dibujo.textlength(opcion, font=cara)) / 2
+        dibujo.text((x, centro - tamano * 0.6), opcion, font=cara, fill=(255, 255, 255))
     return np.asarray(imagen).copy()
 
 

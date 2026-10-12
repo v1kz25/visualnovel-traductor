@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from vn_audiolibro.descargas import Cancelado, Progreso, asegurar_descarga, directorio_modelos
 from vn_audiolibro.ocr.modelos import REC_PPOCRV5_MOBILE
+from vn_audiolibro.textos import N_, _
 from vn_audiolibro.traduccion.llama import (
     HY_MT2_1_8B_Q4,
     asegurar_llama_server,
@@ -22,10 +23,11 @@ from vn_audiolibro.traduccion.llama import (
 from vn_audiolibro.voz.piper import SHARVARD_MEDIUM, asegurar_voz
 from vn_audiolibro.voz.volumen import hay_control_de_volumen
 
-AVISO_COPYRIGHT = (
+AVISO_COPYRIGHT = N_(
     "vn-audiolibro no incluye ningún juego ni textos de juegos. Las traducciones y el audio que "
     "genera se guardan solo en tu equipo y no se comparten con nadie."
 )
+"""Se traduce al mostrarlo, con `_()`."""
 
 
 @dataclass(frozen=True)
@@ -46,8 +48,8 @@ def componentes() -> list[Componente]:
     modelos = directorio_modelos()
     return [
         Componente(
-            "Reconocimiento de texto (PP-OCRv5)",
-            "Lee el texto chino o japonés de la pantalla",
+            _("Reconocimiento de texto (PP-OCRv5)"),
+            _("Lee el texto chino o japonés de la pantalla"),
             "Apache-2.0",
             16_631_306,
             lambda: (modelos / REC_PPOCRV5_MOBILE.fichero).is_file(),
@@ -56,17 +58,17 @@ def componentes() -> list[Componente]:
             ),
         ),
         Componente(
-            "Servidor de traducción (llama.cpp)",
-            "Ejecuta el modelo de traducción en tu equipo",
+            _("Servidor de traducción (llama.cpp)"),
+            _("Ejecuta el modelo de traducción en tu equipo"),
             "MIT",
             binario_llama().tamano,
             lambda: ruta_llama_server().is_file(),
             lambda progreso, cancelado: asegurar_llama_server(progreso=progreso, cancelado=cancelado),
         ),
         Componente(
-            "Voz en español (Piper, sharvard)",
-            "Lee las traducciones en voz alta, con voz de mujer u hombre",
-            "Piper GPL-3.0; voz CC BY 3.0",
+            _("Voz en español (Piper, sharvard)"),
+            _("Lee las traducciones en voz alta, con voz de mujer u hombre"),
+            _("Piper GPL-3.0; voz CC BY 3.0"),
             76_738_518,
             lambda: all(
                 (modelos / d.fichero).is_file() for d in (SHARVARD_MEDIUM.modelo, SHARVARD_MEDIUM.config)
@@ -74,8 +76,8 @@ def componentes() -> list[Componente]:
             lambda progreso, cancelado: asegurar_voz(progreso=progreso, cancelado=cancelado),
         ),
         Componente(
-            "Modelo de traducción (Hy-MT2 1.8B, Tencent)",
-            "Traduce al español sin conexión",
+            _("Modelo de traducción (Hy-MT2 1.8B, Tencent)"),
+            _("Traduce sin conexión"),
             "Apache-2.0",
             1_133_080_448,
             lambda: (modelos / HY_MT2_1_8B_Q4.fichero).is_file(),
@@ -113,17 +115,21 @@ def comprobar_sistema(
     if entorno.get("XDG_SESSION_TYPE", "").lower() == "wayland" or not entorno.get("DISPLAY"):
         avisos.append(
             Aviso(
-                "La sesión no es X11: no se podrá capturar la ventana del juego. Entra en una sesión "
-                "«Xorg» o «X11» desde la pantalla de inicio de sesión.",
+                _(
+                    "La sesión no es X11: no se podrá capturar la ventana del juego. Entra en una sesión "
+                    "«Xorg» o «X11» desde la pantalla de inicio de sesión."
+                ),
                 grave=True,
             )
         )
     if shutil.which("paplay") is None:
         avisos.append(
-            Aviso("Falta «paplay»: no se oirá la voz. Instálalo con: sudo apt install pulseaudio-utils", True)
+            Aviso(
+                _("Falta «paplay»: no se oirá la voz. Instálalo con: sudo apt install pulseaudio-utils"), True
+            )
         )
     if not hay_libpulse():
         avisos.append(
-            Aviso("Falta libpulse: no se podrá bajar el volumen del juego mientras habla la voz.", False)
+            Aviso(_("Falta libpulse: no se podrá bajar el volumen del juego mientras habla la voz."), False)
         )
     return avisos

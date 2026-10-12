@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from vn_audiolibro.descargas import directorio_modelos
+from vn_audiolibro.perfiles.modelos import DESTINOS
 from vn_audiolibro.rutas import directorio_datos
 from vn_audiolibro.traduccion.llama import HY_MT2_1_8B_Q4, VERSION_LLAMA, ServidorLlama
 from vn_audiolibro.traduccion.local import TraductorLocal
@@ -31,6 +32,12 @@ LINEAS = {
         "窓の外では、雨が静かに降り続いていた。",
         "「うん」",
         "「先輩、待ってるよ」",
+    ],
+    "en": [
+        '"...Hey, are you still awake?"',
+        "Outside the window, the rain kept falling quietly.",
+        '"Yeah."',
+        "You bastard! I'll never forgive you!",
     ],
 }
 
@@ -53,9 +60,11 @@ def traductor() -> Iterator[TraductorLocal]:
         yield TraductorLocal(servidor.cliente)
 
 
-@pytest.mark.parametrize("destino", ["es", "en"])
+@pytest.mark.parametrize("destino", DESTINOS)
 @pytest.mark.parametrize("idioma", LINEAS)
 def test_traduce_en_menos_de_3_s(traductor: TraductorLocal, idioma: str, destino: str) -> None:
+    if idioma == destino:
+        pytest.skip("un juego en inglés no se traduce al inglés")
     previas: list[LineaPrevia] = []
     tiempos = []
     for linea in LINEAS[idioma]:
@@ -67,6 +76,8 @@ def test_traduce_en_menos_de_3_s(traductor: TraductorLocal, idioma: str, destino
         assert "\n" not in traduccion.texto
         if destino == "en":
             assert not ESPANOL.search(traduccion.texto), traduccion.texto
+        if idioma == "en":
+            assert traduccion.texto.casefold() != linea.casefold(), traduccion.texto
         previas.append(LineaPrevia(linea, traduccion.texto))
 
     assert statistics.median(tiempos) < TIEMPO_MAX_S
