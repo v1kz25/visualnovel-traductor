@@ -55,6 +55,13 @@ and progress. After that it works offline.
    of the game and other applications, and a glossary of names. **Characters** lists those who have
    already spoken, and you can give each one a female or male voice; the rest use the game's voice.
 
+**Playing on a single screen.** With subtitles turned on in the game's settings, tick **Subtitles
+only: minimize the app while playing**: when you press Play, the app is minimized and only the
+translation stays over the game. Control it without leaving the game with global keyboard shortcuts:
+Ctrl+Alt+P (pause or continue), Ctrl+Alt+R (repeat), Ctrl+Alt+S (skip) and Ctrl+Alt+H (show or hide
+the subtitles). While you play, the game doesn't receive those combinations: if one clashes with the
+game's, change it or turn them off in **Keyboard shortcuts…**. On Linux they work with X11.
+
 **Games with a readable script.** Some games store their script in text files (for now, Unity games
 that keep it in `StreamingAssets/Scripts` with `OutputLine` commands). For those, the app finds the
 script by itself or you can choose its folder in **Game script**: the text comes exactly from the
