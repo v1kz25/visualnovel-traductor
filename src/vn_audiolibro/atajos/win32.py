@@ -108,13 +108,13 @@ class EscuchaAtajosWin32:
         listo.set()
         try:
             while _user32.GetMessageW(ctypes.byref(mensaje), None, 0, 0) > 0:
-                accion = registrados.get(mensaje.wParam) if mensaje.message == WM_HOTKEY else None
-                if accion is None:
+                pulsada = registrados.get(mensaje.wParam) if mensaje.message == WM_HOTKEY else None
+                if pulsada is None:
                     continue
                 try:
-                    al_pulsar(accion)
+                    al_pulsar(pulsada)
                 except Exception:
-                    _registro.exception("Fallo al atender el atajo de %s", accion)
+                    _registro.exception("Fallo al atender el atajo de %s", pulsada)
         finally:
             for numero in registrados:
                 _user32.UnregisterHotKey(None, numero)
