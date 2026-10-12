@@ -4,7 +4,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 
 ## [Sin publicar]
 
+## [0.3.0] - 2026-10-12
+
+Subtítulos sobre el juego, controles sin salir de él, más idiomas, el guion del juego como fuente del texto y Gemini como traductor opcional.
+
 ### Añadido
+- **Subtítulos encima del juego** (opcionales, en los ajustes del juego): la traducción aparece encima o debajo de la caja de texto, o tapándola, con el tamaño de letra y la opacidad que elijas. Los clics siguen llegando al juego y solo se ven mientras el juego es la ventana activa. Aparecen con la primera frase de la traducción, a la vez que la voz, y crecen con cada parte.
+- **Inglés como idioma de origen:** se pueden jugar juegos en inglés y oírlos traducidos.
+- **Menús de opciones:** cuando el juego muestra una elección, cada opción se traduce por separado y la voz las lee numeradas («Opción 1: …»). Funciona con la búsqueda del texto «Con el detector».
 - **Interfaz en inglés:** la app, sus mensajes y la ayuda de la terminal salen en inglés si el sistema está en inglés (o en cualquier idioma que no sea el español). Se puede cambiar en «Idioma de la app», en la ventana principal. Las órdenes y opciones de la terminal no cambian.
 - Resumen del README en inglés (`README.en.md`).
 - **Guion del juego como fuente del texto:** en los juegos que guardan su guion en ficheros de texto (por ahora, los de Unity con órdenes `OutputLine` en `StreamingAssets/Scripts`), el texto sale exacto del guion y el OCR solo sirve para saber por dónde vas, así que funciona aunque el OCR falle bastante. Cada frase de diálogo se lee entera al aparecer su primera parte, y los párrafos siguientes se traducen por adelantado mientras suena el actual. Se elige en el editor del juego («Guion del juego»), que lo encuentra solo al elegir la ventana; se puede traducir desde el texto original o desde la traducción oficial al inglés que traen algunos guiones. `vn-audiolibro traducir-guion "Juego"` lo traduce entero antes de jugar, y se puede cortar y seguir otro día. Los ficheros del juego no se modifican.
@@ -17,6 +24,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 - **Traducir el guion desde la interfaz:** en los juegos con guion, el botón «Traducir el guion…» de la ventana principal lo traduce entero antes de jugar, con el progreso, el tiempo que lleva y una estimación del que falta. Se puede parar y seguir otro día; mientras traduce no se puede jugar.
 - **Aviso de versión nueva:** si hay una versión más nueva publicada, la ventana principal lo dice en una franja discreta, con sus novedades y el enlace para descargarla, una sola vez por versión. La app pregunta la primera vez si quieres el aviso, porque para saberlo consulta GitHub (como mucho una vez al día); se puede cambiar en «Avisar de versiones nuevas». Nunca descarga ni instala nada sola.
 - **Silenciar la voz** sin dejar de traducir: con «Silenciar voz» (tecla M) o la orden `m` en la terminal, cada línea se sigue traduciendo y mostrando, pero no se lee ni se baja el volumen del juego.
+
+### Cambiado
+- **Buscar el texto con el detector:** en los juegos que escriben el texto directamente sobre la imagen, el ajuste «Buscar el texto → Con el detector» encuentra las líneas con el detector de PP-OCRv5 (se descarga la primera vez que se usa). Los juegos ya configurados siguen buscando por color.
+- Banco de pruebas de la traducción (`python -m vn_audiolibro.traduccion`) para medir la velocidad, la calidad y el uso de CPU y memoria.
+
+### Corregido
+- El historial de la ventana principal a veces no mostraba la última línea traducida, sobre todo al cambiar el tamaño de la ventana.
 
 ## [0.2.0] - 2026-09-28
 

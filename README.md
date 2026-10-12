@@ -21,7 +21,7 @@ Audiolibro en español, en tiempo real, para novelas visuales en chino y japoné
 
 Mientras juegas, la app lee el texto de la ventana del juego, lo traduce al español (o al inglés, francés, portugués, alemán o italiano, si lo eliges para ese juego) y lo reproduce con voz. Todo funciona en tu equipo: sin cuentas, sin coste y sin conexión (salvo para descargar los modelos la primera vez y, si lo aceptas, para avisarte de versiones nuevas).
 
-> Última versión: **v0.2.0**, para Linux y Windows.
+> Última versión: **v0.3.0**, para Linux y Windows.
 
 ## Cómo funciona
 

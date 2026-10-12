@@ -1,6 +1,6 @@
 [project]
 name = "vn-audiolibro"
-version = "0.2.0"
+version = "0.3.0"
 description = "Traduce en tiempo real novelas visuales en chino y japonés y las lee en voz alta en español."
 readme = "README.md"
 license = "GPL-3.0-or-later"
