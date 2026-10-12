@@ -91,6 +91,12 @@ jugar, elige el juego y pulsa **Traducir el guion…** (o, en la terminal,
 seguir otro día.
 La app solo lee los ficheros del juego: no los modifica.
 
+**Traducir con Gemini (opcional).** En el editor de cada juego se puede elegir Gemini, de Google, en
+lugar del traductor local, con tu propia clave gratuita de Google AI Studio (se guarda en el
+llavero del sistema). El texto del juego se envía a Google. Si Gemini falla o se agota su límite,
+esa línea se traduce en local. Al traducir el guion entero, Gemini traduce muchas líneas en cada
+petición para que quepa en el límite diario del plan gratuito; si se agota, se sigue otro día.
+
 La interfaz está en español y en inglés: sigue el idioma del sistema y se puede cambiar en
 **Idioma de la app**, en la ventana principal.
 
