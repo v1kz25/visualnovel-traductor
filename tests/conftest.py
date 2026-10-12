@@ -43,12 +43,14 @@ def llavero() -> Iterator[LlaveroEnMemoria]:
 
 @pytest.fixture(autouse=True)
 def en_espanol(monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory) -> Iterator[None]:
-    """Sistema en español y sin ajustes guardados: la CLI elige el idioma al arrancar.
+    """Sistema en español, sin ajustes ni estado guardados: la CLI elige el idioma al arrancar.
 
     Al terminar, deja activo el español aunque el test haya cambiado de idioma.
     """
     monkeypatch.setattr(plataforma, "idiomas_sistema", lambda entorno=None: ["es_ES.UTF-8"])
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path_factory.mktemp("config")))
+    # El estado (como la cuenta de peticiones a Gemini) tampoco se escribe en el del equipo.
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path_factory.mktemp("estado")))
     yield
     textos.activar(textos.ORIGEN)
 
