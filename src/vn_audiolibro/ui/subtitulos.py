@@ -15,7 +15,7 @@ from typing import Protocol
 
 from PySide6.QtCore import QPoint, QRect, Qt, QTimer
 from PySide6.QtGui import QCursor, QFont, QGuiApplication
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
 
 from vn_audiolibro.atajos.modelos import Accion
 from vn_audiolibro.captura.modelos import (
@@ -26,8 +26,9 @@ from vn_audiolibro.captura.modelos import (
 )
 from vn_audiolibro.perfiles.modelos import AjustesSubtitulos, Perfil, PosicionSubtitulos
 from vn_audiolibro.plataforma import gestor_ventanas
-from vn_audiolibro.textos import _
+from vn_audiolibro.textos import _, ngettext
 from vn_audiolibro.ui.controles import ControlesFlotantes
+from vn_audiolibro.voz.modelos import EstadoVoz
 
 _registro = logging.getLogger(__name__)
 
@@ -47,6 +48,8 @@ class PantallaSubtitulos(Protocol):
     def alternar(self) -> None: ...
 
     def conectar(self, al_control: Callable[[Accion], None]) -> None: ...
+
+    def estado_voz(self, estado: EstadoVoz) -> None: ...
 
     def cerrar(self) -> None: ...
 
@@ -116,18 +119,37 @@ class Subtitulos(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        opacidad = 1.0 if ajustes.posicion is PosicionSubtitulos.TAPAR else ajustes.opacidad
+        relleno = round(MARGEN * ajustes.tamano)
+        self.caja = QFrame()
+        """El fondo de los subtítulos, con el texto y debajo cómo va la lectura."""
+        self.caja.setObjectName("caja")
+        self.caja.setStyleSheet(
+            f"QFrame#caja {{ background-color: rgba(0, 0, 0, {round(opacidad * 255)}); "
+            f"border-radius: {relleno // 2}px; }}"
+        )
         self.texto = QLabel()
         self.texto.setWordWrap(True)
         self.texto.setAlignment(Qt.AlignmentFlag.AlignCenter)
         fuente = QFont(self.texto.font())
         fuente.setPointSize(ajustes.tamano)
         self.texto.setFont(fuente)
-        opacidad = 1.0 if ajustes.posicion is PosicionSubtitulos.TAPAR else ajustes.opacidad
-        relleno = round(MARGEN * ajustes.tamano)
-        self.texto.setStyleSheet(
-            f"background-color: rgba(0, 0, 0, {round(opacidad * 255)}); color: white; "
-            f"padding: {relleno}px; border-radius: {relleno // 2}px;"
+        self.texto.setStyleSheet(f"color: white; padding: {relleno}px;")
+        self.lectura = QLabel()
+        """Si quedan líneas en la cola o si ya se puede avanzar."""
+        self.lectura.setAlignment(Qt.AlignmentFlag.AlignRight)
+        pequena = QFont(self.lectura.font())
+        pequena.setPointSize(max(8, ajustes.tamano // 2))
+        self.lectura.setFont(pequena)
+        self.lectura.setStyleSheet(
+            f"color: rgba(255, 255, 255, 180); padding: 0 {relleno}px {relleno // 2}px {relleno}px;"
         )
+        self.lectura.hide()
+        dentro = QVBoxLayout(self.caja)
+        dentro.setContentsMargins(0, 0, 0, 0)
+        dentro.setSpacing(0)
+        dentro.addWidget(self.texto)
+        dentro.addWidget(self.lectura)
         self.marca = QLabel(_("Subtítulos ocultos · pasa el ratón para ver los controles"))
         self.marca.setStyleSheet(
             "background-color: rgba(0, 0, 0, 140); color: rgba(255, 255, 255, 200); "
@@ -136,7 +158,7 @@ class Subtitulos(QWidget):
         self.marca.hide()
         columna = QVBoxLayout(self)
         columna.setContentsMargins(0, 0, 0, 0)
-        columna.addWidget(self.texto)
+        columna.addWidget(self.caja)
         columna.addWidget(self.marca)
         self.controles = ControlesFlotantes()
         self._sin_raton = 0
@@ -155,6 +177,18 @@ class Subtitulos(QWidget):
         self.texto.setText(texto)
         self.seguir()
 
+    def estado_voz(self, estado: EstadoVoz) -> None:
+        """Muestra debajo del texto cuántas líneas quedan en la cola o que ya se puede avanzar."""
+        if estado.en_espera:
+            texto = ngettext("{n} línea más en cola", "{n} líneas más en cola", estado.en_espera)
+            self.lectura.setText(texto.format(n=estado.en_espera))
+        elif estado.libre:
+            self.lectura.setText(_("✓ Leída · puedes avanzar"))
+        else:
+            self.lectura.clear()
+        self.lectura.setVisible(bool(self.lectura.text()))
+        self.seguir()
+
     def alternar(self) -> None:
         """Oculta los subtítulos o los vuelve a mostrar (con el atajo o el botón)."""
         self.ocultos = not self.ocultos
@@ -168,8 +202,11 @@ class Subtitulos(QWidget):
             self.hide()
             self.controles.hide()
             return
-        self.texto.setVisible(not self.ocultos)
+        self.caja.setVisible(not self.ocultos)
         self.marca.setVisible(self.ocultos)
+        for capa in (self.caja.layout(), self.layout()):
+            if capa is not None:
+                capa.activate()  # que el tamaño mínimo ya cuente lo que se acaba de mostrar u ocultar
         if self.ocultos:
             alto = self.marca.sizeHint().height()
             sitio = rectangulo_subtitulos(juego, self._zona, self._ajustes.posicion, alto)
@@ -177,6 +214,8 @@ class Subtitulos(QWidget):
         else:
             ancho = round(self._zona.ancho * juego.ancho)
             alto = self.texto.heightForWidth(ancho) if ancho > 0 else 0
+            if not self.lectura.isHidden():
+                alto += self.lectura.sizeHint().height()
             sitio = rectangulo_subtitulos(juego, self._zona, self._ajustes.posicion, max(alto, 1))
         self.setGeometry(QRect(sitio.x, sitio.y, sitio.ancho, sitio.alto))
         if self.isHidden():

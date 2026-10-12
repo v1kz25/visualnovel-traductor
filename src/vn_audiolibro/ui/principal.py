@@ -46,6 +46,7 @@ from vn_audiolibro.ui.guion import TraducirGuion
 from vn_audiolibro.ui.puente import PuenteSesion
 from vn_audiolibro.ui.subtitulos import PantallaSubtitulos, abrir_subtitulos
 from vn_audiolibro.ui.versiones import AvisoVersion, BuscadorVersiones, preguntar_si_avisar
+from vn_audiolibro.voz.modelos import EstadoVoz
 
 _registro = logging.getLogger(__name__)
 
@@ -258,6 +259,7 @@ class VentanaPrincipal(QMainWindow):
         self.puente.estado.connect(self.estado.setText)
         self.puente.linea.connect(self._mostrar_linea)
         self.puente.subtitulo.connect(self._mostrar_subtitulo)
+        self.puente.voz.connect(self._mostrar_estado_voz)
         barra = self.historial.verticalScrollBar()
         barra.rangeChanged.connect(lambda _minimo, _maximo: self._bajar_historial())
         barra.valueChanged.connect(self._al_mover_historial)
@@ -479,6 +481,10 @@ class VentanaPrincipal(QMainWindow):
         # la barra se baja cada vez que cambia su rango (`_bajar_historial`), no solo aquí.
         self._seguir_final = True
         self._bajar_historial()
+
+    def _mostrar_estado_voz(self, estado: EstadoVoz) -> None:
+        if self._subtitulos is not None:
+            self._subtitulos.estado_voz(estado)
 
     def _mostrar_subtitulo(self, texto: str) -> None:
         if self._subtitulos is not None:

@@ -14,6 +14,7 @@ from vn_audiolibro.ui.subtitulos import (
     abrir_subtitulos,
     rectangulo_subtitulos,
 )
+from vn_audiolibro.voz.modelos import EstadoVoz
 
 JUEGO = Rectangulo(100, 50, 800, 600)
 ZONA = ZonaRelativa(0.1, 0.7, 0.8, 0.25)  # en píxeles del juego: x=80, y=420, 640×150
@@ -127,8 +128,8 @@ def test_tapar_lleva_fondo_opaco(qtbot: QtBot, ventanas: VentanasFalsas) -> None
     tapar = abrir(qtbot, ventanas, AjustesSubtitulos(activo=True, posicion=TAPAR, opacidad=0.2))
     encima = abrir(qtbot, ventanas, AjustesSubtitulos(activo=True, opacidad=0.2))
 
-    assert "rgba(0, 0, 0, 255)" in tapar.texto.styleSheet()
-    assert "rgba(0, 0, 0, 51)" in encima.texto.styleSheet()
+    assert "rgba(0, 0, 0, 255)" in tapar.caja.styleSheet()
+    assert "rgba(0, 0, 0, 51)" in encima.caja.styleSheet()
     assert tapar.texto.font().pointSize() == 22
 
 
@@ -162,15 +163,15 @@ def test_ocultar_deja_una_marca_y_volver_a_mostrar(qtbot: QtBot, ventanas: Venta
 
     subtitulos.alternar()
     assert subtitulos.isVisible()  # queda la marca, para que no parezca que han desaparecido
-    assert subtitulos.texto.isHidden()
+    assert subtitulos.caja.isHidden()
     assert subtitulos.marca.isVisible()
     assert subtitulos.geometry().height() < 60
     assert subtitulos.controles.botones[Accion.SUBTITULOS].text() == "Mostrar"
     subtitulos.mostrar("Adiós")  # el texto se sigue actualizando, sin verse
-    assert subtitulos.texto.isHidden()
+    assert subtitulos.caja.isHidden()
 
     subtitulos.alternar()
-    assert subtitulos.texto.isVisible()
+    assert subtitulos.caja.isVisible()
     assert subtitulos.marca.isHidden()
     assert subtitulos.texto.text() == "Adiós"
     assert subtitulos.controles.botones[Accion.SUBTITULOS].text() == "Ocultar"
@@ -274,3 +275,32 @@ def test_cerrar_cierra_los_controles(qtbot: QtBot, ventanas: VentanasFalsas) -> 
 
     subtitulos.cerrar()
     assert subtitulos.controles.isHidden()
+
+
+# Cómo va la lectura
+
+
+def test_dice_cuantas_quedan_en_cola_y_cuando_se_puede_avanzar(
+    qtbot: QtBot, ventanas: VentanasFalsas
+) -> None:
+    subtitulos = abrir(qtbot, ventanas)
+    subtitulos.mostrar("Hola")
+    alto_solo = subtitulos.geometry().height()
+    assert subtitulos.lectura.isHidden()
+
+    subtitulos.estado_voz(EstadoVoz(leyendo=True, en_espera=2))
+    assert subtitulos.lectura.text() == "2 líneas más en cola"
+    assert subtitulos.lectura.isVisible()
+    assert subtitulos.geometry().height() > alto_solo  # cabe debajo del texto
+    assert subtitulos.geometry().bottom() + 1 == 470  # sigue justo encima de la zona de texto
+
+    subtitulos.estado_voz(EstadoVoz(leyendo=True, en_espera=1))
+    assert subtitulos.lectura.text() == "1 línea más en cola"
+
+    subtitulos.estado_voz(EstadoVoz(leyendo=True, en_espera=0))
+    assert subtitulos.lectura.isHidden()  # leyendo la última: nada que decir
+    assert subtitulos.geometry().height() == alto_solo
+
+    subtitulos.estado_voz(EstadoVoz(leyendo=False, en_espera=0))
+    assert subtitulos.lectura.text() == "✓ Leída · puedes avanzar"
+    assert subtitulos.lectura.isVisible()

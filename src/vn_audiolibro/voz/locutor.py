@@ -20,6 +20,7 @@ from vn_audiolibro.voz.modelos import (
     MAX_EN_ESPERA,
     PAUSA_ENTRE_LINEAS_S,
     Atenuador,
+    EstadoVoz,
     Fragmento,
     ModoLectura,
     Reproductor,
@@ -109,7 +110,12 @@ class Locutor:
         max_en_espera: int = MAX_EN_ESPERA,
         pausa_s: float = PAUSA_ENTRE_LINEAS_S,
         voces: Mapping[str, Sintetizador] | None = None,
+        al_cambio: Callable[[EstadoVoz], None] | None = None,
     ) -> None:
+        """`al_cambio` recibe, desde el hilo que lo cambia, el estado de la lectura cada vez que
+        cambia (empieza o termina una línea, o llega o se descarta una de la cola)."""
+        self._al_cambio = al_cambio
+        self._estado_avisado: EstadoVoz | None = None
         self._sintetizador = sintetizador
         self._voces = dict(voces or {})
         self._reproductor = reproductor
@@ -184,6 +190,21 @@ class Locutor:
             self._condicion.notify_all()
         if salida is not None:
             salida.detener()
+        self._avisar_cambio()
+
+    def _avisar_cambio(self) -> None:
+        """Avisa del estado de la lectura si ha cambiado desde el último aviso."""
+        if self._al_cambio is None:
+            return
+        with self._condicion:
+            estado = EstadoVoz(self._actual is not None, len(self._cola))
+            if estado == self._estado_avisado:
+                return
+            self._estado_avisado = estado
+        try:
+            self._al_cambio(estado)
+        except Exception:
+            _registro.exception("Falló el aviso del estado de la lectura")
 
     def esperar(self, timeout_s: float | None = None) -> bool:
         """Espera a que no quede nada por leer. Devuelve False si se agota el tiempo."""
@@ -214,6 +235,7 @@ class Locutor:
             self._condicion.notify_all()
         if salida is not None:
             salida.detener()
+        self._avisar_cambio()
 
     def _bucle(self) -> None:
         while True:
@@ -222,6 +244,7 @@ class Locutor:
                 if self._cerrado:
                     return
                 pedido = self._actual = self._cola.popleft()
+            self._avisar_cambio()
             try:
                 self._atender(pedido)
             except Exception:
@@ -236,6 +259,7 @@ class Locutor:
                     self._actual = None
                     self._salida = None
                     self._condicion.notify_all()
+                self._avisar_cambio()
 
     def _atender(self, pedido: _Pedido) -> None:
         guardado = self._audio_guardado(pedido.clave, pedido.voz) if pedido.partes is None else None

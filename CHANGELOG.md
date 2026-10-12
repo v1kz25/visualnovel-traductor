@@ -6,6 +6,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 
 ### Añadido
 - **Controles al pasar el ratón por los subtítulos:** botones para pausar o seguir, repetir, saltar y ocultar los subtítulos, sin salir del juego y sin depender de los atajos de teclado. Los clics no le quitan el foco al juego.
+- **Los subtítulos dicen cómo va la lectura:** debajo del texto, «2 líneas más en cola» mientras quedan líneas por leer y «✓ Leída · puedes avanzar» cuando la voz ha terminado, para saber cuándo pasar a la siguiente si se ha perdido la cuenta.
 - Al ocultar los subtítulos queda una marca pequeña de «Subtítulos ocultos» sobre el juego, para que no parezca que han desaparecido; al pasar el ratón por ella vuelven los controles.
 
 ## [0.3.0] - 2026-10-12

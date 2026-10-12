@@ -86,5 +86,18 @@ MAX_EN_ESPERA = 3
 """Líneas que pueden esperar su turno en modo cola; si llegan más, se descartan las más antiguas."""
 
 
+@dataclass(frozen=True)
+class EstadoVoz:
+    """Cómo va la lectura: si suena (o se prepara) una línea y cuántas esperan detrás."""
+
+    leyendo: bool
+    en_espera: int
+
+    @property
+    def libre(self) -> bool:
+        """Ya se ha leído todo: se puede pasar a la siguiente línea del juego."""
+        return not self.leyendo and not self.en_espera
+
+
 class VozFallidaError(Exception):
     """No se ha podido sintetizar o reproducir el audio."""

@@ -1256,6 +1256,14 @@ msgstr "Error while stopping: {error}"
 msgid "Subtítulos ocultos · pasa el ratón para ver los controles"
 msgstr "Subtitles hidden · hover here for the controls"
 
+msgid "{n} línea más en cola"
+msgid_plural "{n} líneas más en cola"
+msgstr[0] "{n} more line queued"
+msgstr[1] "{n} more lines queued"
+
+msgid "✓ Leída · puedes avanzar"
+msgstr "✓ Read · you can go on"
+
 msgid "Versiones nuevas"
 msgstr "New versions"
 
