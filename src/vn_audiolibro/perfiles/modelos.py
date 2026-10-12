@@ -18,10 +18,11 @@ IDIOMAS = ("zh-Hant", "zh-Hans", "ja", "en")
 """Idiomas de origen admitidos: chino tradicional, chino simplificado, japonés e inglés."""
 
 INGLES = "en"
-"""Un juego en inglés solo se traduce al español y su texto va en horizontal."""
+"""Un juego en inglés no se traduce al inglés y su texto va en horizontal."""
 
-DESTINOS = ("es", "en")
-"""Idiomas a los que se traduce y en los que se lee: español (por defecto) e inglés."""
+DESTINOS = ("es", "en", "fr", "pt", "de", "it")
+"""Idiomas a los que se traduce y en los que se lee: español (por defecto), inglés, francés,
+portugués, alemán e italiano."""
 
 LARGO_MAX_NOMBRE = 80
 VELOCIDAD_MIN, VELOCIDAD_MAX = 0.5, 2.0
@@ -219,7 +220,7 @@ class Perfil:
                 )
             )
         if self.idioma == INGLES and self.destino == INGLES:
-            raise PerfilInvalidoError(_("Un juego en inglés solo se puede traducir al español"))
+            raise PerfilInvalidoError(_("Un juego en inglés no se puede traducir al inglés"))
         if self.idioma == INGLES and self.orientacion is Orientacion.VERTICAL:
             raise PerfilInvalidoError(_("El texto en inglés no puede ir en columnas verticales"))
         self._validar_personajes()

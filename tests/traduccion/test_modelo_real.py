@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from vn_audiolibro.descargas import directorio_modelos
+from vn_audiolibro.perfiles.modelos import DESTINOS
 from vn_audiolibro.rutas import directorio_datos
 from vn_audiolibro.traduccion.llama import HY_MT2_1_8B_Q4, VERSION_LLAMA, ServidorLlama
 from vn_audiolibro.traduccion.local import TraductorLocal
@@ -59,11 +60,11 @@ def traductor() -> Iterator[TraductorLocal]:
         yield TraductorLocal(servidor.cliente)
 
 
-@pytest.mark.parametrize("destino", ["es", "en"])
+@pytest.mark.parametrize("destino", DESTINOS)
 @pytest.mark.parametrize("idioma", LINEAS)
 def test_traduce_en_menos_de_3_s(traductor: TraductorLocal, idioma: str, destino: str) -> None:
     if idioma == destino:
-        pytest.skip("un juego en inglés solo se traduce al español")
+        pytest.skip("un juego en inglés no se traduce al inglés")
     previas: list[LineaPrevia] = []
     tiempos = []
     for linea in LINEAS[idioma]:

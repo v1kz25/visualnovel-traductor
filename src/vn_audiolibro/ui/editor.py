@@ -5,8 +5,10 @@ import threading
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
+from typing import cast
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QStandardItemModel
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -57,7 +59,14 @@ NOMBRES_IDIOMAS = {
     "ja": N_("Japonés"),
     "en": N_("Inglés"),
 }
-NOMBRES_DESTINOS = {"es": N_("Español"), "en": N_("Inglés")}
+NOMBRES_DESTINOS = {
+    "es": N_("Español"),
+    "en": N_("Inglés"),
+    "fr": N_("Francés"),
+    "pt": N_("Portugués"),
+    "de": N_("Alemán"),
+    "it": N_("Italiano"),
+}
 NOMBRES_COLORES = {Color.CLARO: N_("Claro sobre fondo oscuro"), Color.OSCURO: N_("Oscuro sobre fondo claro")}
 NOMBRES_ORIENTACIONES = {
     Orientacion.HORIZONTAL: N_("Horizontal"),
@@ -559,12 +568,15 @@ class EditorJuego(QDialog):
             )
 
     def _al_cambiar_idioma(self) -> None:
-        """Un juego en inglés solo se traduce al español y en horizontal: se fijan y se bloquean."""
+        """Un juego en inglés no se traduce al inglés y va en horizontal: se bloquean esas opciones."""
         ingles = self.idioma.currentData() == INGLES
         if ingles:
-            self._elegir(self.destino, DESTINOS[0])
+            if self.destino.currentData() == INGLES:
+                self._elegir(self.destino, DESTINOS[0])
             self._elegir(self.orientacion, Orientacion.HORIZONTAL.value)
-        self.destino.setEnabled(not ingles)
+        # El modelo por defecto de QComboBox es un QStandardItemModel.
+        modelo = cast(QStandardItemModel, self.destino.model())
+        modelo.item(self.destino.findData(INGLES)).setEnabled(not ingles)
         self.orientacion.setEnabled(not ingles)
 
     def _actualizar_botones(self) -> None:

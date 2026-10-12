@@ -11,12 +11,19 @@ from pathlib import Path
 import pytest
 
 from tests.ocr.sinteticas import falta
-from vn_audiolibro.descargas import DescargaFallidaError
+from vn_audiolibro.descargas import DescargaFallidaError, directorio_modelos
+from vn_audiolibro.perfiles.modelos import DESTINOS
 from vn_audiolibro.voz.modelos import VozFallidaError
 from vn_audiolibro.voz.piper import (
+    FABER_MEDIUM,
     JOHN_MEDIUM,
+    KERSTIN_LOW,
     KRISTIN_MEDIUM,
+    PAOLA_MEDIUM,
     SHARVARD_MEDIUM,
+    THORSTEN_MEDIUM,
+    UPMC_MEDIUM,
+    VOCES,
     Hablante,
     SintetizadorPiper,
     VozElegida,
@@ -94,7 +101,7 @@ def test_hablante_que_la_voz_no_tiene(tmp_path: Path, modelo: Path) -> None:
     config["num_speakers"], config["speaker_id_map"] = 1, {}
     (tmp_path / "unico.onnx.json").write_text(json.dumps(config), encoding="utf-8")
 
-    with pytest.raises(VozFallidaError, match="hablante hombre"):
+    with pytest.raises(VozFallidaError, match="hablante M"):
         SintetizadorPiper(unico, Hablante.HOMBRE)
 
 
@@ -128,3 +135,46 @@ def test_elegir_voz() -> None:
     assert elegir_voz("es") == VozElegida(SHARVARD_MEDIUM, Hablante.MUJER)
     assert elegir_voz("en", Hablante.MUJER) == VozElegida(KRISTIN_MEDIUM, None)
     assert elegir_voz("en", Hablante.HOMBRE) == VozElegida(JOHN_MEDIUM, None)
+    assert elegir_voz("fr", Hablante.MUJER) == VozElegida(UPMC_MEDIUM, "jessica")
+    assert elegir_voz("fr", Hablante.HOMBRE) == VozElegida(UPMC_MEDIUM, "pierre")
+    assert elegir_voz("de", Hablante.MUJER) == VozElegida(KERSTIN_LOW, None)
+    assert elegir_voz("de", Hablante.HOMBRE) == VozElegida(THORSTEN_MEDIUM, None)
+    # Sin una segunda voz con licencia libre, la única lee a los dos.
+    assert (
+        elegir_voz("pt", Hablante.HOMBRE)
+        == elegir_voz("pt", Hablante.MUJER)
+        == VozElegida(FABER_MEDIUM, None)
+    )
+    assert (
+        elegir_voz("it", Hablante.HOMBRE)
+        == elegir_voz("it", Hablante.MUJER)
+        == VozElegida(PAOLA_MEDIUM, None)
+    )
+
+
+def test_cada_idioma_de_destino_tiene_voz_de_mujer_y_de_hombre() -> None:
+    assert set(VOCES) == set(DESTINOS)
+    assert all(set(voces) == set(Hablante) for voces in VOCES.values())
+
+
+FRASES_IDIOMAS = {
+    "fr": "On rentre ensemble ? Il pleut.",
+    "pt": "Vamos para casa juntos? Está chovendo.",
+    "de": "Gehen wir zusammen nach Hause? Es regnet.",
+    "it": "Torniamo a casa insieme? Sta piovendo.",
+}
+
+
+@pytest.mark.parametrize(
+    ("destino", "hablante"),
+    [(destino, hablante) for destino in FRASES_IDIOMAS for hablante in Hablante],
+)
+def test_voces_de_los_otros_idiomas(destino: str, hablante: Hablante) -> None:
+    # No se descargan en la CI (~330 MB entre todas): se prueban si ya están en el equipo.
+    elegida = elegir_voz(destino, hablante)
+    if not (directorio_modelos() / elegida.voz.modelo.fichero).is_file():
+        pytest.skip(f"voz {elegida.voz.modelo.fichero} no descargada")
+    modelo = asegurar_voz(elegida.voz)
+    fragmentos = list(SintetizadorPiper(modelo, elegida.hablante).sintetizar(FRASES_IDIOMAS[destino]))
+    assert len(fragmentos) == 2
+    assert all(f.duracion_s > 0.3 for f in fragmentos)

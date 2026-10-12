@@ -19,7 +19,7 @@ Audiolibro en español, en tiempo real, para novelas visuales en chino y japoné
 
 <sub>Escena de ejemplo dibujada para esta imagen; no pertenece a ningún juego.</sub>
 
-Mientras juegas, la app lee el texto de la ventana del juego, lo traduce al español (o al inglés, si lo eliges para ese juego) y lo reproduce con voz. Todo funciona en tu equipo: sin cuentas, sin coste y sin conexión (salvo para descargar los modelos la primera vez).
+Mientras juegas, la app lee el texto de la ventana del juego, lo traduce al español (o al inglés, francés, portugués, alemán o italiano, si lo eliges para ese juego) y lo reproduce con voz. Todo funciona en tu equipo: sin cuentas, sin coste y sin conexión (salvo para descargar los modelos la primera vez).
 
 > Última versión: **v0.2.0**, para Linux y Windows.
 
@@ -68,8 +68,9 @@ en `%LOCALAPPDATA%\vn-audiolibro` y los ajustes en `%APPDATA%\vn-audiolibro`.
 ## Uso
 
 1. **Añadir juego**: elige la ventana del juego, captúrala y dibuja un recuadro sobre la caja de texto.
-   Ahí se elige también el idioma de la traducción y de la voz: español (por defecto) o inglés.
-   La voz inglesa (unos 64 MB, de dominio público) se descarga la primera vez que se usa.
+   Ahí se elige también el idioma de la traducción y de la voz: español (por defecto), inglés,
+   francés, portugués, alemán o italiano. La voz de cada idioma (unos 60-80 MB) se descarga la
+   primera vez que se usa; ver [Voces](#voces).
    El nombre de quien habla no se lee en voz alta: se muestra delante de la traducción. La app lo
    reconoce al principio de la línea (`Nombre：texto`, `【Nombre】texto` o `Nombre「texto」`) o, si el
    juego lo pone en una caja aparte, en la **Zona del nombre** que dibujes. Cada nombre se traduce
@@ -111,6 +112,24 @@ Los textos de la interfaz se escriben en español marcados con `_()` y cada idio
 
 Los errores y las propuestas se abren como [issues](../../issues/new/choose). Si quieres enviar un
 cambio, lee antes [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+## Voces
+
+Todas son voces de [Piper](https://github.com/rhasspy/piper-voices) con licencia libre (sin
+restricción de uso no comercial). La app no las incluye: las descarga del repositorio oficial y
+comprueba su SHA-256.
+
+| Idioma | Mujer | Hombre | Licencia de los datos |
+|---|---|---|---|
+| Español | sharvard (F) | sharvard (M) | CC BY 3.0 |
+| Inglés | kristin | john | Dominio público (LibriVox) |
+| Francés | upmc (jessica) | upmc (pierre) | CC BY-SA 4.0 |
+| Portugués (Brasil) | faber | faber | CC0 |
+| Alemán | kerstin | thorsten | CC0 |
+| Italiano | paola | paola | CC0 |
+
+En portugués e italiano no hay una segunda voz de calidad con licencia libre, así que una sola lee
+a todos los personajes.
 
 ## Licencia
 
