@@ -60,8 +60,9 @@ that keep it in `StreamingAssets/Scripts` with `OutputLine` commands). For those
 script by itself or you can choose its folder in **Game script**: the text comes exactly from the
 script even if OCR fails, OCR is only used to know where you are, and the next paragraphs are
 translated in advance while you listen. If the script includes an official English translation, you
-can translate from it. To translate the whole script before playing:
-`vn-audiolibro traducir-guion "My game"`. The app only reads the game files: it never changes them.
+can translate from it. To translate the whole script before playing,
+choose the game and press **Translate the script…** (or run `vn-audiolibro traducir-guion "My game"`):
+it shows the progress and the time left, and you can stop and continue another day. The app only reads the game files: it never changes them.
 
 From the terminal: `vn-audiolibro --help` (`vn-audiolibro-consola.exe --help` on Windows).
 

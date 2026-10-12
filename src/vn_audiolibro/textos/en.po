@@ -975,6 +975,62 @@ msgstr "Saved in the keyring (type another one to change it)"
 msgid "Pega aquí tu clave de Google AI Studio"
 msgstr "Paste your Google AI Studio key here"
 
+msgid "menos de 1 min"
+msgstr "less than 1 min"
+
+msgid "{minutos} min"
+msgstr "{minutos} min"
+
+msgid "{horas} h {minutos:02d} min"
+msgstr "{horas} h {minutos:02d} min"
+
+msgid "Traducir el guion"
+msgstr "Translate the script"
+
+msgid "Traduce entero el guion de «{nombre}» antes de jugar: al jugar, todo saldrá de la caché al momento.\n\nCon el traductor local puede tardar varias horas en un guion largo. Puedes parar cuando quieras y seguir otro día: lo traducido se conserva. Mientras traduce no se puede jugar."
+msgstr "Translates the whole script of “{nombre}” before you play: while playing, everything will come straight from the cache.\n\nWith the local translator, a long script can take several hours. You can stop whenever you like and continue another day: what's already translated is kept. You can't play while it's translating."
+
+msgid "Empezar"
+msgstr "Start"
+
+msgid "Cerrar"
+msgstr "Close"
+
+msgid "Parar"
+msgstr "Stop"
+
+msgid "Buscando lo que falta por traducir…"
+msgstr "Looking for what's left to translate…"
+
+msgid "Traduciendo…"
+msgstr "Translating…"
+
+msgid "{hechos} de {total} párrafos ({porcentaje} %)"
+msgstr "{hechos} of {total} paragraphs ({porcentaje}%)"
+
+msgid "Tiempo: {transcurrido}"
+msgstr "Time: {transcurrido}"
+
+msgid "Tiempo: {transcurrido} · Falta, más o menos: {restante}"
+msgstr "Time: {transcurrido} · About {restante} left"
+
+msgid "Seguir"
+msgstr "Continue"
+
+msgid "Parado. La próxima vez seguirá por donde lo ha dejado."
+msgstr "Stopped. Next time it will pick up where it left off."
+
+msgid "Reintentar"
+msgstr "Retry"
+
+msgid "Listo: {n} párrafo traducido. El guion está entero en la caché."
+msgid_plural "Listo: {n} párrafos traducidos. El guion está entero en la caché."
+msgstr[0] "Done: {n} paragraph translated. The whole script is in the cache."
+msgstr[1] "Done: {n} paragraphs translated. The whole script is in the cache."
+
+msgid "Parando…"
+msgstr "Stopping…"
+
 msgid "Pendiente"
 msgstr "Pending"
 
@@ -1020,9 +1076,6 @@ msgstr "Could not download “{componente}”: {error}"
 msgid "{hecho} de {total}"
 msgstr "{hecho} of {total}"
 
-msgid "Reintentar"
-msgstr "Retry"
-
 msgid "Descarga cancelada."
 msgstr "Download cancelled."
 
@@ -1043,6 +1096,12 @@ msgstr "Delete"
 
 msgid "Caché…"
 msgstr "Cache…"
+
+msgid "Traducir el guion…"
+msgstr "Translate the script…"
+
+msgid "Traduce entero el guion del juego antes de jugar (solo en los juegos con guion)."
+msgstr "Translates the game's whole script before you play (only for games with a script)."
 
 msgid "Juegos"
 msgstr "Games"
@@ -1095,9 +1154,6 @@ msgstr "Delete “{nombre}” from the list?\n\nIts saved translations and audio
 msgid "Preparando «{nombre}»…"
 msgstr "Preparing “{nombre}”…"
 
-msgid "Parando…"
-msgstr "Stopping…"
-
 msgid "Leyendo «{nombre}». Juega con normalidad."
 msgstr "Reading “{nombre}”. Play as usual."
 
@@ -1115,9 +1171,6 @@ msgstr "New versions"
 
 msgid "¿Quieres que la app te avise cuando haya una versión nueva?\n\nPara saberlo, consultará GitHub como mucho una vez al día al abrirse. No descarga ni instala nada. Se puede cambiar cuando quieras en «Avisar de versiones nuevas»."
 msgstr "Do you want the app to tell you when there's a new version?\n\nTo find out, it will check GitHub at most once a day when it opens. It doesn't download or install anything. You can change this at any time with “Notify me of new versions”."
-
-msgid "Cerrar"
-msgstr "Close"
 
 msgid "Hay una versión nueva: {version}."
 msgstr "A new version is available: {version}."

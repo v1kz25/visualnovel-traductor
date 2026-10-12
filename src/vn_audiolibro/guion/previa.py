@@ -107,15 +107,21 @@ class PreparadorGuion:
         self._cache.guardar_traduccion(self.clave(parrafo), traduccion.texto, traduccion.modelo)
         return traduccion
 
+    def pendientes(self) -> int:
+        """Cuántos párrafos del guion faltan por traducir."""
+        return sum(1 for parrafo in self.guion.parrafos if self.pendiente(parrafo))
+
     def traducir_todo(
         self,
         al_progreso: Callable[[int, int], None] = lambda _hechos, _total: None,
         cancelado: Callable[[], bool] = lambda: False,
+        al_traducir: Callable[[], None] = lambda: None,
     ) -> int:
         """Traduce en orden los párrafos que falten y devuelve cuántos ha traducido.
 
         Lo ya traducido está en la caché, así que se puede cortar y seguir otro día. `al_progreso`
-        recibe los párrafos hechos (traducidos ahora o antes) y el total.
+        recibe los párrafos hechos (traducidos ahora o antes) y el total; `al_traducir` se llama
+        cada vez que se traduce uno ahora, para estimar lo que falta.
         """
         total = len(self.guion.parrafos)
         traducidos = 0
@@ -124,5 +130,6 @@ class PreparadorGuion:
                 break
             if self.pendiente(parrafo) and self.traducir(parrafo, cancelado) is not None:
                 traducidos += 1
+                al_traducir()
             al_progreso(hechos, total)
         return traducidos

@@ -86,7 +86,9 @@ añadirlos, la app encuentra el guion sola o puedes elegir su carpeta en **Guion
 texto sale exacto del guion aunque el OCR falle, el OCR solo sirve para saber por dónde vas, y los
 párrafos siguientes se traducen por adelantado mientras escuchas el actual. Si el guion trae una
 traducción oficial al inglés, puedes traducir desde ella. Para traducir el guion entero antes de
-jugar: `vn-audiolibro traducir-guion "Mi juego"` (se puede cortar con Ctrl+C y seguir otro día).
+jugar, elige el juego y pulsa **Traducir el guion…** (o, en la terminal,
+`vn-audiolibro traducir-guion "Mi juego"`): muestra el progreso y lo que falta, y se puede parar y
+seguir otro día.
 La app solo lee los ficheros del juego: no los modifica.
 
 La interfaz está en español y en inglés: sigue el idioma del sistema y se puede cambiar en

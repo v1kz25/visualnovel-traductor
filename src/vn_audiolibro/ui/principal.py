@@ -39,6 +39,7 @@ from vn_audiolibro.textos import N_, _
 from vn_audiolibro.ui.ajustes import AjustesJuego
 from vn_audiolibro.ui.cache import VentanaCache
 from vn_audiolibro.ui.editor import EditorJuego
+from vn_audiolibro.ui.guion import TraducirGuion
 from vn_audiolibro.ui.puente import PuenteSesion
 from vn_audiolibro.ui.subtitulos import PantallaSubtitulos, abrir_subtitulos
 from vn_audiolibro.ui.versiones import AvisoVersion, BuscadorVersiones, preguntar_si_avisar
@@ -53,6 +54,7 @@ AbrirCache = Callable[[], CacheSQLite]
 AbrirEditor = Callable[[QWidget, AlmacenPerfiles, Perfil | None], EditorJuego]
 AbrirAjustes = Callable[[QWidget, AlmacenPerfiles, Perfil], AjustesJuego]
 AbrirVentanaCache = Callable[[QWidget, AlmacenPerfiles], VentanaCache]
+AbrirTraduccionGuion = Callable[[QWidget, Perfil], QDialog]
 
 
 def _html(linea: LineaJuego) -> str:
@@ -86,8 +88,12 @@ class VentanaPrincipal(QMainWindow):
         ruta_ajustes: Path | None = None,
         subtitulos: Callable[[Perfil], PantallaSubtitulos | None] = abrir_subtitulos,
         consultar_version: Consultar = consultar_github,
+        abrir_traduccion_guion: AbrirTraduccionGuion | None = None,
     ) -> None:
         super().__init__()
+        self._abrir_traduccion_guion = abrir_traduccion_guion or (
+            lambda padre, perfil: TraducirGuion(perfil, parent=padre)
+        )
         self.buscador_versiones = BuscadorVersiones(
             version_instalada(), consultar_version, ruta_ajustes, parent=self
         )
@@ -125,6 +131,10 @@ class VentanaPrincipal(QMainWindow):
         self.boton_ajustes = QPushButton(_("Ajustes"))
         self.boton_borrar = QPushButton(_("Borrar"))
         self.boton_cache = QPushButton(_("Caché…"))
+        self.boton_guion = QPushButton(_("Traducir el guion…"))
+        self.boton_guion.setToolTip(
+            _("Traduce entero el guion del juego antes de jugar (solo en los juegos con guion).")
+        )
 
         izquierda = QWidget()
         columna = QVBoxLayout(izquierda)
@@ -135,6 +145,7 @@ class VentanaPrincipal(QMainWindow):
         for boton in (self.boton_anadir, self.boton_editar, self.boton_ajustes, self.boton_borrar):
             fila.addWidget(boton)
         columna.addLayout(fila)
+        columna.addWidget(self.boton_guion)
         columna.addWidget(self.boton_cache)
         self.idioma = QComboBox()
         self.idioma.addItem(_("El del sistema"), None)
@@ -197,6 +208,7 @@ class VentanaPrincipal(QMainWindow):
         self.boton_editar.clicked.connect(lambda: self.editar(self.perfil_elegido()))
         self.boton_ajustes.clicked.connect(self.ajustar)
         self.boton_cache.clicked.connect(self.ver_cache)
+        self.boton_guion.clicked.connect(self.traducir_guion)
         self.boton_pausa.clicked.connect(self._alternar_pausa)
         self.boton_repetir.clicked.connect(self.puente.repetir)
         self.boton_saltar.clicked.connect(self.puente.saltar)
@@ -271,6 +283,13 @@ class VentanaPrincipal(QMainWindow):
         """Abre la ventana de la caché (no mientras se juega: la partida la está usando)."""
         if not self.puente.jugando:
             self._abrir_ventana_cache(self, self._almacen).exec()
+
+    def traducir_guion(self) -> None:
+        """Abre la traducción del guion entero. Es modal: mientras dura no se puede jugar."""
+        perfil = self.perfil_elegido()
+        if perfil is None or perfil.guion is None or self.puente.jugando:
+            return
+        self._abrir_traduccion_guion(self, perfil).exec()
 
     def borrar(self) -> None:
         perfil = self.perfil_elegido()
@@ -394,6 +413,8 @@ class VentanaPrincipal(QMainWindow):
         self.boton_borrar.setEnabled(hay_perfil and not jugando)
         self.boton_editar.setEnabled(hay_perfil and not jugando)
         self.boton_ajustes.setEnabled(hay_perfil and not jugando)
+        perfil = self.perfil_elegido()
+        self.boton_guion.setEnabled(perfil is not None and perfil.guion is not None and not jugando)
         self.boton_anadir.setEnabled(not jugando)
         self.boton_cache.setEnabled(not jugando)
         self.lista_perfiles.setEnabled(not jugando)

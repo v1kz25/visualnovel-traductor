@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QDialog, QMessageBox
 from pytestqt.qtbot import QtBot
 
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
-from vn_audiolibro.perfiles.modelos import Perfil
+from vn_audiolibro.perfiles.modelos import AjustesGuion, Perfil
 from vn_audiolibro.pipeline.orquestador import LineaJuego
 from vn_audiolibro.traduccion.modelos import Glosario
 from vn_audiolibro.ui.principal import MAX_LINEAS, VentanaPrincipal
@@ -380,3 +380,38 @@ def test_el_historial_sigue_la_ultima_linea(qtbot: QtBot, ventana: VentanaPrinci
     assert barra.value() == 0
     emitir(200)
     qtbot.waitUntil(al_final, timeout=ESPERA_MS)
+
+
+def test_traducir_el_guion_solo_en_juegos_con_guion(
+    qtbot: QtBot, almacen: AlmacenPerfiles, fabrica: Fabrica, cache: CacheFalsa
+) -> None:
+    con_guion = Perfil("Con guion", "guion", guion=AjustesGuion("/juegos/guion"))
+    almacen.guardar(con_guion)
+    abiertos: list[Perfil] = []
+
+    class DialogoFalso:
+        def __init__(self, perfil: Perfil) -> None:
+            abiertos.append(perfil)
+
+        def exec(self) -> int:
+            return 0
+
+    ventana = VentanaPrincipal(
+        almacen,
+        PuenteSesion(fabrica),
+        lambda: cache,  # type: ignore[arg-type,return-value]
+        abrir_traduccion_guion=lambda _padre, perfil: DialogoFalso(perfil),  # type: ignore[arg-type,return-value]
+    )
+    qtbot.addWidget(ventana)
+    ventana.recargar_perfiles(elegir=almacen.buscar("Alfa").id)
+    assert not ventana.boton_guion.isEnabled()
+    ventana.traducir_guion()
+    assert abiertos == []
+
+    ventana.recargar_perfiles(elegir=con_guion.id)
+    assert ventana.boton_guion.isEnabled()
+    ventana.boton_guion.click()
+    assert abiertos == [con_guion]
+
+    jugar(qtbot, ventana)
+    assert not ventana.boton_guion.isEnabled()

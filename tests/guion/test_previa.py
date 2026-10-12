@@ -133,11 +133,16 @@ def test_traducir_todo_con_progreso_y_se_puede_seguir(cache: CacheSQLite) -> Non
     def al_progreso(hechos: int, de: int) -> None:
         progreso.append((hechos, de))
 
+    assert preparador.pendientes() == total
     assert preparador.traducir_todo(al_progreso, lambda: len(progreso) >= 2) == 2
     assert progreso == [(1, total), (2, total)]
+    assert preparador.pendientes() == total - 2
 
-    assert preparador.traducir_todo() == total - 2
+    traducidos: list[None] = []
+    assert preparador.traducir_todo(al_traducir=lambda: traducidos.append(None)) == total - 2
+    assert len(traducidos) == total - 2
     assert len(traductor.peticiones) == total
+    assert preparador.pendientes() == 0
     assert preparador.traducir_todo() == 0
 
 
