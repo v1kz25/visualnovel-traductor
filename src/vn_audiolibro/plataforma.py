@@ -11,6 +11,7 @@ import sys
 from collections.abc import Mapping
 from pathlib import Path
 
+from vn_audiolibro.atajos.modelos import EscuchaAtajos
 from vn_audiolibro.captura.capturador import Capturador, CapturadorMss, Ventanas
 from vn_audiolibro.textos import _
 from vn_audiolibro.voz.modelos import Reproductor
@@ -123,6 +124,19 @@ def instalar_acceso() -> Path:
     from vn_audiolibro.ui.acceso import instalar_acceso as instalar_acceso_linux
 
     return instalar_acceso_linux()
+
+
+def escucha_atajos() -> EscuchaAtajos:
+    """Atajos de teclado globales, que funcionan con el juego en primer plano: `XGrabKey` en
+    Linux (X11) y `RegisterHotKey` en Windows."""
+    if es_windows():
+        from vn_audiolibro.atajos.win32 import EscuchaAtajosWin32
+
+        return EscuchaAtajosWin32()
+    _exigir_linux(_("Los atajos de teclado globales"))
+    from vn_audiolibro.atajos.x11 import EscuchaAtajosX11
+
+    return EscuchaAtajosX11()
 
 
 def cliente_audio() -> ClienteAudio:
