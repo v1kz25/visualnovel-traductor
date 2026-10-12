@@ -3,13 +3,14 @@
 En la interfaz los perfiles se llaman «juegos»: es lo que el usuario configura.
 """
 
+import logging
 from collections import deque
 from collections.abc import Callable
 from dataclasses import replace
 from html import escape
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -30,6 +31,7 @@ from PySide6.QtWidgets import (
 
 from vn_audiolibro import plataforma, textos
 from vn_audiolibro.actualizaciones import Consultar, consultar_github, version_instalada
+from vn_audiolibro.atajos.modelos import Accion, AtajoNoValidoError, EscuchaAtajos, leer_atajos
 from vn_audiolibro.cache.sqlite import CacheSQLite
 from vn_audiolibro.configuracion import cargar_ajustes, guardar_ajustes
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
@@ -37,12 +39,15 @@ from vn_audiolibro.perfiles.modelos import Perfil
 from vn_audiolibro.pipeline.orquestador import LineaJuego
 from vn_audiolibro.textos import N_, _
 from vn_audiolibro.ui.ajustes import AjustesJuego
+from vn_audiolibro.ui.atajos import DialogoAtajos
 from vn_audiolibro.ui.cache import VentanaCache
 from vn_audiolibro.ui.editor import EditorJuego
 from vn_audiolibro.ui.guion import TraducirGuion
 from vn_audiolibro.ui.puente import PuenteSesion
 from vn_audiolibro.ui.subtitulos import PantallaSubtitulos, abrir_subtitulos
 from vn_audiolibro.ui.versiones import AvisoVersion, BuscadorVersiones, preguntar_si_avisar
+
+_registro = logging.getLogger(__name__)
 
 TITULO = "vn-audiolibro"
 MAX_LINEAS = 500
@@ -77,6 +82,9 @@ def _lineas_html(texto: str) -> str:
 class VentanaPrincipal(QMainWindow):
     """Lista de juegos a la izquierda; la partida en curso a la derecha."""
 
+    atajo = Signal(str)
+    """Acción de un atajo global; se emite desde el hilo de los atajos y se atiende en el de Qt."""
+
     def __init__(
         self,
         almacen: AlmacenPerfiles,
@@ -89,8 +97,12 @@ class VentanaPrincipal(QMainWindow):
         subtitulos: Callable[[Perfil], PantallaSubtitulos | None] = abrir_subtitulos,
         consultar_version: Consultar = consultar_github,
         abrir_traduccion_guion: AbrirTraduccionGuion | None = None,
+        escucha_atajos: Callable[[], EscuchaAtajos] | None = None,
     ) -> None:
         super().__init__()
+        self._crear_escucha = escucha_atajos or (lambda: plataforma.escucha_atajos())
+        self._escucha: EscuchaAtajos | None = None
+        self._minimizada_al_jugar = False
         self._abrir_traduccion_guion = abrir_traduccion_guion or (
             lambda padre, perfil: TraducirGuion(perfil, parent=padre)
         )
@@ -131,6 +143,7 @@ class VentanaPrincipal(QMainWindow):
         self.boton_ajustes = QPushButton(_("Ajustes"))
         self.boton_borrar = QPushButton(_("Borrar"))
         self.boton_cache = QPushButton(_("Caché…"))
+        self.boton_atajos = QPushButton(_("Atajos de teclado…"))
         self.boton_guion = QPushButton(_("Traducir el guion…"))
         self.boton_guion.setToolTip(
             _("Traduce entero el guion del juego antes de jugar (solo en los juegos con guion).")
@@ -146,7 +159,10 @@ class VentanaPrincipal(QMainWindow):
             fila.addWidget(boton)
         columna.addLayout(fila)
         columna.addWidget(self.boton_guion)
-        columna.addWidget(self.boton_cache)
+        fila = QHBoxLayout()
+        fila.addWidget(self.boton_cache)
+        fila.addWidget(self.boton_atajos)
+        columna.addLayout(fila)
         self.idioma = QComboBox()
         self.idioma.addItem(_("El del sistema"), None)
         for codigo in textos.disponibles():
@@ -176,6 +192,14 @@ class VentanaPrincipal(QMainWindow):
         self.silenciar = QCheckBox(_("Silenciar voz (M)"))
         self.silenciar.setToolTip(_("Sigue traduciendo y mostrando cada línea, pero sin leerla."))
         self.siempre_encima = QCheckBox(_("Mantener encima del juego"))
+        self.solo_subtitulos = QCheckBox(_("Solo subtítulos: minimizar la app al jugar"))
+        self.solo_subtitulos.setToolTip(
+            _(
+                "Al jugar, la app se minimiza y sobre el juego solo quedan los subtítulos. Controla "
+                "la partida con los atajos de teclado y, al terminar, la app vuelve."
+            )
+        )
+        self.solo_subtitulos.setChecked(cargar_ajustes(self._ruta_ajustes).solo_subtitulos)
 
         derecha = QWidget()
         columna = QVBoxLayout(derecha)
@@ -187,6 +211,7 @@ class VentanaPrincipal(QMainWindow):
         columna.addLayout(fila)
         columna.addWidget(self.silenciar)
         columna.addWidget(self.siempre_encima)
+        columna.addWidget(self.solo_subtitulos)
 
         divisor = QSplitter()
         divisor.addWidget(izquierda)
@@ -209,6 +234,9 @@ class VentanaPrincipal(QMainWindow):
         self.boton_ajustes.clicked.connect(self.ajustar)
         self.boton_cache.clicked.connect(self.ver_cache)
         self.boton_guion.clicked.connect(self.traducir_guion)
+        self.boton_atajos.clicked.connect(self.configurar_atajos)
+        self.solo_subtitulos.toggled.connect(self._al_cambiar_solo_subtitulos)
+        self.atajo.connect(self._al_atajo)
         self.boton_pausa.clicked.connect(self._alternar_pausa)
         self.boton_repetir.clicked.connect(self.puente.repetir)
         self.boton_saltar.clicked.connect(self.puente.saltar)
@@ -363,13 +391,77 @@ class VentanaPrincipal(QMainWindow):
         if self._perfil_en_juego is not None:
             texto = _("Leyendo «{nombre}». Juega con normalidad.")
             self.estado.setText(texto.format(nombre=self._perfil_en_juego.nombre))
+        self._iniciar_atajos()
+        if self.solo_subtitulos.isChecked() and self._subtitulos is not None and not self.isMinimized():
+            self._minimizada_al_jugar = True
+            self.showMinimized()
         self._actualizar_botones()
+
+    # Atajos globales y modo «solo subtítulos»
+
+    def configurar_atajos(self) -> None:
+        """Abre los atajos de teclado (no mientras se juega: ya están en uso)."""
+        if not self.puente.jugando:
+            DialogoAtajos(self._ruta_ajustes, parent=self).exec()
+
+    def _iniciar_atajos(self) -> None:
+        ajustes = cargar_ajustes(self._ruta_ajustes)
+        if not ajustes.atajos_activos:
+            return
+        try:
+            atajos = leer_atajos(ajustes.atajos)
+            self._escucha = self._crear_escucha()
+            fallidos = self._escucha.iniciar(atajos, lambda accion: self.atajo.emit(accion.value))
+        except AtajoNoValidoError as error:
+            self._avisar(str(error))
+            return
+        except Exception:
+            # Sin atajos se puede jugar igual, con los botones de la app.
+            _registro.warning("No se pueden usar los atajos de teclado globales", exc_info=True)
+            self._avisar(_("No se pueden usar los atajos de teclado en este sistema."))
+            return
+        if fallidos:
+            ocupados = ", ".join(str(atajos[accion]) for accion in fallidos)
+            self._avisar(
+                _("Estos atajos ya los usa otra aplicación y no funcionarán: {atajos}").format(
+                    atajos=ocupados
+                )
+            )
+
+    def _detener_atajos(self) -> None:
+        if self._escucha is not None:
+            self._escucha.detener()
+            self._escucha = None
+
+    def _al_atajo(self, accion: str) -> None:
+        if not self.puente.jugando:
+            return
+        acciones = {
+            Accion.PAUSA: self._alternar_pausa,
+            Accion.REPETIR: self.puente.repetir,
+            Accion.SALTAR: self.puente.saltar,
+            Accion.SUBTITULOS: self._alternar_subtitulos,
+        }
+        acciones[Accion(accion)]()
+
+    def _alternar_subtitulos(self) -> None:
+        if self._subtitulos is not None:
+            self._subtitulos.alternar()
+
+    def _al_cambiar_solo_subtitulos(self, activo: bool) -> None:
+        ajustes = cargar_ajustes(self._ruta_ajustes)
+        if ajustes.solo_subtitulos != activo:
+            guardar_ajustes(replace(ajustes, solo_subtitulos=activo), self._ruta_ajustes)
 
     def _al_terminar(self) -> None:
         if self._perfil_en_juego is not None:
             # La partida puede haber añadido nombres de personajes al glosario del juego.
             self.recargar_perfiles(elegir=self._perfil_en_juego.id)
         self._perfil_en_juego = None
+        self._detener_atajos()
+        if self._minimizada_al_jugar:
+            self._minimizada_al_jugar = False
+            self.showNormal()
         if self._subtitulos is not None:
             self._subtitulos.cerrar()
             self._subtitulos = None
@@ -398,6 +490,10 @@ class VentanaPrincipal(QMainWindow):
         # Al crecer el documento el valor no cambia; solo cambia si se mueve la barra o se recorta al final.
         self._seguir_final = valor >= self.historial.verticalScrollBar().maximum()
 
+    def _avisar(self, mensaje: str) -> None:
+        """Un aviso que no impide jugar: no cuenta como error de la partida."""
+        self.estado.setText(f"⚠ {mensaje}")
+
     def _mostrar_error(self, mensaje: str) -> None:
         self._hubo_error = True  # que no lo tape el «Partida terminada» que llega después
         self.estado.setText(f"⚠ {mensaje}")
@@ -417,6 +513,7 @@ class VentanaPrincipal(QMainWindow):
         self.boton_guion.setEnabled(perfil is not None and perfil.guion is not None and not jugando)
         self.boton_anadir.setEnabled(not jugando)
         self.boton_cache.setEnabled(not jugando)
+        self.boton_atajos.setEnabled(not jugando)
         self.lista_perfiles.setEnabled(not jugando)
         for boton in (self.boton_pausa, self.boton_repetir, self.boton_saltar, self.boton_detener):
             boton.setEnabled(jugando)
@@ -427,6 +524,7 @@ class VentanaPrincipal(QMainWindow):
         if self.puente.jugando:
             self.puente.detener()
         self.puente.esperar(timeout_s=15)
+        self._detener_atajos()
         if self._subtitulos is not None:
             self._subtitulos.cerrar()  # no tiene padre: si no, la app seguiría abierta
             self._subtitulos = None

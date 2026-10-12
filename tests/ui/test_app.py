@@ -17,6 +17,9 @@ def test_abre_la_ventana_principal(
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     monkeypatch.setattr(QApplication, "exec", lambda _: 0)
     monkeypatch.setattr(app, "preparar", lambda: None)  # sin el diálogo de descargas
+    traductores: list[object] = []
+    original = app.instalar_traduccion
+    monkeypatch.setattr(app, "instalar_traduccion", lambda qt: traductores.append(original(qt)))
     preguntas: list[object] = []
     # La primera vez pregunta si avisar de versiones nuevas; con «No», no se conecta a nada.
 
@@ -37,6 +40,10 @@ def test_abre_la_ventana_principal(
     assert not QApplication.windowIcon().isNull()
     for ventana in ventanas:
         ventana.close()
+    # Que la traducción de Qt no se quede instalada para los tests siguientes.
+    for traductor in traductores:
+        if traductor is not None:
+            qapp.removeTranslator(traductor)  # type: ignore[arg-type]
 
 
 def test_icono(qapp: QApplication) -> None:

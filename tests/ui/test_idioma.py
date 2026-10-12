@@ -26,8 +26,10 @@ from vn_audiolibro.perfiles.modelos import AjustesVolumen, Perfil
 from vn_audiolibro.preparacion import Aviso, Componente
 from vn_audiolibro.ui import app
 from vn_audiolibro.ui.ajustes import AjustesJuego
+from vn_audiolibro.ui.atajos import DialogoAtajos
 from vn_audiolibro.ui.cache import VentanaCache
 from vn_audiolibro.ui.editor import EditorJuego
+from vn_audiolibro.ui.guion import TraducirGuion
 from vn_audiolibro.ui.preparacion import PrimerArranque
 from vn_audiolibro.ui.principal import VentanaPrincipal
 from vn_audiolibro.ui.puente import PuenteSesion
@@ -79,6 +81,8 @@ def ventanas(almacen: AlmacenPerfiles, tmp_path: Path) -> list[QWidget]:
         AjustesJuego(almacen, PERFIL, abrir_cache, lambda ajustes, destino: None, lambda: []),
         VentanaCache(almacen, abrir_cache, tmp_path / "ajustes.json"),
         PrimerArranque([componente], [Aviso("x", grave=False)], acceso=lambda: tmp_path),
+        DialogoAtajos(tmp_path / "ajustes.json"),
+        TraducirGuion(PERFIL),
     ]
 
 

@@ -80,6 +80,13 @@ en `%LOCALAPPDATA%\vn-audiolibro` y los ajustes en `%APPDATA%\vn-audiolibro`.
    y de otras aplicaciones, y glosario de nombres propios. En **Personajes** aparecen los que ya han
    hablado y puedes darle a cada uno voz de mujer u hombre; los demás usan la voz del juego.
 
+**Jugar con una sola pantalla.** Con los subtítulos activados en los ajustes del juego, marca
+**Solo subtítulos: minimizar la app al jugar**: al pulsar Jugar, la app se minimiza y sobre el juego
+solo queda la traducción. La partida se controla sin salir del juego con atajos de teclado globales:
+Ctrl+Alt+P (pausar o seguir), Ctrl+Alt+R (repetir), Ctrl+Alt+S (saltar) y Ctrl+Alt+H (mostrar u
+ocultar los subtítulos). Mientras juegas, el juego no recibe esas combinaciones: si alguna choca con
+las suyas, cámbiala o desactívalos en **Atajos de teclado…**. En Linux funcionan con X11.
+
 **Juegos con el guion legible.** Algunos juegos guardan su guion en ficheros de texto (por ahora,
 los hechos con Unity que lo tienen en `StreamingAssets/Scripts` con órdenes `OutputLine`). Al
 añadirlos, la app encuentra el guion sola o puedes elegir su carpeta en **Guion del juego**. Así el

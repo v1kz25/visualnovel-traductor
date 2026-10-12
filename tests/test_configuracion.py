@@ -105,3 +105,41 @@ def test_hora_entera_se_lee_como_decimal(tmp_path: Path) -> None:
     ruta = tmp_path / "ajustes.json"
     ruta.write_text('{"ultima_busqueda": 1800000000}', encoding="utf-8")
     assert cargar_ajustes(ruta).ultima_busqueda == 1_800_000_000.0
+
+
+def test_atajos_y_solo_subtitulos_por_defecto(tmp_path: Path) -> None:
+    ajustes = cargar_ajustes(tmp_path / "ajustes.json")
+    assert ajustes.atajos_activos
+    assert ajustes.atajos == {
+        "pausa": "Ctrl+Alt+P",
+        "repetir": "Ctrl+Alt+R",
+        "saltar": "Ctrl+Alt+S",
+        "subtitulos": "Ctrl+Alt+H",
+    }
+    assert not ajustes.solo_subtitulos
+
+
+def test_guardar_y_cargar_los_atajos(tmp_path: Path) -> None:
+    ruta = tmp_path / "ajustes.json"
+    atajos = {**AjustesApp().atajos, "pausa": "F9"}
+    ajustes = AjustesApp(atajos_activos=False, atajos=atajos, solo_subtitulos=True)
+    guardar_ajustes(ajustes, ruta)
+    assert cargar_ajustes(ruta) == ajustes
+
+
+def test_atajos_guardados_a_medias(tmp_path: Path) -> None:
+    ruta = tmp_path / "ajustes.json"
+    ruta.write_text('{"atajos": {"pausa": "F9", "volar": "F10"}}', encoding="utf-8")
+    atajos = cargar_ajustes(ruta).atajos
+    assert atajos["pausa"] == "F9"  # el guardado
+    assert atajos["saltar"] == "Ctrl+Alt+S"  # el que falta, por defecto
+    assert "volar" not in atajos
+
+
+@pytest.mark.parametrize(
+    "contenido", ['{"atajos": ["F9"]}', '{"atajos": {"pausa": 9}}', '{"atajos_activos": "sí"}']
+)
+def test_atajos_no_validos(tmp_path: Path, contenido: str) -> None:
+    ruta = tmp_path / "ajustes.json"
+    ruta.write_text(contenido, encoding="utf-8")
+    assert cargar_ajustes(ruta) == AjustesApp()
