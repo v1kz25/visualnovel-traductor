@@ -56,6 +56,10 @@ _registro = logging.getLogger(__name__)
 FRASES_PRUEBA = {
     "es": "Hola. Así sonará la traducción mientras juegas. ¿Qué te parece?",
     "en": "Hello. This is how the translation will sound while you play. What do you think?",
+    "fr": "Bonjour. Voici comment sonnera la traduction pendant que tu joues. Qu'en penses-tu ?",
+    "pt": "Olá. É assim que a tradução vai soar enquanto você joga. O que acha?",
+    "de": "Hallo. So klingt die Übersetzung, während du spielst. Was meinst du?",
+    "it": "Ciao. Ecco come suonerà la traduzione mentre giochi. Che ne pensi?",
 }
 """Frase de prueba de la voz en cada idioma de destino."""
 BAJAR, SILENCIAR, NO_TOCAR = "bajar", "silenciar", "no tocar"

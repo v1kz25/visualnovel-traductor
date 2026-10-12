@@ -221,7 +221,14 @@ class AjustesOrquestador:
 LARGO_MAX_PERSONAJE = 40
 """Una «traducción» de un nombre más larga que esto es que el traductor se ha ido por las ramas."""
 
-OPCION_DICHA = {"es": "Opción {numero}: {opcion}", "en": "Option {numero}: {opcion}"}
+OPCION_DICHA = {
+    "es": "Opción {numero}: {opcion}",
+    "en": "Option {numero}: {opcion}",
+    "fr": "Option {numero} : {opcion}",
+    "pt": "Opção {numero}: {opcion}",
+    "de": "Option {numero}: {opcion}",
+    "it": "Opzione {numero}: {opcion}",
+}
 """Cómo lee la voz cada opción de un menú, en el idioma de la traducción (no en el de la app)."""
 
 _SOBRA_EN_PERSONAJE = " \t\n.,:;!?¡¿\"'«»“”。：「」【】[]"

@@ -49,3 +49,17 @@ def test_salida_vacia_no_es_valida() -> None:
 @pytest.mark.parametrize("salida", ["«Yeah»", "「Yeah」", "Yeah", " “Yeah” "])
 def test_en_ingles_el_dialogo_va_con_comillas_inglesas(salida: str) -> None:
     assert limpiar(salida, "「うん」", "en") == "\u201cYeah\u201d"
+
+
+@pytest.mark.parametrize(
+    ("destino", "esperada"),
+    [
+        ("fr", "«\u00a0Oui\u00a0»"),
+        ("pt", "\u201cOui\u201d"),
+        ("de", "\u201eOui\u201c"),
+        ("it", "«Oui»"),
+    ],
+)
+@pytest.mark.parametrize("salida", ["«Oui»", "« Oui »", "„Oui“", "「Oui」", "Oui", "\u201cOui\u201d"])
+def test_cada_idioma_pone_sus_comillas(salida: str, destino: str, esperada: str) -> None:
+    assert limpiar(salida, "「うん」", destino) == esperada

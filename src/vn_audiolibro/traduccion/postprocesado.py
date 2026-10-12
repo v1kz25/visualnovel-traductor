@@ -3,12 +3,19 @@
 import re
 from collections.abc import Sequence
 
-COMILLAS_APERTURA = '「『“"«'
-COMILLAS_CIERRE = '」』”"»'
+COMILLAS_APERTURA = '「『“„"«'
+COMILLAS_CIERRE = '」』”“"»'
 
 _ESPACIOS = re.compile(r"\s+")
 
-COMILLAS_DIALOGO = {"es": ("«", "»"), "en": ("\u201c", "\u201d")}
+COMILLAS_DIALOGO = {
+    "es": ("«", "»"),
+    "en": ("\u201c", "\u201d"),
+    "fr": ("«\u00a0", "\u00a0»"),
+    "pt": ("\u201c", "\u201d"),
+    "de": ("\u201e", "\u201c"),
+    "it": ("«", "»"),
+}
 """Comillas con las que se escribe un diálogo en cada idioma de destino."""
 
 LARGO_FIJO = 60
@@ -29,7 +36,9 @@ def limpiar(salida: str, original: str, destino: str = "es") -> str:
     """Quita espacios sobrantes y unifica las comillas del diálogo según el idioma de destino.
 
     El modelo devuelve las comillas del original unas veces como 「」, otras como “” y a veces
-    mezcladas; en español se usan las angulares («…») y en inglés las inglesas (“…”).
+    mezcladas; se ponen las de cada idioma: angulares en español e italiano («…»), con espacio
+    fino en francés («\u00a0…\u00a0»), inglesas en inglés y portugués de Brasil (“…”) y bajas en
+    alemán („…“).
     """
     texto = _ESPACIOS.sub(" ", salida).strip()
     if es_dialogo(original):
