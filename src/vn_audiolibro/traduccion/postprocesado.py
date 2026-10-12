@@ -37,7 +37,7 @@ def limpiar(salida: str, original: str, destino: str = "es") -> str:
 
     El modelo devuelve las comillas del original unas veces como 「」, otras como “” y a veces
     mezcladas; se ponen las de cada idioma: angulares en español e italiano («…»), con espacio
-    fino en francés («\u00a0…\u00a0»), inglesas en inglés y portugués de Brasil (“…”) y bajas en
+    de no separación en francés («\u00a0…\u00a0»), inglesas en inglés y portugués de Brasil (“…”) y bajas en
     alemán („…“).
     """
     texto = _ESPACIOS.sub(" ", salida).strip()
