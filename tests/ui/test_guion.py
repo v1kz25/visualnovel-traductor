@@ -3,12 +3,13 @@
 import contextlib
 import threading
 from collections.abc import Callable, Iterator
+from dataclasses import replace
 
 import pytest
 from pytestqt.qtbot import QtBot
 
 from vn_audiolibro.perfiles.modelos import AjustesGuion, Perfil
-from vn_audiolibro.traduccion.modelos import TraduccionFallidaError
+from vn_audiolibro.traduccion.modelos import Motor, TraduccionFallidaError
 from vn_audiolibro.ui.guion import TraducirGuion, duracion
 
 from .conftest import ESPERA_MS
@@ -187,3 +188,12 @@ def test_un_fallo_inesperado_tambien_se_muestra(qtbot: QtBot) -> None:
     with qtbot.waitSignal(ventana.terminado, timeout=ESPERA_MS):
         ventana.empezar()
     assert ventana.mensaje.text() == "RuntimeError"
+
+
+@pytest.mark.parametrize(
+    ("motor", "texto"), [(Motor.LOCAL, "varias horas"), (Motor.GEMINI, "40 líneas por petición")]
+)
+def test_la_explicacion_depende_del_traductor(qtbot: QtBot, motor: Motor, texto: str) -> None:
+    ventana = TraducirGuion(replace(PERFIL, traductor=motor), Abrir())  # type: ignore[arg-type]
+    qtbot.addWidget(ventana)
+    assert texto in ventana.explicacion.text()

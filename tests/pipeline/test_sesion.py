@@ -16,7 +16,7 @@ from vn_audiolibro.pipeline import sesion as modulo
 from vn_audiolibro.pipeline.orquestador import GuionJuego
 from vn_audiolibro.pipeline.sesion import Sesion, ajustes_guion, traductor_guion
 from vn_audiolibro.traduccion.gemini import TraductorConRespaldo
-from vn_audiolibro.traduccion.modelos import Glosario, Motor
+from vn_audiolibro.traduccion.modelos import Glosario, Motor, TraductorPorLotes
 from vn_audiolibro.voz.modelos import VozFallidaError
 from vn_audiolibro.voz.piper import Hablante
 from vn_audiolibro.voz.volumen import Juego
@@ -339,3 +339,24 @@ def test_en_ingles_la_otra_voz_es_otro_modelo(registro: Registro, monkeypatch: p
         assert set(registro.opciones["locutor"]["voces"]) == {"M"}
     assert descargadas == ["en_US-kristin-medium.onnx", "en_US-john-medium.onnx"]
     assert registro.creados["sintetizador"] == (Path("en_US-john-medium.onnx"), None, 1.0)
+
+
+@pytest.mark.parametrize("motor", [Motor.LOCAL, Motor.GEMINI])
+def test_traductor_guion_con_el_traductor_del_juego(registro: Registro, tmp_path: Path, motor: Motor) -> None:
+    claves.guardar("clave-123")
+    perfil = Perfil("Juego", "juego", idioma="ja", traductor=motor, guion=AjustesGuion(str(juego(tmp_path))))
+
+    with traductor_guion(perfil) as preparador:
+        # Con Gemini va por lotes, con el local como respaldo.
+        assert isinstance(preparador._traductor, TraductorPorLotes) is (motor is Motor.GEMINI)
+
+
+def test_traductor_guion_con_gemini_sin_clave_avisa_y_va_en_local(registro: Registro, tmp_path: Path) -> None:
+    perfil = Perfil(
+        "Juego", "juego", idioma="ja", traductor=Motor.GEMINI, guion=AjustesGuion(str(juego(tmp_path)))
+    )
+    avisos: list[str] = []
+
+    with traductor_guion(perfil, avisos.append) as preparador:
+        assert not isinstance(preparador._traductor, TraductorPorLotes)
+    assert "Falta la clave de Gemini: se traducirá en local. Añádela en el editor del juego." in avisos

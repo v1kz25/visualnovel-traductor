@@ -10,6 +10,7 @@ from vn_audiolibro.guion.modelos import OrigenGuion
 from vn_audiolibro.guion.previa import AjustesTraduccionGuion, PreparadorGuion
 from vn_audiolibro.traduccion.modelos import (
     Glosario,
+    LimiteAgotadoError,
     Peticion,
     ResultadoPorPartes,
     Traduccion,
@@ -151,3 +152,96 @@ def test_el_fallo_del_traductor_se_propaga(cache: CacheSQLite) -> None:
 
     with pytest.raises(TraduccionFallidaError):
         preparador.traducir_todo()
+
+
+class TraductorPorLotesFalso(TraductorFalso):
+    """Traduce por lotes; con `limite`, se agota tras ese número de lotes."""
+
+    def __init__(self, tamano_lote: int = 3, limite: int | None = None) -> None:
+        super().__init__()
+        self.tamano_lote = tamano_lote
+        self.lotes: list[list[str]] = []
+        self._limite = limite
+
+    def traducir_lote(
+        self, peticiones: list[Peticion], cancelado: Callable[[], bool]
+    ) -> list[Traduccion] | None:
+        if cancelado():
+            return None
+        if self._limite is not None and len(self.lotes) >= self._limite:
+            raise LimiteAgotadoError("límite diario agotado")
+        self.lotes.append([peticion.texto for peticion in peticiones])
+        return [Traduccion(f"lote:{peticion.texto}", "gemini") for peticion in peticiones]
+
+
+def test_traducir_todo_por_lotes(cache: CacheSQLite) -> None:
+    traductor = TraductorPorLotesFalso(tamano_lote=3)
+    preparador = _preparador(cache, traductor)
+    total = len(preparador.guion.parrafos)
+    pendientes = preparador.pendientes()
+    progreso: list[int] = []
+    traducidos: list[None] = []
+
+    assert (
+        preparador.traducir_todo(
+            lambda h, _t: progreso.append(h), al_traducir=lambda: traducidos.append(None)
+        )
+        == pendientes
+    )
+    assert [len(lote) for lote in traductor.lotes] == [3] * (pendientes // 3) + (
+        [pendientes % 3] if pendientes % 3 else []
+    )
+    assert traductor.peticiones == []  # nada línea a línea
+    assert len(traducidos) == pendientes
+    assert progreso == sorted(progreso)
+    assert progreso[-1] == total
+    assert preparador.pendientes() == 0
+    parrafo = next(p for p in preparador.guion.parrafos if preparador.hay_que_leer(p))
+    entrada = cache.consultar(preparador.clave(parrafo))
+    assert entrada is not None
+    assert (entrada.traduccion, entrada.modelo) == (f"lote:{parrafo.original}", "gemini")
+
+
+def test_por_lotes_el_contexto_es_el_de_antes_del_lote(cache: CacheSQLite) -> None:
+    preparador = _preparador(cache, TraductorPorLotesFalso(tamano_lote=2))
+    peticiones: list[Peticion] = []
+    original = preparador._traductor.traducir_lote  # type: ignore[attr-defined]
+
+    def apuntar(lote: list[Peticion], cancelado: Callable[[], bool]) -> list[Traduccion] | None:
+        peticiones.extend(lote)
+        return original(lote, cancelado)  # type: ignore[no-any-return]
+
+    preparador._traductor.traducir_lote = apuntar  # type: ignore[attr-defined]
+    preparador.traducir_todo()
+    tercera = peticiones[2]  # primera del segundo lote: ve las del primero ya traducidas
+    assert [linea.traduccion for linea in tercera.contexto][-2:] == [
+        f"lote:{peticion.texto}" for peticion in peticiones[:2]
+    ]
+
+
+def test_por_lotes_se_puede_parar_y_seguir_otro_dia(cache: CacheSQLite) -> None:
+    traductor = TraductorPorLotesFalso(tamano_lote=2, limite=1)
+    preparador = _preparador(cache, traductor)
+    pendientes = preparador.pendientes()
+
+    with pytest.raises(LimiteAgotadoError):
+        preparador.traducir_todo()
+    assert preparador.pendientes() == pendientes - 2  # el primer lote se ha guardado
+
+    traductor._limite = None
+    assert preparador.traducir_todo() == pendientes - 2
+    assert preparador.pendientes() == 0
+
+
+def test_por_lotes_cancelado(cache: CacheSQLite) -> None:
+    traductor = TraductorPorLotesFalso(tamano_lote=2)
+    preparador = _preparador(cache, traductor)
+    pendientes = preparador.pendientes()
+
+    assert preparador.traducir_todo(cancelado=lambda: len(traductor.lotes) >= 1) == 2
+    assert preparador.pendientes() == pendientes - 2
+
+    # Cancelado a mitad de un lote: no se guarda nada de él.
+    traductor.traducir_lote = lambda _peticiones, _cancelado: None  # type: ignore[method-assign]
+    assert preparador.traducir_todo() == 0
+    assert preparador.pendientes() == pendientes - 2

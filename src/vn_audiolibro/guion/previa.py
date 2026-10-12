@@ -19,6 +19,7 @@ from vn_audiolibro.traduccion.modelos import (
     Peticion,
     Traduccion,
     Traductor,
+    TraductorPorLotes,
     TraductorPorPartes,
 )
 
@@ -123,6 +124,8 @@ class PreparadorGuion:
         recibe los párrafos hechos (traducidos ahora o antes) y el total; `al_traducir` se llama
         cada vez que se traduce uno ahora, para estimar lo que falta.
         """
+        if isinstance(self._traductor, TraductorPorLotes):
+            return self._traducir_por_lotes(self._traductor, al_progreso, cancelado, al_traducir)
         total = len(self.guion.parrafos)
         traducidos = 0
         for hechos, parrafo in enumerate(self.guion.parrafos, 1):
@@ -133,3 +136,48 @@ class PreparadorGuion:
                 al_traducir()
             al_progreso(hechos, total)
         return traducidos
+
+    def _traducir_por_lotes(
+        self,
+        traductor: TraductorPorLotes,
+        al_progreso: Callable[[int, int], None],
+        cancelado: Callable[[], bool],
+        al_traducir: Callable[[], None],
+    ) -> int:
+        """Como `traducir_todo`, pero junta los párrafos pendientes en lotes de una petición.
+
+        El progreso de los párrafos de un lote se da cuando el lote se ha traducido y guardado.
+        """
+        total = len(self.guion.parrafos)
+        traducidos = 0
+        lote: list[Parrafo] = []
+        for hechos, parrafo in enumerate(self.guion.parrafos, 1):
+            if cancelado():
+                return traducidos
+            if self.pendiente(parrafo):
+                lote.append(parrafo)
+            if len(lote) == traductor.tamano_lote or (lote and hechos == total):
+                guardados = self._traducir_lote(traductor, lote, cancelado, al_traducir)
+                if guardados is None:
+                    return traducidos
+                traducidos += guardados
+                lote = []
+            if not lote:
+                al_progreso(hechos, total)
+        return traducidos
+
+    def _traducir_lote(
+        self,
+        traductor: TraductorPorLotes,
+        lote: list[Parrafo],
+        cancelado: Callable[[], bool],
+        al_traducir: Callable[[], None],
+    ) -> int | None:
+        """Traduce y guarda los párrafos del lote; None si se cancela (no se guarda nada)."""
+        traducciones = traductor.traducir_lote([self.peticion(parrafo) for parrafo in lote], cancelado)
+        if traducciones is None:
+            return None
+        for parrafo, traduccion in zip(lote, traducciones, strict=True):
+            self._cache.guardar_traduccion(self.clave(parrafo), traduccion.texto, traduccion.modelo)
+            al_traducir()
+        return len(lote)
