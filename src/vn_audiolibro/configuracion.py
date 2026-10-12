@@ -2,10 +2,11 @@
 
 import json
 import logging
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from vn_audiolibro.atajos.modelos import POR_DEFECTO
 from vn_audiolibro.rutas import directorio_config
 from vn_audiolibro.textos import _, decimal
 
@@ -14,6 +15,10 @@ _registro = logging.getLogger(__name__)
 LIMITE_CACHE_MB = 2048
 """Tamaño máximo de la caché por defecto: da para varias novelas enteras con su audio."""
 LIMITE_MIN_MB = 100
+
+
+def atajos_por_defecto() -> dict[str, str]:
+    return {accion.value: atajo for accion, atajo in POR_DEFECTO.items()}
 
 
 @dataclass(frozen=True)
@@ -30,6 +35,12 @@ class AjustesApp:
     """Cuándo se buscó por última vez una versión nueva (segundos desde 1970)."""
     version_avisada: str | None = None
     """Última versión nueva de la que se ha avisado, para no repetir el aviso."""
+    atajos_activos: bool = True
+    """Si mientras se juega funcionan los atajos de teclado globales."""
+    atajos: dict[str, str] = field(default_factory=atajos_por_defecto)
+    """Atajo de cada acción (`Accion`), como lo escribe Qt: «Ctrl+Alt+P»."""
+    solo_subtitulos: bool = False
+    """Si al jugar se minimiza la ventana de la app y solo quedan los subtítulos sobre el juego."""
 
     def __post_init__(self) -> None:
         if self.limite_cache_mb is not None and self.limite_cache_mb < LIMITE_MIN_MB:
@@ -61,12 +72,26 @@ def cargar_ajustes(ruta: Path | None = None) -> AjustesApp:
             avisar_versiones=_opcional(datos, "avisar_versiones", bool),
             ultima_busqueda=None if ultima is None else float(ultima),
             version_avisada=_opcional(datos, "version_avisada", str),
+            atajos_activos=_opcional(datos, "atajos_activos", bool) is not False,
+            atajos=_atajos(datos.get("atajos")),
+            solo_subtitulos=_opcional(datos, "solo_subtitulos", bool) is True,
         )
     except FileNotFoundError:
         return AjustesApp()
     except (OSError, ValueError, TypeError, AttributeError):
         _registro.warning("Ajustes ilegibles en %s: se usan los de por defecto", ruta, exc_info=True)
         return AjustesApp()
+
+
+def _atajos(guardados: object) -> dict[str, str]:
+    """Los atajos guardados, con los de por defecto en las acciones que falten."""
+    if guardados is None:
+        return atajos_por_defecto()
+    if not isinstance(guardados, dict) or not all(isinstance(v, str) for v in guardados.values()):
+        raise TypeError(f"atajos no válidos: {guardados!r}")
+    atajos = atajos_por_defecto()
+    atajos.update({accion: texto for accion, texto in guardados.items() if accion in atajos})
+    return atajos
 
 
 def _opcional(datos: dict[str, Any], campo: str, tipos: type | tuple[type, ...]) -> Any:

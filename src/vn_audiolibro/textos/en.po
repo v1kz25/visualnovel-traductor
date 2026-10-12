@@ -4,6 +4,33 @@ msgstr ""
 "Language: en\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+msgid "Pausar o seguir"
+msgstr "Pause or continue"
+
+msgid "Repetir la línea"
+msgstr "Repeat the line"
+
+msgid "Saltar la línea"
+msgstr "Skip the line"
+
+msgid "Mostrar u ocultar los subtítulos"
+msgstr "Show or hide the subtitles"
+
+msgid "Atajo no válido: «{atajo}». Usa una letra, un número o de F1 a F12."
+msgstr "Invalid shortcut: “{atajo}”. Use a letter, a number or F1 to F12."
+
+msgid "Atajo no válido: «{atajo}». Los modificadores son Ctrl, Alt, Shift y Meta."
+msgstr "Invalid shortcut: “{atajo}”. The modifiers are Ctrl, Alt, Shift and Meta."
+
+msgid "Atajo no válido: «{atajo}». Ctrl+Alt con F1 a F12 cambia de consola en Linux."
+msgstr "Invalid shortcut: “{atajo}”. Ctrl+Alt with F1 to F12 switches console on Linux."
+
+msgid "Atajo no válido: «{atajo}». Una letra o un número necesitan Ctrl, Alt o Meta."
+msgstr "Invalid shortcut: “{atajo}”. A letter or a number needs Ctrl, Alt or Meta."
+
+msgid "El atajo «{atajo}» está repetido: «{una}» y «{otra}»."
+msgstr "The shortcut “{atajo}” is used twice: “{una}” and “{otra}”."
+
 msgid "Jugar"
 msgstr "Play"
 
@@ -465,6 +492,9 @@ msgstr "Audio playback"
 msgid "El acceso directo en el menú"
 msgstr "The menu shortcut"
 
+msgid "Los atajos de teclado globales"
+msgstr "Global keyboard shortcuts"
+
 msgid "El control del volumen"
 msgstr "Volume control"
 
@@ -739,6 +769,18 @@ msgstr "Glossary changed"
 
 msgid "Las líneas ya traducidas no usan el glosario nuevo.\n\n¿Borrar sus traducciones guardadas para que se vuelvan a traducir al jugar?"
 msgstr "Lines that were already translated do not use the new glossary.\n\nDelete their saved translations so they are translated again when you play?"
+
+msgid "Atajos de teclado"
+msgstr "Keyboard shortcuts"
+
+msgid "Mientras juegas, estas combinaciones funcionan aunque el juego esté en primer plano, y el juego deja de recibirlas. Si alguna choca con las del juego o con otra aplicación, cámbiala o desactiva los atajos."
+msgstr "While you play, these key combinations work even with the game in the foreground, and the game no longer receives them. If one clashes with the game's or another application's, change it or turn the shortcuts off."
+
+msgid "Usar atajos de teclado mientras juegas"
+msgstr "Use keyboard shortcuts while playing"
+
+msgid "Restablecer"
+msgstr "Reset"
 
 msgid "Caché de traducciones y audio"
 msgstr "Translation and audio cache"
@@ -1112,6 +1154,9 @@ msgstr "Delete"
 msgid "Caché…"
 msgstr "Cache…"
 
+msgid "Atajos de teclado…"
+msgstr "Keyboard shortcuts…"
+
 msgid "Traducir el guion…"
 msgstr "Translate the script…"
 
@@ -1157,6 +1202,12 @@ msgstr "Keeps translating and showing each line, without reading it aloud."
 msgid "Mantener encima del juego"
 msgstr "Keep on top of the game"
 
+msgid "Solo subtítulos: minimizar la app al jugar"
+msgstr "Subtitles only: minimize the app while playing"
+
+msgid "Al jugar, la app se minimiza y sobre el juego solo quedan los subtítulos. Controla la partida con los atajos de teclado y, al terminar, la app vuelve."
+msgstr "While you play, the app is minimized and only the subtitles stay over the game. Control it with the keyboard shortcuts; when you stop, the app comes back."
+
 msgid "Ventana «{ventana}» · {idioma} → {destino}"
 msgstr "Window “{ventana}” · {idioma} → {destino}"
 
@@ -1171,6 +1222,12 @@ msgstr "Preparing “{nombre}”…"
 
 msgid "Leyendo «{nombre}». Juega con normalidad."
 msgstr "Reading “{nombre}”. Play as usual."
+
+msgid "No se pueden usar los atajos de teclado en este sistema."
+msgstr "Keyboard shortcuts can't be used on this system."
+
+msgid "Estos atajos ya los usa otra aplicación y no funcionarán: {atajos}"
+msgstr "These shortcuts are already used by another application and won't work: {atajos}"
 
 msgid "Partida terminada. Elige un juego y pulsa Jugar."
 msgstr "Session finished. Choose a game and press Play."

@@ -37,6 +37,8 @@ class PantallaSubtitulos(Protocol):
 
     def mostrar(self, texto: str) -> None: ...
 
+    def alternar(self) -> None: ...
+
     def cerrar(self) -> None: ...
 
 
@@ -87,6 +89,8 @@ class Subtitulos(QWidget):
         self._zona = zona
         self._ventanas = ventanas
         self._id_ventana = id_ventana
+        self.ocultos = False
+        """Si el usuario los ha ocultado con el atajo; el texto se sigue actualizando."""
         bandera = Qt.WindowType
         self.setWindowFlags(
             bandera.FramelessWindowHint
@@ -122,9 +126,14 @@ class Subtitulos(QWidget):
         self.texto.setText(texto)
         self.seguir()
 
+    def alternar(self) -> None:
+        """Oculta los subtítulos o los vuelve a mostrar (con el atajo, sin salir del juego)."""
+        self.ocultos = not self.ocultos
+        self.seguir()
+
     def seguir(self) -> None:
         """Coloca los subtítulos sobre el juego, o los oculta si el juego no está a la vista."""
-        if not self.texto.text() or self._ventanas.activa() != self._id_ventana:
+        if self.ocultos or not self.texto.text() or self._ventanas.activa() != self._id_ventana:
             self.hide()
             return
         try:

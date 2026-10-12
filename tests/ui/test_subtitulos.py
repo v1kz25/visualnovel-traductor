@@ -148,3 +148,16 @@ def test_abrir_subtitulos(qtbot: QtBot, monkeypatch: pytest.MonkeyPatch, ventana
     abiertos = abrir_subtitulos(Perfil("Juego", "juego", subtitulos=activos))
     assert isinstance(abiertos, Subtitulos)
     qtbot.addWidget(abiertos)
+
+
+def test_ocultar_y_volver_a_mostrar(qtbot: QtBot, ventanas: VentanasFalsas) -> None:
+    subtitulos = abrir(qtbot, ventanas)
+    subtitulos.mostrar("Hola")
+
+    subtitulos.alternar()
+    assert subtitulos.isHidden()
+    subtitulos.mostrar("Adiós")  # sigue oculto aunque cambie el texto
+    assert subtitulos.isHidden()
+    subtitulos.alternar()
+    assert subtitulos.isVisible()
+    assert subtitulos.texto.text() == "Adiós"
