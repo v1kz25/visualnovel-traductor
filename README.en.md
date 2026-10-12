@@ -10,7 +10,8 @@ A real-time audiobook for Chinese and Japanese visual novels.
 
 While you play, the app reads the text in the game window, translates it into Spanish, English,
 French, Portuguese, German or Italian (chosen per game) and reads it aloud. Everything runs on your
-computer: no accounts, no cost and no connection (except to download the models the first time).
+computer: no accounts, no cost and no connection (except to download the models the first time
+and, if you agree, to tell you about new versions).
 
 The app itself is available in Spanish and English: it follows your system language, and you can
 change it under **App language** in the main window.
