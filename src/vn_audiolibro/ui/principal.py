@@ -375,6 +375,9 @@ class VentanaPrincipal(QMainWindow):
         self.estado.setText(_("Preparando «{nombre}»…").format(nombre=perfil.nombre))
         # Antes de arrancar: la primera línea puede llegar en cuanto empieza la captura.
         self._subtitulos = self._crear_subtitulos(perfil)
+        if self._subtitulos is not None:
+            # Los botones que salen al pasar el ratón por los subtítulos hacen lo mismo que los atajos.
+            self._subtitulos.conectar(lambda accion: self._al_atajo(accion.value))
         self.puente.iniciar(perfil)
         self._actualizar_botones()
 

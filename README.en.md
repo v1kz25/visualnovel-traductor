@@ -60,7 +60,10 @@ only: minimize the app while playing**: when you press Play, the app is minimize
 translation stays over the game. Control it without leaving the game with global keyboard shortcuts:
 Ctrl+Alt+P (pause or continue), Ctrl+Alt+R (repeat), Ctrl+Alt+S (skip) and Ctrl+Alt+H (show or hide
 the subtitles). While you play, the game doesn't receive those combinations: if one clashes with the
-game's, change it or turn them off in **Keyboard shortcuts…**. On Linux they work with X11.
+game's, change it or turn them off in **Keyboard shortcuts…**. On Linux they work with X11. You can
+also use the mouse: hovering over the subtitles shows buttons to pause, repeat, skip and hide them.
+If you hide them, a small marker stays in their place; hovering over it brings the buttons back,
+including the one to show them again.
 
 **Games with a readable script.** Some games store their script in text files (for now, Unity games
 that keep it in `StreamingAssets/Scripts` with `OutputLine` commands). For those, the app finds the
