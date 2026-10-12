@@ -429,6 +429,9 @@ msgstr "Preparing the translator (downloaded the first time)…"
 msgid "Arrancando el traductor…"
 msgstr "Starting the translator…"
 
+msgid "Falta la clave de Gemini: se traducirá en local. Añádela en el editor del juego."
+msgstr "The Gemini key is missing: translating locally. Add it in the game editor."
+
 msgid "Buscando la ventana «{ventana}»…"
 msgstr "Looking for the window “{ventana}”…"
 
@@ -440,9 +443,6 @@ msgstr "Warming up the translator…"
 
 msgid "Leyendo «{ventana}»."
 msgstr "Reading “{ventana}”."
-
-msgid "Falta la clave de Gemini: se traducirá en local. Añádela en el editor del juego."
-msgstr "The Gemini key is missing: translating locally. Add it in the game editor."
 
 msgid "No se usará el guion, solo el OCR: {error}"
 msgstr "The script will not be used, only OCR: {error}"
@@ -538,6 +538,15 @@ msgstr "Gemini returned no translation"
 
 msgid "Gemini no ha traducido la línea ({motivo})"
 msgstr "Gemini did not translate the line ({motivo})"
+
+msgid "Lo traducido se conserva: sigue mañana, o elige el traductor local en el editor del juego para seguir ahora."
+msgstr "What has been translated is kept: continue tomorrow, or choose the local translator in the game editor to continue now."
+
+msgid "Google sigue diciendo que se ha agotado el límite de Gemini. {seguir}"
+msgstr "Google keeps saying the Gemini limit has been reached. {seguir}"
+
+msgid "Se ha agotado el límite diario de Gemini ({peticiones} peticiones). {seguir}"
+msgstr "The daily Gemini limit ({peticiones} requests) has been reached. {seguir}"
 
 msgid "límite de peticiones por minuto o por día"
 msgstr "requests per minute or per day limit"
@@ -987,8 +996,14 @@ msgstr "{horas} h {minutos:02d} min"
 msgid "Traducir el guion"
 msgstr "Translate the script"
 
-msgid "Traduce entero el guion de «{nombre}» antes de jugar: al jugar, todo saldrá de la caché al momento.\n\nCon el traductor local puede tardar varias horas en un guion largo. Puedes parar cuando quieras y seguir otro día: lo traducido se conserva. Mientras traduce no se puede jugar."
-msgstr "Translates the whole script of “{nombre}” before you play: while playing, everything will come straight from the cache.\n\nWith the local translator, a long script can take several hours. You can stop whenever you like and continue another day: what's already translated is kept. You can't play while it's translating."
+msgid "Con Gemini se traducen {lineas} líneas por petición. El plan gratuito permite unas {peticiones} peticiones al día: si se agotan, sigue otro día."
+msgstr "With Gemini, {lineas} lines are translated per request. The free plan allows about {peticiones} requests a day: if they run out, continue another day."
+
+msgid "Con el traductor local puede tardar varias horas en un guion largo."
+msgstr "With the local translator, a long script can take several hours."
+
+msgid "Traduce entero el guion de «{nombre}» antes de jugar: al jugar, todo saldrá de la caché al momento.\n\n{como} Puedes parar cuando quieras y seguir otro día: lo traducido se conserva. Mientras traduce no se puede jugar."
+msgstr "Translates the whole script of “{nombre}” before you play: while playing, everything will come straight from the cache.\n\n{como} You can stop whenever you like and continue another day: what's already translated is kept. You can't play while it's translating."
 
 msgid "Empezar"
 msgstr "Start"

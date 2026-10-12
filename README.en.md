@@ -62,7 +62,14 @@ script even if OCR fails, OCR is only used to know where you are, and the next p
 translated in advance while you listen. If the script includes an official English translation, you
 can translate from it. To translate the whole script before playing,
 choose the game and press **Translate the script…** (or run `vn-audiolibro traducir-guion "My game"`):
-it shows the progress and the time left, and you can stop and continue another day. The app only reads the game files: it never changes them.
+it shows the progress and the time left, and you can stop and continue another day. The app only
+reads the game files: it never changes them.
+
+**Translating with Gemini (optional).** In each game's editor you can choose Google's Gemini instead
+of the local translator, with your own free Google AI Studio key (stored in the system keyring). The
+game text is sent to Google. If Gemini fails or its limit runs out, that line is translated locally.
+When translating the whole script, Gemini translates many lines per request so that it fits in the
+free plan's daily limit; if it runs out, you continue another day.
 
 From the terminal: `vn-audiolibro --help` (`vn-audiolibro-consola.exe --help` on Windows).
 

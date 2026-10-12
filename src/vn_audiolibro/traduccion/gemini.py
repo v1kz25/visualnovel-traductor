@@ -16,11 +16,15 @@ import urllib.error
 import urllib.request
 from collections import deque
 from collections.abc import Callable, Generator, Sequence
+from pathlib import Path
 from typing import Any
 
-from vn_audiolibro.textos import _
+from vn_audiolibro.rutas import directorio_estado
+from vn_audiolibro.textos import N_, _
 from vn_audiolibro.traduccion import postprocesado
 from vn_audiolibro.traduccion.modelos import (
+    Glosario,
+    LimiteAgotadoError,
     Peticion,
     ResultadoPorPartes,
     Traduccion,
@@ -51,6 +55,13 @@ PAUSA_CUOTA_S = 60.0
 
 LINEAS_CONTEXTO = 3
 
+TAMANO_LOTE = 40
+"""Líneas del guion por petición al traducirlo por adelantado: con 1000 peticiones al día caben
+40 000 líneas, y la respuesta (unos 2000-4000 tokens) sale en pocos segundos."""
+
+REINTENTOS_CUOTA = 3
+"""«Límite agotado» seguidos de Google con los que se da el día por terminado."""
+
 INSTRUCCIONES = (
     "You translate dialogue and narration from a visual novel into {destino}. Translate the "
     "[Source Text] faithfully and naturally, keeping its tone and register: do not soften insults "
@@ -59,6 +70,25 @@ INSTRUCCIONES = (
     "translation, on a single line, without quotes around it unless the source has them, notes "
     "or explanations."
 )
+
+INSTRUCCIONES_LOTE = (
+    "You translate dialogue and narration from a visual novel into {destino}. The [Lines] are "
+    "numbered and in order: translate each one faithfully and naturally, keeping its tone and "
+    "register: do not soften insults or swearing, and do not add, omit, merge or split lines. Use "
+    "the given translations for names and terms. The [Background] lines are only context: never "
+    'translate them. Answer with one item per line: its number in "n" and its translation, on a '
+    'single line, in "t". Keep quotes only where the source has them.'
+)
+
+ESQUEMA_LOTE = {
+    "type": "ARRAY",
+    "items": {
+        "type": "OBJECT",
+        "properties": {"n": {"type": "INTEGER"}, "t": {"type": "STRING"}},
+        "required": ["n", "t"],
+    },
+}
+"""Respuesta estructurada de un lote: Gemini devuelve JSON con este esquema."""
 
 CATEGORIAS = (
     "HARM_CATEGORY_HARASSMENT",
@@ -176,12 +206,82 @@ def cuerpo_peticion(peticion: Peticion) -> dict[str, Any]:
         "systemInstruction": {"parts": [{"text": INSTRUCCIONES.format(destino=DESTINOS[peticion.destino])}]},
         "contents": [{"role": "user", "parts": [{"text": "\n\n".join(bloques)}]}],
         "generationConfig": {"temperature": 0.3, "maxOutputTokens": 64 + 4 * len(peticion.texto)},
-        "safetySettings": [{"category": categoria, "threshold": "BLOCK_NONE"} for categoria in CATEGORIAS],
+        "safetySettings": _ajustes_seguridad(),
     }
 
 
+def _ajustes_seguridad() -> list[dict[str, str]]:
+    return [{"category": categoria, "threshold": "BLOCK_NONE"} for categoria in CATEGORIAS]
+
+
+def cuerpo_lote(peticiones: Sequence[Peticion]) -> dict[str, Any]:
+    """La petición de un lote: las líneas numeradas, el contexto de la primera y el glosario.
+
+    Todas las líneas van al mismo idioma de destino; el contexto es el de antes de la primera,
+    porque cada línea tiene las anteriores del lote justo encima.
+    """
+    primera = peticiones[0]
+    glosario = Glosario()
+    for idioma in dict.fromkeys(peticion.idioma for peticion in peticiones):
+        glosario = glosario.unir(glosario_por_defecto(idioma))
+    glosario = glosario.unir(primera.glosario)
+    lineas = [" ".join(peticion.texto.split()) for peticion in peticiones]
+    bloques = []
+    if contexto := list(primera.contexto)[-LINEAS_CONTEXTO:]:
+        bloques.append("[Background]\n" + "\n".join(linea.original for linea in contexto))
+    if terminos := glosario.presentes("\n".join(lineas)):
+        bloques.append("[Glossary]\n" + "\n".join(f"{t} = {d}" for t, d in terminos))
+    bloques.append("[Lines]\n" + "\n".join(f"{n}. {linea}" for n, linea in enumerate(lineas, 1)))
+    caracteres = sum(len(linea) for linea in lineas)
+    instrucciones = INSTRUCCIONES_LOTE.format(destino=DESTINOS[primera.destino])
+    return {
+        "systemInstruction": {"parts": [{"text": instrucciones}]},
+        "contents": [{"role": "user", "parts": [{"text": "\n\n".join(bloques)}]}],
+        "generationConfig": {
+            "temperature": 0.3,
+            "maxOutputTokens": 256 + 32 * len(lineas) + 4 * caracteres,
+            "responseMimeType": "application/json",
+            "responseSchema": ESQUEMA_LOTE,
+        },
+        "safetySettings": _ajustes_seguridad(),
+    }
+
+
+def leer_lote(salida: str, peticiones: Sequence[Peticion]) -> list[str | None]:
+    """La traducción de cada línea del lote, en orden; None en las que falten o no valgan.
+
+    Se ordenan por su número, no por su posición en la respuesta. Una línea repetida vale la
+    primera vez; una vacía, desproporcionada o con varias líneas no vale.
+    """
+    textos: list[str | None] = [None] * len(peticiones)
+    try:
+        elementos = json.loads(salida)
+    except ValueError:
+        _registro.warning("Gemini ha devuelto un lote que no es JSON válido")
+        return textos
+    for elemento in elementos if isinstance(elementos, list) else ():
+        leido = _elemento_lote(elemento, len(peticiones))
+        if leido is None or textos[leido[0] - 1] is not None:
+            continue
+        numero, texto = leido
+        peticion = peticiones[numero - 1]
+        if postprocesado.es_valida(texto, peticion.texto):
+            textos[numero - 1] = postprocesado.limpiar(texto, peticion.texto, peticion.destino)
+    return textos
+
+
+def _elemento_lote(elemento: object, lineas: int) -> tuple[int, str] | None:
+    """El número (de 1 a `lineas`) y el texto de un elemento de la respuesta, o None si no vale."""
+    if not isinstance(elemento, dict):
+        return None
+    numero, texto = elemento.get("n"), elemento.get("t")
+    if isinstance(numero, bool) or not isinstance(numero, int) or not isinstance(texto, str):
+        return None
+    return (numero, texto) if 1 <= numero <= lineas else None
+
+
 class TraductorGemini:
-    """Traduce con Gemini, en streaming si se pide por partes."""
+    """Traduce con Gemini, en streaming si se pide por partes, o varias líneas en una petición."""
 
     def __init__(self, cliente: ClienteGemini) -> None:
         self._cliente = cliente
@@ -190,6 +290,11 @@ class TraductorGemini:
     def traducir(self, peticion: Peticion) -> Traduccion:
         salida = self._cliente.generar(cuerpo_peticion(peticion))
         return self._traduccion(salida, peticion)
+
+    def traducir_lote(self, peticiones: Sequence[Peticion]) -> list[Traduccion | None]:
+        """Una traducción por línea, en orden; None en las que Gemini no haya traducido bien."""
+        textos = leer_lote(self._cliente.generar(cuerpo_lote(peticiones)), peticiones)
+        return [None if texto is None else Traduccion(texto, self.modelo) for texto in textos]
 
     def traducir_por_partes(
         self, peticion: Peticion, al_parte: Callable[[str], None], cancelado: Callable[[], bool]
@@ -216,42 +321,106 @@ class TraductorGemini:
         return Traduccion(postprocesado.limpiar(salida, peticion.texto, peticion.destino), self.modelo)
 
 
+DIA_S = 24 * 3600
+
+
+def fichero_peticiones() -> Path:
+    """Donde se apuntan las peticiones a Gemini, para respetar el límite diario entre ejecuciones."""
+    return directorio_estado() / "gemini-peticiones.json"
+
+
 class LimitePeticiones:
-    """Cuenta las peticiones del último minuto y del último día para no pasar los límites."""
+    """Cuenta las peticiones del último minuto y del último día para no pasar los límites.
+
+    Con `ruta`, guarda la hora de cada petición del último día en ese fichero: el límite diario se
+    respeta aunque se cierre la app, y lo comparten la partida y la traducción del guion.
+    """
 
     def __init__(
         self,
         por_minuto: int = POR_MINUTO,
         por_dia: int = POR_DIA,
-        reloj: Callable[[], float] = time.monotonic,
+        reloj: Callable[[], float] = time.time,
+        ruta: Path | None = None,
     ) -> None:
+        self.por_dia = por_dia
         self._por_minuto = por_minuto
-        self._por_dia = por_dia
         self._reloj = reloj
-        self._instantes: deque[float] = deque()
+        self._ruta = ruta
+        self._instantes: deque[float] = deque(self._cargar())
         self._pausa_hasta = 0.0
         self._cerrojo = threading.Lock()
+
+    @classmethod
+    def compartido(cls) -> "LimitePeticiones":
+        """El límite guardado en el fichero de estado de la app."""
+        return cls(ruta=fichero_peticiones())
+
+    def _cargar(self) -> list[float]:
+        if self._ruta is None:
+            return []
+        try:
+            datos = json.loads(self._ruta.read_text(encoding="utf-8"))
+            ahora = self._reloj()
+            # Las de más de un día ya no cuentan; las del futuro (el reloj ha cambiado), tampoco.
+            return sorted(
+                float(instante)
+                for instante in datos["peticiones"]
+                if isinstance(instante, int | float) and 0 <= ahora - instante < DIA_S
+            )
+        except FileNotFoundError:
+            return []
+        except (OSError, ValueError, KeyError, TypeError):
+            _registro.warning("No se pudo leer %s: se empieza la cuenta de cero", self._ruta, exc_info=True)
+            return []
+
+    def _guardar(self) -> None:
+        if self._ruta is None:
+            return
+        try:
+            self._ruta.parent.mkdir(parents=True, exist_ok=True)
+            temporal = self._ruta.with_name(self._ruta.name + ".parcial")
+            temporal.write_text(json.dumps({"peticiones": list(self._instantes)}), encoding="utf-8")
+            temporal.replace(self._ruta)
+        except OSError:
+            _registro.warning("No se pudo guardar la cuenta de peticiones a Gemini", exc_info=True)
+
+    def _olvidar_viejas(self, ahora: float) -> None:
+        while self._instantes and ahora - self._instantes[0] >= DIA_S:
+            self._instantes.popleft()
 
     def reservar(self) -> bool:
         """Apunta una petición si cabe en los límites; False si hay que esperar."""
         with self._cerrojo:
             ahora = self._reloj()
-            while self._instantes and ahora - self._instantes[0] >= 24 * 3600:
-                self._instantes.popleft()
+            self._olvidar_viejas(ahora)
             ultimo_minuto = sum(1 for instante in self._instantes if ahora - instante < 60)
             if (
                 ahora < self._pausa_hasta
                 or ultimo_minuto >= self._por_minuto
-                or len(self._instantes) >= self._por_dia
+                or len(self._instantes) >= self.por_dia
             ):
                 return False
             self._instantes.append(ahora)
+            self._guardar()
             return True
+
+    def lleno_hoy(self) -> bool:
+        """Si ya se han hecho todas las peticiones del día."""
+        with self._cerrojo:
+            self._olvidar_viejas(self._reloj())
+            return len(self._instantes) >= self.por_dia
 
     def pausar(self, segundos: float = PAUSA_CUOTA_S) -> None:
         """No deja hacer peticiones durante un rato (tras un «límite agotado» de Google)."""
         with self._cerrojo:
             self._pausa_hasta = self._reloj() + segundos
+
+
+SEGUIR = N_(
+    "Lo traducido se conserva: sigue mañana, o elige el traductor local en el editor del juego "
+    "para seguir ahora."
+)
 
 
 class TraductorConRespaldo:
@@ -261,17 +430,21 @@ class TraductorConRespaldo:
     vuelve a funcionar, sin repetir el aviso en cada línea.
     """
 
+    tamano_lote = TAMANO_LOTE
+
     def __init__(
         self,
         principal: TraductorGemini,
         respaldo: Traductor,
         al_aviso: Callable[[str], None] = lambda _: None,
         limite: LimitePeticiones | None = None,
+        dormir: Callable[[float], None] = time.sleep,
     ) -> None:
         self._principal = principal
         self._respaldo = respaldo
         self._al_aviso = al_aviso
         self._limite = limite or LimitePeticiones()
+        self._dormir = dormir
         self._avisado = False
 
     def traducir(self, peticion: Peticion) -> Traduccion:
@@ -312,6 +485,65 @@ class TraductorConRespaldo:
         if isinstance(self._respaldo, TraductorPorPartes):
             return self._respaldo.traducir_por_partes(peticion, al_parte, cancelado)
         return ResultadoPorPartes(self._respaldo.traducir(peticion), por_partes=False)
+
+    def traducir_lote(
+        self, peticiones: Sequence[Peticion], cancelado: Callable[[], bool]
+    ) -> list[Traduccion] | None:
+        """Traduce el lote con Gemini en una petición; lo que no traduzca bien, en local.
+
+        Espera si se ha llegado al límite por minuto. Lanza `LimiteAgotadoError` si no quedan
+        peticiones por hoy o si Google sigue diciendo que se ha agotado el límite.
+        """
+        parciales = self._lote_gemini(peticiones, cancelado)
+        if parciales is None:
+            return None
+        traducciones = []
+        for peticion, traduccion in zip(peticiones, parciales, strict=True):
+            if cancelado():
+                return None
+            traducciones.append(traduccion or self._respaldo.traducir(peticion))
+        if faltan := parciales.count(None):
+            _registro.info(
+                "Gemini no ha traducido %d de %d líneas del lote: van en local", faltan, len(peticiones)
+            )
+        return traducciones
+
+    def _lote_gemini(
+        self, peticiones: Sequence[Peticion], cancelado: Callable[[], bool]
+    ) -> list[Traduccion | None] | None:
+        """Lo que traduce Gemini del lote (None en lo que falte), o None si se cancela."""
+        for _intento in range(REINTENTOS_CUOTA):
+            if not self._esperar_turno(cancelado):
+                return None
+            try:
+                parciales = self._principal.traducir_lote(peticiones)
+            except CuotaAgotadaError as error:
+                self._fallo(error)  # pausa Gemini un minuto y se vuelve a intentar
+                continue
+            except TraduccionFallidaError as error:
+                self._fallo(error)
+                return [None] * len(peticiones)
+            self._funciona()
+            return parciales
+        raise LimiteAgotadoError(
+            _("Google sigue diciendo que se ha agotado el límite de Gemini. {seguir}").format(
+                seguir=_(SEGUIR)
+            )
+        )
+
+    def _esperar_turno(self, cancelado: Callable[[], bool]) -> bool:
+        """Espera a que quepa una petición en el límite por minuto; False si se cancela."""
+        while not self._limite.reservar():
+            if self._limite.lleno_hoy():
+                raise LimiteAgotadoError(
+                    _("Se ha agotado el límite diario de Gemini ({peticiones} peticiones). {seguir}").format(
+                        peticiones=self._limite.por_dia, seguir=_(SEGUIR)
+                    )
+                )
+            if cancelado():
+                return False
+            self._dormir(1)
+        return not cancelado()
 
     def _fallo(self, error: TraduccionFallidaError | None) -> None:
         if isinstance(error, CuotaAgotadaError):

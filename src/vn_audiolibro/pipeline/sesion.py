@@ -26,7 +26,12 @@ from vn_audiolibro.perfiles.modelos import Perfil
 from vn_audiolibro.pipeline.orquestador import AjustesOrquestador, GuionJuego, LineaJuego, Orquestador
 from vn_audiolibro.plataforma import capturador, cliente_audio, gestor_ventanas, juego_de_pid, reproductor
 from vn_audiolibro.textos import _
-from vn_audiolibro.traduccion.gemini import ClienteGemini, TraductorConRespaldo, TraductorGemini
+from vn_audiolibro.traduccion.gemini import (
+    ClienteGemini,
+    LimitePeticiones,
+    TraductorConRespaldo,
+    TraductorGemini,
+)
 from vn_audiolibro.traduccion.llama import ServidorLlama, asegurar_llama_server, asegurar_modelo_traduccion
 from vn_audiolibro.traduccion.local import TraductorLocal
 from vn_audiolibro.traduccion.modelos import Glosario, Motor, Traductor
@@ -67,7 +72,23 @@ def traductor_guion(
         pila.callback(servidor.detener)
         cache = CacheSQLite(limite_bytes=cargar_ajustes().limite_cache_bytes)
         pila.callback(cache.cerrar)
-        yield PreparadorGuion(guion, ajustes_guion(perfil), TraductorLocal(cliente), cache)
+        traductor = traductor_del_juego(perfil, TraductorLocal(cliente), al_estado)
+        yield PreparadorGuion(guion, ajustes_guion(perfil), traductor, cache)
+
+
+def traductor_del_juego(perfil: Perfil, local: TraductorLocal, al_aviso: Callable[[str], None]) -> Traductor:
+    """El traductor del juego: el local o Gemini, que recurre al local si falla.
+
+    Con Gemini, la cuenta del límite diario se guarda y la comparten la partida y el guion.
+    """
+    if perfil.traductor is not Motor.GEMINI:
+        return local
+    clave = claves.leer()
+    if clave is None:
+        al_aviso(_("Falta la clave de Gemini: se traducirá en local. Añádela en el editor del juego."))
+        return local
+    gemini = TraductorGemini(ClienteGemini(clave))
+    return TraductorConRespaldo(gemini, local, al_aviso, LimitePeticiones.compartido())
 
 
 class Sesion:
@@ -238,17 +259,7 @@ class Sesion:
             _registro.warning("No se pudo guardar el nombre «%s» en el glosario", original, exc_info=True)
 
     def _traductor(self, local: TraductorLocal) -> Traductor:
-        """El traductor del juego: el local o Gemini, que recurre al local si falla."""
-        if self.perfil.traductor is not Motor.GEMINI:
-            return local
-        clave = claves.leer()
-        if clave is None:
-            self._al_error(
-                _("Falta la clave de Gemini: se traducirá en local. Añádela en el editor del juego.")
-            )
-            return local
-        gemini = TraductorGemini(ClienteGemini(clave))
-        return TraductorConRespaldo(gemini, local, self._al_error)
+        return traductor_del_juego(self.perfil, local, self._al_error)
 
     def _guion(self, traductor: Traductor, cache: CacheSQLite) -> GuionJuego | None:
         """El guion del juego, si se ha configurado y se puede leer; si no, se juega con el OCR."""

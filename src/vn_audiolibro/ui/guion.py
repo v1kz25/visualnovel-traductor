@@ -19,7 +19,8 @@ from vn_audiolibro.guion.previa import PreparadorGuion
 from vn_audiolibro.perfiles.modelos import Perfil
 from vn_audiolibro.pipeline.sesion import traductor_guion
 from vn_audiolibro.textos import _, ngettext
-from vn_audiolibro.traduccion.modelos import TraduccionFallidaError
+from vn_audiolibro.traduccion.gemini import POR_DIA, TAMANO_LOTE
+from vn_audiolibro.traduccion.modelos import Motor, TraduccionFallidaError
 
 _registro = logging.getLogger(__name__)
 
@@ -75,13 +76,19 @@ class TraducirGuion(QDialog):
         self._traducidos = 0
         self.traducidos_al_terminar: int | None = None
 
+        if perfil.traductor is Motor.GEMINI:
+            como = _(
+                "Con Gemini se traducen {lineas} líneas por petición. El plan gratuito permite unas "
+                "{peticiones} peticiones al día: si se agotan, sigue otro día."
+            ).format(lineas=TAMANO_LOTE, peticiones=POR_DIA)
+        else:
+            como = _("Con el traductor local puede tardar varias horas en un guion largo.")
         self.explicacion = QLabel(
             _(
                 "Traduce entero el guion de «{nombre}» antes de jugar: al jugar, todo saldrá de la "
-                "caché al momento.\n\nCon el traductor local puede tardar varias horas en un guion "
-                "largo. Puedes parar cuando quieras y seguir otro día: lo traducido se conserva. "
-                "Mientras traduce no se puede jugar."
-            ).format(nombre=perfil.nombre)
+                "caché al momento.\n\n{como} Puedes parar cuando quieras y seguir otro día: lo "
+                "traducido se conserva. Mientras traduce no se puede jugar."
+            ).format(nombre=perfil.nombre, como=como)
         )
         self.explicacion.setWordWrap(True)
         self.barra = QProgressBar()
