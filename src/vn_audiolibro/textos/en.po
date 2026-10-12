@@ -1053,6 +1053,12 @@ msgstr "System default"
 msgid "Idioma de la app"
 msgstr "App language"
 
+msgid "Avisar de versiones nuevas"
+msgstr "Notify me of new versions"
+
+msgid "Al abrir la app, consulta en GitHub como mucho una vez al día si hay una versión nueva."
+msgstr "When the app opens, it checks GitHub for a new version at most once a day."
+
 msgid "Elige un juego y pulsa Jugar."
 msgstr "Choose a game and press Play."
 
@@ -1103,6 +1109,27 @@ msgstr "Resume (P)"
 
 msgid "Error al parar: {error}"
 msgstr "Error while stopping: {error}"
+
+msgid "Versiones nuevas"
+msgstr "New versions"
+
+msgid "¿Quieres que la app te avise cuando haya una versión nueva?\n\nPara saberlo, consultará GitHub como mucho una vez al día al abrirse. No descarga ni instala nada. Se puede cambiar cuando quieras en «Avisar de versiones nuevas»."
+msgstr "Do you want the app to tell you when there's a new version?\n\nTo find out, it will check GitHub at most once a day when it opens. It doesn't download or install anything. You can change this at any time with “Notify me of new versions”."
+
+msgid "Cerrar"
+msgstr "Close"
+
+msgid "Hay una versión nueva: {version}."
+msgstr "A new version is available: {version}."
+
+msgid "Novedades"
+msgstr "What's new"
+
+msgid "Novedades de la versión {version}"
+msgstr "What's new in version {version}"
+
+msgid "Esta versión no tiene notas."
+msgstr "This version has no release notes."
 
 msgid "Pulsa «Capturar ventana»"
 msgstr "Press “Capture window”"

@@ -56,4 +56,5 @@ def ejecutar(argv: list[str] | None = None) -> int:
     preparar()
     ventana = VentanaPrincipal(AlmacenPerfiles())
     ventana.show()
+    ventana.buscar_version_nueva()
     return app.exec()

@@ -2,8 +2,9 @@
 
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Any
 
 from vn_audiolibro.rutas import directorio_config
 from vn_audiolibro.textos import _, decimal
@@ -23,6 +24,12 @@ class AjustesApp:
     """Tamaño máximo de la caché en MB, o None para no limitarla."""
     idioma: str | None = None
     """Idioma de la interfaz elegido en la app, o None para usar el del sistema."""
+    avisar_versiones: bool | None = None
+    """Si se busca al arrancar si hay una versión nueva; None si aún no se ha preguntado."""
+    ultima_busqueda: float | None = None
+    """Cuándo se buscó por última vez una versión nueva (segundos desde 1970)."""
+    version_avisada: str | None = None
+    """Última versión nueva de la que se ha avisado, para no repetir el aviso."""
 
     def __post_init__(self) -> None:
         if self.limite_cache_mb is not None and self.limite_cache_mb < LIMITE_MIN_MB:
@@ -47,10 +54,14 @@ def cargar_ajustes(ruta: Path | None = None) -> AjustesApp:
         limite = datos.get("limite_cache_mb", LIMITE_CACHE_MB)
         if limite is not None and (isinstance(limite, bool) or not isinstance(limite, int)):
             raise TypeError(f"límite no válido: {limite!r}")
-        idioma = datos.get("idioma")
-        if idioma is not None and not isinstance(idioma, str):
-            raise TypeError(f"idioma no válido: {idioma!r}")
-        return AjustesApp(limite_cache_mb=limite, idioma=idioma)
+        ultima = _opcional(datos, "ultima_busqueda", (int, float))
+        return AjustesApp(
+            limite_cache_mb=limite,
+            idioma=_opcional(datos, "idioma", str),
+            avisar_versiones=_opcional(datos, "avisar_versiones", bool),
+            ultima_busqueda=None if ultima is None else float(ultima),
+            version_avisada=_opcional(datos, "version_avisada", str),
+        )
     except FileNotFoundError:
         return AjustesApp()
     except (OSError, ValueError, TypeError, AttributeError):
@@ -58,11 +69,20 @@ def cargar_ajustes(ruta: Path | None = None) -> AjustesApp:
         return AjustesApp()
 
 
+def _opcional(datos: dict[str, Any], campo: str, tipos: type | tuple[type, ...]) -> Any:
+    """El valor de `campo`, o None si no está; TypeError si no es de los tipos esperados."""
+    valor = datos.get(campo)
+    es_bool_por_numero = isinstance(valor, bool) and tipos is not bool  # `bool` es un `int`
+    if valor is not None and (not isinstance(valor, tipos) or es_bool_por_numero):
+        raise TypeError(f"{campo} no válido: {valor!r}")
+    return valor
+
+
 def guardar_ajustes(ajustes: AjustesApp, ruta: Path | None = None) -> None:
     ruta = ruta or fichero_ajustes()
     ruta.parent.mkdir(parents=True, exist_ok=True)
     temporal = ruta.with_name(ruta.name + ".parcial")
-    datos = {"limite_cache_mb": ajustes.limite_cache_mb, "idioma": ajustes.idioma}
+    datos = asdict(ajustes)
     temporal.write_text(json.dumps(datos, indent=2) + "\n", encoding="utf-8")
     temporal.replace(ruta)
 

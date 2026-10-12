@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
 )
 
 from vn_audiolibro import plataforma, textos
+from vn_audiolibro.actualizaciones import Consultar, consultar_github, version_instalada
 from vn_audiolibro.cache.sqlite import CacheSQLite
 from vn_audiolibro.configuracion import cargar_ajustes, guardar_ajustes
 from vn_audiolibro.perfiles.almacen import AlmacenPerfiles
@@ -40,6 +41,7 @@ from vn_audiolibro.ui.cache import VentanaCache
 from vn_audiolibro.ui.editor import EditorJuego
 from vn_audiolibro.ui.puente import PuenteSesion
 from vn_audiolibro.ui.subtitulos import PantallaSubtitulos, abrir_subtitulos
+from vn_audiolibro.ui.versiones import AvisoVersion, BuscadorVersiones, preguntar_si_avisar
 
 TITULO = "vn-audiolibro"
 MAX_LINEAS = 500
@@ -83,8 +85,12 @@ class VentanaPrincipal(QMainWindow):
         abrir_ventana_cache: AbrirVentanaCache | None = None,
         ruta_ajustes: Path | None = None,
         subtitulos: Callable[[Perfil], PantallaSubtitulos | None] = abrir_subtitulos,
+        consultar_version: Consultar = consultar_github,
     ) -> None:
         super().__init__()
+        self.buscador_versiones = BuscadorVersiones(
+            version_instalada(), consultar_version, ruta_ajustes, parent=self
+        )
         self._crear_subtitulos = subtitulos
         self._subtitulos: PantallaSubtitulos | None = None
         self._ruta_ajustes = ruta_ajustes
@@ -139,6 +145,12 @@ class VentanaPrincipal(QMainWindow):
         fila.addWidget(QLabel(_("Idioma de la app")))
         fila.addWidget(self.idioma, 1)
         columna.addLayout(fila)
+        self.avisar_versiones = QCheckBox(_("Avisar de versiones nuevas"))
+        self.avisar_versiones.setToolTip(
+            _("Al abrir la app, consulta en GitHub como mucho una vez al día si hay una versión nueva.")
+        )
+        self.avisar_versiones.setChecked(cargar_ajustes(self._ruta_ajustes).avisar_versiones is True)
+        columna.addWidget(self.avisar_versiones)
 
         self.estado = QLabel(_("Elige un juego y pulsa Jugar."))
         self.estado.setWordWrap(True)
@@ -169,7 +181,12 @@ class VentanaPrincipal(QMainWindow):
         divisor.addWidget(izquierda)
         divisor.addWidget(derecha)
         divisor.setStretchFactor(1, 3)
-        self.setCentralWidget(divisor)
+        self.aviso_version = AvisoVersion()
+        central = QWidget()
+        columna = QVBoxLayout(central)
+        columna.addWidget(self.aviso_version)
+        columna.addWidget(divisor, 1)
+        self.setCentralWidget(central)
 
     def _conectar(self) -> None:
         self.boton_jugar.clicked.connect(self.jugar)
@@ -187,6 +204,8 @@ class VentanaPrincipal(QMainWindow):
         self.silenciar.toggled.connect(self.puente.silenciar)
         self.siempre_encima.toggled.connect(self._mantener_encima)
         self.idioma.activated.connect(lambda _indice: self.cambiar_idioma(self.idioma.currentData()))
+        self.avisar_versiones.toggled.connect(self._al_cambiar_avisos)
+        self.buscador_versiones.encontrada.connect(self.aviso_version.mostrar)
         atajos = {
             "P": self._alternar_pausa,
             "R": self.puente.repetir,
@@ -284,6 +303,17 @@ class VentanaPrincipal(QMainWindow):
         guardar_ajustes(replace(ajustes, idioma=idioma), self._ruta_ajustes)
         nuevo = textos.catalogo(textos.elegir(idioma, plataforma.idiomas_sistema()))
         QMessageBox.information(self, TITULO, nuevo.gettext(AVISO_IDIOMA))
+
+    def buscar_version_nueva(self) -> None:
+        """La primera vez pregunta si avisar de versiones nuevas; si está activado, busca si hay una."""
+        preguntar_si_avisar(self, self._ruta_ajustes)
+        self.avisar_versiones.setChecked(cargar_ajustes(self._ruta_ajustes).avisar_versiones is True)
+        self.buscador_versiones.iniciar()
+
+    def _al_cambiar_avisos(self, activo: bool) -> None:
+        ajustes = cargar_ajustes(self._ruta_ajustes)
+        if ajustes.avisar_versiones != activo:
+            guardar_ajustes(replace(ajustes, avisar_versiones=activo), self._ruta_ajustes)
 
     # Partida
 
