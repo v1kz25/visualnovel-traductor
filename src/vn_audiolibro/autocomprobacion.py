@@ -56,9 +56,12 @@ def _piper() -> str:
     from piper.phonemize_espeak import EspeakPhonemizer
 
     fonetizador = EspeakPhonemizer()
-    fonemas = {idioma: fonetizador.phonemize(idioma, "hola") for idioma in ("es", "en")}
-    if not all(frases and frases[0] for frases in fonemas.values()):
-        raise RuntimeError("espeak-ng no ha devuelto fonemas en español e inglés")
+    # Las voces de espeak-ng que usan las de Piper de cada idioma de destino.
+    idiomas = ("es", "en", "fr", "pt-br", "de", "it")
+    fonemas = {idioma: fonetizador.phonemize(idioma, "hola") for idioma in idiomas}
+    sin_fonemas = [idioma for idioma, frases in fonemas.items() if not (frases and frases[0])]
+    if sin_fonemas:
+        raise RuntimeError(f"espeak-ng no ha devuelto fonemas en: {', '.join(sin_fonemas)}")
     return "".join(fonemas["es"][0])
 
 
