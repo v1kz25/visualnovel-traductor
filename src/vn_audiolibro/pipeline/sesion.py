@@ -84,13 +84,17 @@ class Sesion:
         al_error: Callable[[str], None],
         al_estado: Callable[[str], None] = lambda _: None,
         almacen: AlmacenPerfiles | None = None,
+        al_subtitulo: Callable[[str], None] = lambda _: None,
     ) -> None:
-        """`almacen` es donde se guardan los nombres de personaje aprendidos al jugar."""
+        """`almacen` es donde se guardan los nombres de personaje aprendidos al jugar.
+
+        `al_subtitulo` recibe lo que tienen que mostrar los subtítulos cada vez que cambia."""
         self.perfil = perfil
         self._almacen = almacen or AlmacenPerfiles()
         self._al_linea = al_linea
         self._al_error = al_error
         self._al_estado = al_estado
+        self._al_subtitulo = al_subtitulo
         self._pila = contextlib.ExitStack()
         self.orquestador: Orquestador | None = None
 
@@ -187,6 +191,7 @@ class Sesion:
             self._al_error,
             guion,
             al_personaje=self.guardar_personaje,
+            al_subtitulo=self._al_subtitulo,
         )
         pila.callback(orquestador.cerrar)
 

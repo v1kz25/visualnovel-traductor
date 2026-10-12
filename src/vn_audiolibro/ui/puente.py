@@ -48,8 +48,16 @@ class SesionJuego(Protocol):
 
 
 FabricaSesion = Callable[
-    [Perfil, Callable[[LineaJuego], None], Callable[[str], None], Callable[[str], None]], SesionJuego
+    [
+        Perfil,
+        Callable[[LineaJuego], None],
+        Callable[[str], None],
+        Callable[[str], None],
+        Callable[[str], None],
+    ],
+    SesionJuego,
 ]
+"""Crea la sesión de un juego con sus avisos: línea, error, estado y subtítulo."""
 
 
 def _sesion_real(
@@ -57,8 +65,9 @@ def _sesion_real(
     al_linea: Callable[[LineaJuego], None],
     al_error: Callable[[str], None],
     al_estado: Callable[[str], None],
+    al_subtitulo: Callable[[str], None],
 ) -> SesionJuego:
-    return Sesion(perfil, al_linea, al_error, al_estado)
+    return Sesion(perfil, al_linea, al_error, al_estado, al_subtitulo=al_subtitulo)
 
 
 class PuenteSesion(QObject):
@@ -66,6 +75,8 @@ class PuenteSesion(QObject):
 
     estado = Signal(str)
     linea = Signal(object)
+    subtitulo = Signal(str)
+    """Lo que tienen que mostrar los subtítulos: la línea que suena, a medida que se traduce."""
     error = Signal(str)
     iniciada = Signal()
     terminada = Signal()
@@ -98,7 +109,9 @@ class PuenteSesion(QObject):
         if self._sesion is not None:
             return
         self.esperar()  # por si aún se está parando la anterior
-        sesion = self._fabrica(perfil, self.linea.emit, self.error.emit, self.estado.emit)
+        sesion = self._fabrica(
+            perfil, self.linea.emit, self.error.emit, self.estado.emit, self.subtitulo.emit
+        )
         with self._cerrojo:
             self._sesion, self._arrancando = sesion, True
         self._lanzar(lambda: self._arrancar(sesion))
