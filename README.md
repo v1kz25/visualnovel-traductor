@@ -85,7 +85,10 @@ en `%LOCALAPPDATA%\vn-audiolibro` y los ajustes en `%APPDATA%\vn-audiolibro`.
 solo queda la traducción. La partida se controla sin salir del juego con atajos de teclado globales:
 Ctrl+Alt+P (pausar o seguir), Ctrl+Alt+R (repetir), Ctrl+Alt+S (saltar) y Ctrl+Alt+H (mostrar u
 ocultar los subtítulos). Mientras juegas, el juego no recibe esas combinaciones: si alguna choca con
-las suyas, cámbiala o desactívalos en **Atajos de teclado…**. En Linux funcionan con X11.
+las suyas, cámbiala o desactívalos en **Atajos de teclado…**. En Linux funcionan con X11. También
+puedes usar el ratón: al pasarlo por los subtítulos aparecen botones para pausar, repetir, saltar
+y ocultarlos. Si los ocultas, queda una marca pequeña en su lugar; al pasar el ratón por ella
+vuelven los botones, también el de mostrarlos.
 
 **Juegos con el guion legible.** Algunos juegos guardan su guion en ficheros de texto (por ahora,
 los hechos con Unity que lo tienen en `StreamingAssets/Scripts` con órdenes `OutputLine`). Al

@@ -4,6 +4,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); v
 
 ## [Sin publicar]
 
+### Añadido
+- **Controles al pasar el ratón por los subtítulos:** botones para pausar o seguir, repetir, saltar y ocultar los subtítulos, sin salir del juego y sin depender de los atajos de teclado. Los clics no le quitan el foco al juego.
+- Al ocultar los subtítulos queda una marca pequeña de «Subtítulos ocultos» sobre el juego, para que no parezca que han desaparecido; al pasar el ratón por ella vuelven los controles.
+
 ## [0.3.0] - 2026-10-12
 
 Subtítulos sobre el juego, controles sin salir de él, más idiomas, el guion del juego como fuente del texto y Gemini como traductor opcional.
