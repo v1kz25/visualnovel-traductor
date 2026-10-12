@@ -77,3 +77,31 @@ def test_idioma_no_valido(tmp_path: Path) -> None:
 @pytest.mark.usefixtures("en_ingles")
 def test_formato_tamano_en_ingles() -> None:
     assert formato_tamano(int(1.5 * 1024**2)) == "1.5 MB"
+
+
+def test_guardar_y_cargar_el_aviso_de_versiones(tmp_path: Path) -> None:
+    ruta = tmp_path / "ajustes.json"
+    ajustes = AjustesApp(avisar_versiones=True, ultima_busqueda=1_800_000_000.5, version_avisada="0.3.0")
+    guardar_ajustes(ajustes, ruta)
+    assert cargar_ajustes(ruta) == ajustes
+
+
+@pytest.mark.parametrize(
+    "contenido",
+    [
+        '{"avisar_versiones": "sí"}',
+        '{"ultima_busqueda": true}',
+        '{"ultima_busqueda": "ayer"}',
+        '{"version_avisada": 3}',
+    ],
+)
+def test_aviso_de_versiones_no_valido(tmp_path: Path, contenido: str) -> None:
+    ruta = tmp_path / "ajustes.json"
+    ruta.write_text(contenido, encoding="utf-8")
+    assert cargar_ajustes(ruta) == AjustesApp()
+
+
+def test_hora_entera_se_lee_como_decimal(tmp_path: Path) -> None:
+    ruta = tmp_path / "ajustes.json"
+    ruta.write_text('{"ultima_busqueda": 1800000000}', encoding="utf-8")
+    assert cargar_ajustes(ruta).ultima_busqueda == 1_800_000_000.0
