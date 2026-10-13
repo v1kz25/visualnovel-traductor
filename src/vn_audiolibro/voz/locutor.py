@@ -116,6 +116,8 @@ class Locutor:
         cambia (empieza o termina una línea, o llega o se descarta una de la cola)."""
         self._al_cambio = al_cambio
         self._estado_avisado: EstadoVoz | None = None
+        self._cerrojo_aviso = threading.Lock()
+        """Que los avisos salgan de uno en uno y en orden, aunque los den hilos distintos."""
         self._sintetizador = sintetizador
         self._voces = dict(voces or {})
         self._reproductor = reproductor
@@ -196,15 +198,16 @@ class Locutor:
         """Avisa del estado de la lectura si ha cambiado desde el último aviso."""
         if self._al_cambio is None:
             return
-        with self._condicion:
-            estado = EstadoVoz(self._actual is not None, len(self._cola))
+        with self._cerrojo_aviso:
+            with self._condicion:
+                estado = EstadoVoz(self._actual is not None, len(self._cola))
             if estado == self._estado_avisado:
                 return
             self._estado_avisado = estado
-        try:
-            self._al_cambio(estado)
-        except Exception:
-            _registro.exception("Falló el aviso del estado de la lectura")
+            try:
+                self._al_cambio(estado)
+            except Exception:
+                _registro.exception("Falló el aviso del estado de la lectura")
 
     def esperar(self, timeout_s: float | None = None) -> bool:
         """Espera a que no quede nada por leer. Devuelve False si se agota el tiempo."""
