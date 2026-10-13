@@ -13,6 +13,7 @@ from vn_audiolibro import plataforma
 from vn_audiolibro.atajos.modelos import Accion, Atajo
 from vn_audiolibro.perfiles.modelos import Perfil
 from vn_audiolibro.pipeline.orquestador import LineaJuego
+from vn_audiolibro.voz.modelos import EstadoVoz
 
 ESPERA_MS = 5000
 
@@ -59,6 +60,7 @@ class SesionFalsa:
         al_error: Callable[[str], None],
         al_estado: Callable[[str], None],
         al_subtitulo: Callable[[str], None],
+        al_voz: Callable[[EstadoVoz], None] = lambda _: None,
         puerta: threading.Event | None = None,
         fallo: str | None = None,
         fallo_al_parar: str | None = None,
@@ -67,6 +69,7 @@ class SesionFalsa:
         self._al_linea = al_linea
         self._al_estado = al_estado
         self._al_subtitulo = al_subtitulo
+        self._al_voz = al_voz
         self._puerta = puerta
         self._fallo = fallo
         self._fallo_al_parar = fallo_al_parar
@@ -82,6 +85,7 @@ class SesionFalsa:
         if self._fallo:
             raise RuntimeError(self._fallo)
         self._al_subtitulo("uno")
+        self._al_voz(EstadoVoz(leyendo=True, en_espera=1))
         self._al_linea(LineaJuego("一", "uno", desde_cache=False, leida=True))
         return self.control
 
@@ -105,8 +109,9 @@ class Fabrica:
         al_error: Callable[[str], None],
         al_estado: Callable[[str], None],
         al_subtitulo: Callable[[str], None],
+        al_voz: Callable[[EstadoVoz], None],
     ) -> SesionFalsa:
-        sesion = SesionFalsa(perfil, al_linea, al_error, al_estado, al_subtitulo, **self.opciones)  # type: ignore[arg-type]
+        sesion = SesionFalsa(perfil, al_linea, al_error, al_estado, al_subtitulo, al_voz, **self.opciones)  # type: ignore[arg-type]
         self.sesiones.append(sesion)
         return sesion
 

@@ -36,7 +36,7 @@ from vn_audiolibro.traduccion.llama import ServidorLlama, asegurar_llama_server,
 from vn_audiolibro.traduccion.local import TraductorLocal
 from vn_audiolibro.traduccion.modelos import Glosario, Motor, Traductor
 from vn_audiolibro.voz.locutor import Locutor
-from vn_audiolibro.voz.modelos import Atenuador, Sintetizador
+from vn_audiolibro.voz.modelos import Atenuador, EstadoVoz, Sintetizador
 from vn_audiolibro.voz.piper import SintetizadorPiper, VozElegida, asegurar_voz, elegir_voz
 from vn_audiolibro.voz.volumen import AtenuadorJuego, Juego
 
@@ -106,16 +106,19 @@ class Sesion:
         al_estado: Callable[[str], None] = lambda _: None,
         almacen: AlmacenPerfiles | None = None,
         al_subtitulo: Callable[[str], None] = lambda _: None,
+        al_voz: Callable[[EstadoVoz], None] = lambda _: None,
     ) -> None:
         """`almacen` es donde se guardan los nombres de personaje aprendidos al jugar.
 
-        `al_subtitulo` recibe lo que tienen que mostrar los subtítulos cada vez que cambia."""
+        `al_subtitulo` recibe lo que tienen que mostrar los subtítulos cada vez que cambia, y
+        `al_voz`, cómo va la lectura (si queda algo en la cola)."""
         self.perfil = perfil
         self._almacen = almacen or AlmacenPerfiles()
         self._al_linea = al_linea
         self._al_error = al_error
         self._al_estado = al_estado
         self._al_subtitulo = al_subtitulo
+        self._al_voz = al_voz
         self._pila = contextlib.ExitStack()
         self.orquestador: Orquestador | None = None
 
@@ -178,6 +181,7 @@ class Sesion:
                 h.value: self._sintetizador_de(voz, sintetizador, elegida, modelos_otras[h])
                 for h, elegida in otras_voces.items()
             },
+            al_cambio=self._al_voz,
         )
         pila.callback(locutor.cerrar)
 

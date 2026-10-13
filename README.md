@@ -88,7 +88,8 @@ ocultar los subtítulos). Mientras juegas, el juego no recibe esas combinaciones
 las suyas, cámbiala o desactívalos en **Atajos de teclado…**. En Linux funcionan con X11. También
 puedes usar el ratón: al pasarlo por los subtítulos aparecen botones para pausar, repetir, saltar
 y ocultarlos. Si los ocultas, queda una marca pequeña en su lugar; al pasar el ratón por ella
-vuelven los botones, también el de mostrarlos.
+vuelven los botones, también el de mostrarlos. Debajo del texto, los subtítulos dicen cuántas líneas
+quedan por leer o, cuando la voz termina, «✓ Leída · puedes avanzar».
 
 **Juegos con el guion legible.** Algunos juegos guardan su guion en ficheros de texto (por ahora,
 los hechos con Unity que lo tienen en `StreamingAssets/Scripts` con órdenes `OutputLine`). Al

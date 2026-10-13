@@ -85,6 +85,9 @@ class SubtitulosFalsos:
     def mostrar(self, texto: str) -> None:
         pass
 
+    def estado_voz(self, estado: object) -> None:
+        self.estados = [*getattr(self, "estados", []), estado]
+
     def conectar(self, al_control: object) -> None:
         self.al_control = al_control
 

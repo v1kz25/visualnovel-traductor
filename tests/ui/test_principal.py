@@ -15,6 +15,7 @@ from vn_audiolibro.pipeline.orquestador import LineaJuego
 from vn_audiolibro.traduccion.modelos import Glosario
 from vn_audiolibro.ui.principal import MAX_LINEAS, VentanaPrincipal
 from vn_audiolibro.ui.puente import PuenteSesion
+from vn_audiolibro.voz.modelos import EstadoVoz
 
 from .conftest import ESPERA_MS, Fabrica
 
@@ -311,6 +312,9 @@ class SubtitulosFalsos:
     def mostrar(self, texto: str) -> None:
         self.textos.append(texto)
 
+    def estado_voz(self, estado: object) -> None:
+        self.estados = [*getattr(self, "estados", []), estado]
+
     def conectar(self, al_control: object) -> None:
         self.al_control = al_control
 
@@ -335,6 +339,7 @@ def test_subtitulos_durante_la_partida(qtbot: QtBot, almacen: AlmacenPerfiles, f
     ((nombre, subtitulos),) = abiertos
     assert nombre == "Alfa"
     assert subtitulos.textos == ["uno"]
+    assert subtitulos.estados == [EstadoVoz(leyendo=True, en_espera=1)]  # cómo va la lectura
     with qtbot.waitSignal(ventana.puente.terminada, timeout=ESPERA_MS):
         ventana.detener()
     assert subtitulos.cerrados

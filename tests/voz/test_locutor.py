@@ -12,7 +12,7 @@ from vn_audiolibro.cache.modelos import Clave
 from vn_audiolibro.cache.sqlite import CacheSQLite
 from vn_audiolibro.voz import opus
 from vn_audiolibro.voz.locutor import Locutor, TextoPorPartes
-from vn_audiolibro.voz.modelos import Fragmento, ModoLectura
+from vn_audiolibro.voz.modelos import EstadoVoz, Fragmento, ModoLectura
 
 from .falsos import ESPERA_S, FRECUENCIA, AtenuadorFalso, ReproductorFalso, SintetizadorFalso
 
@@ -600,3 +600,80 @@ def test_un_fallo_en_el_aviso_no_corta_la_linea(caplog: pytest.LogCaptureFixture
     assert "Falló el aviso" in caplog.text
     assert reproductor.salidas[0].valores == [len("sigue")]
     assert reproductor.salidas[0].terminada
+
+
+# Estado de la lectura
+
+
+class Estados:
+    """Apunta los avisos del estado de la lectura y deja esperar a uno."""
+
+    def __init__(self) -> None:
+        self.avisos: list[EstadoVoz] = []
+        self._condicion = threading.Condition()
+
+    def __call__(self, estado: EstadoVoz) -> None:
+        with self._condicion:
+            self.avisos.append(estado)
+            self._condicion.notify_all()
+
+    def esperar(self, estado: EstadoVoz) -> None:
+        with self._condicion:
+            assert self._condicion.wait_for(lambda: self.avisos and self.avisos[-1] == estado, ESPERA_S)
+
+
+LIBRE = EstadoVoz(leyendo=False, en_espera=0)
+
+
+def test_avisa_de_la_cola_y_de_cuando_ya_se_ha_leido_todo() -> None:
+    sintetizador, reproductor = SintetizadorFalso(), ReproductorFalso(bloquear=True)
+    estados = Estados()
+    locutor = Locutor(sintetizador, reproductor, pausa_s=0, al_cambio=estados)
+
+    locutor.decir(clave("a"), "uno")
+    reproductor.esperar_sonando(0)
+    estados.esperar(EstadoVoz(leyendo=True, en_espera=0))
+    locutor.decir(clave("b"), "dos")
+    locutor.decir(clave("c"), "tres")
+    estados.esperar(EstadoVoz(leyendo=True, en_espera=2))
+
+    reproductor.salidas[0].soltar()
+    reproductor.esperar_sonando(1)
+    estados.esperar(EstadoVoz(leyendo=True, en_espera=1))
+    reproductor.salidas[1].soltar()
+    reproductor.esperar_sonando(2).soltar()
+    estados.esperar(LIBRE)
+    locutor.cerrar()
+
+    assert LIBRE.libre
+    assert not EstadoVoz(leyendo=True, en_espera=0).libre
+    # Nunca se repite el mismo aviso seguido.
+    assert all(a != b for a, b in zip(estados.avisos, estados.avisos[1:], strict=False))
+
+
+def test_callar_vacia_la_cola_y_avisa() -> None:
+    sintetizador, reproductor = SintetizadorFalso(), ReproductorFalso(bloquear=True)
+    estados = Estados()
+    locutor = Locutor(sintetizador, reproductor, pausa_s=0, al_cambio=estados)
+
+    locutor.decir(clave("a"), "uno")
+    reproductor.esperar_sonando(0)
+    locutor.decir(clave("b"), "dos")
+    estados.esperar(EstadoVoz(leyendo=True, en_espera=1))
+    locutor.callar()
+    estados.esperar(LIBRE)
+    locutor.cerrar()
+
+
+def test_un_fallo_en_el_aviso_del_estado_no_para_la_voz(caplog: pytest.LogCaptureFixture) -> None:
+    sintetizador, reproductor = SintetizadorFalso(), ReproductorFalso()
+
+    def fallar(_estado: EstadoVoz) -> None:
+        raise RuntimeError("roto")
+
+    locutor = Locutor(sintetizador, reproductor, pausa_s=0, al_cambio=fallar)
+    locutor.decir(clave("a"), "uno")
+    assert locutor.esperar(ESPERA_S)
+    locutor.cerrar()
+    assert sintetizador.textos == ["uno"]
+    assert "estado de la lectura" in caplog.text

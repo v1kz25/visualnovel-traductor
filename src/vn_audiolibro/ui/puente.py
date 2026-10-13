@@ -16,6 +16,7 @@ from vn_audiolibro.perfiles.modelos import Perfil
 from vn_audiolibro.pipeline.orquestador import LineaJuego
 from vn_audiolibro.pipeline.sesion import Sesion
 from vn_audiolibro.textos import _
+from vn_audiolibro.voz.modelos import EstadoVoz
 
 _registro = logging.getLogger(__name__)
 
@@ -54,10 +55,11 @@ FabricaSesion = Callable[
         Callable[[str], None],
         Callable[[str], None],
         Callable[[str], None],
+        Callable[[EstadoVoz], None],
     ],
     SesionJuego,
 ]
-"""Crea la sesión de un juego con sus avisos: línea, error, estado y subtítulo."""
+"""Crea la sesión de un juego con sus avisos: línea, error, estado, subtítulo y lectura."""
 
 
 def _sesion_real(
@@ -66,8 +68,9 @@ def _sesion_real(
     al_error: Callable[[str], None],
     al_estado: Callable[[str], None],
     al_subtitulo: Callable[[str], None],
+    al_voz: Callable[[EstadoVoz], None],
 ) -> SesionJuego:
-    return Sesion(perfil, al_linea, al_error, al_estado, al_subtitulo=al_subtitulo)
+    return Sesion(perfil, al_linea, al_error, al_estado, al_subtitulo=al_subtitulo, al_voz=al_voz)
 
 
 class PuenteSesion(QObject):
@@ -77,6 +80,8 @@ class PuenteSesion(QObject):
     linea = Signal(object)
     subtitulo = Signal(str)
     """Lo que tienen que mostrar los subtítulos: la línea que suena, a medida que se traduce."""
+    voz = Signal(object)
+    """Cómo va la lectura (`EstadoVoz`): si queda algo en la cola."""
     error = Signal(str)
     iniciada = Signal()
     terminada = Signal()
@@ -110,7 +115,7 @@ class PuenteSesion(QObject):
             return
         self.esperar()  # por si aún se está parando la anterior
         sesion = self._fabrica(
-            perfil, self.linea.emit, self.error.emit, self.estado.emit, self.subtitulo.emit
+            perfil, self.linea.emit, self.error.emit, self.estado.emit, self.subtitulo.emit, self.voz.emit
         )
         with self._cerrojo:
             self._sesion, self._arrancando = sesion, True
